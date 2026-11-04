@@ -9,6 +9,7 @@
     <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- html2canvas để xuất ảnh JPG -->
+    <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style> 
         body { -webkit-tap-highlight-color: transparent; } 
@@ -86,7 +87,7 @@
         </div>
     </div>
 
-    <!-- MODAL THÊM KHÁCH HÀNG MỚI (GPS 1 CHẠM TỰ ĐỘNG) -->
+    <!-- MODAL THÊM KHÁCH HÀNG MỚI (LƯU ĐƯỢC CẢ GÕ TAY & GPS) -->
     <div id="sale-add-store-modal" class="fixed inset-0 bg-slate-950/85 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
         <div class="bg-theme-card border border-theme-border rounded-3xl max-w-lg w-full p-5 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto hide-scrollbar text-theme-text">
             <div class="flex justify-between items-center border-b border-theme-border pb-3">
@@ -111,26 +112,26 @@
                 
                 <div class="bg-amber-500/10 border border-amber-500/30 p-3.5 rounded-2xl space-y-2">
                     <div class="flex items-center justify-between flex-wrap gap-2">
-                        <label class="block text-xs font-bold text-amber-500 uppercase"><i class="fa-solid fa-location-crosshairs mr-1"></i> Tọa độ GPS & Địa chỉ tự động</label>
+                        <label class="block text-xs font-bold text-amber-500 uppercase"><i class="fa-solid fa-location-crosshairs mr-1"></i> Tọa độ GPS (Tự động hoặc Gõ tay)</label>
                         <button type="button" onclick="getRealGPSAndReverseGeocode()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs shadow flex items-center space-x-1.5 transition">
                             <i class="fa-solid fa-crosshairs"></i><span>Lấy GPS thiết bị (1 Chạm)</span>
                         </button>
                     </div>
-                    <div class="text-xs font-mono">Tọa độ đang bắt: <span id="s-gps-text" class="text-amber-500 font-bold">[Chưa có tọa độ]</span></div>
+                    <div class="text-xs font-mono">Tọa độ hiện tại: <span id="s-gps-text" class="text-amber-500 font-bold">[20.4356, 106.3275] (Mặc định hoặc GPS)</span></div>
                 </div>
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                        <label class="block text-xs font-semibold uppercase mb-1">Tỉnh / Thành phố *</label>
-                        <input type="text" id="s-city" class="w-full px-4 py-2.5 rounded-xl bg-theme-input border border-theme-border text-theme-text text-sm focus:outline-none" placeholder="Tự động điền...">
+                        <label class="block text-xs font-semibold uppercase mb-1">Tỉnh / Thành phố * (Có thể gõ tay)</label>
+                        <input type="text" id="s-city" class="w-full px-4 py-2.5 rounded-xl bg-theme-input border border-theme-border text-theme-text text-sm focus:outline-none" placeholder="VD: Thái Bình, Nam Định...">
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold uppercase mb-1">Quận / Huyện *</label>
-                        <input type="text" id="s-district" class="w-full px-4 py-2.5 rounded-xl bg-theme-input border border-theme-border text-theme-text text-sm focus:outline-none" placeholder="Tự động điền...">
+                        <label class="block text-xs font-semibold uppercase mb-1">Quận / Huyện * (Có thể gõ tay)</label>
+                        <input type="text" id="s-district" class="w-full px-4 py-2.5 rounded-xl bg-theme-input border border-theme-border text-theme-text text-sm focus:outline-none" placeholder="VD: TP Thái Bình, Vũ Thư...">
                     </div>
                 </div>
                 <div>
-                    <label class="block text-xs font-semibold uppercase mb-1">Địa chỉ chi tiết *</label>
+                    <label class="block text-xs font-semibold uppercase mb-1">Địa chỉ chi tiết * (Có thể gõ tay)</label>
                     <input type="text" id="s-address" class="w-full px-4 py-2.5 rounded-xl bg-theme-input border border-theme-border text-theme-text text-sm focus:outline-none" placeholder="Số nhà, tên đường, thôn xóm...">
                 </div>
 
@@ -575,7 +576,7 @@
         let warehouseSubTab = 'all'; 
         let authMode = 'login', currentLivePos = { lat: 20.4356, lng: 106.3275 };
         let activeCheckinStoreId = null, capturedImageData = null, mediaStream = null;
-        let newStoreLat = 0, newStoreLng = 0, storePhotoData = null, storeMediaStream = null;
+        let newStoreLat = 20.4356, newStoreLng = 106.3275, storePhotoData = null, storeMediaStream = null;
         let activeOrderStoreId = null, lastOrderShareText = "";
         let selectedCategory = '', uploadedProductImg = '', prodMediaStream = null;
         let orderPhotos = [], orderMediaStream = null;
@@ -852,7 +853,7 @@
                         </div>
                         <div class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                             <button onclick="openSaleAddModal()" class="w-full sm:w-auto px-4 py-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-xl text-xs transition shadow-lg flex items-center justify-center space-x-2">
-                                <i class="fa-solid fa-map-pin"></i><span>+ Thêm Mới (GPS 1 Chạm)</span>
+                                <i class="fa-solid fa-map-pin"></i><span>+ Thêm Mới (GPS hoặc Gõ tay)</span>
                             </button>
                             ${isAdmin ? `
                                 <button onclick="openAdminAddStoreModal()" class="w-full sm:w-auto px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs transition shadow-lg flex items-center justify-center space-x-2">
@@ -880,7 +881,7 @@
                     </div>
 
                     <div class="space-y-4">
-                        ${filteredStores.length === 0 ? `<div class="bg-theme-card border border-theme-border p-10 text-center rounded-2xl opacity-75 text-sm">Không tìm thấy điểm bán nào trên Cloud.</div>` : ''}
+                        ${filteredStores.length === 0 ? `<div class="bg-theme-card border border-theme-border p-10 text-center rounded-2xl opacity-75 text-sm">Không tìm thấy điểm bán nào trên hệ thống.</div>` : ''}
                         ${filteredStores.map((s, index) => {
                             const distance = s.calculatedDistance;
                             const canCheckin = distance <= (db.settings?.checkinRadius || 50);
@@ -2161,7 +2162,6 @@
                 canvas.toBlob(blob => {
                     let file = new File([blob], "hoa-don.jpg", { type: "image/jpeg" });
                     
-                    // Luôn tự động tải ảnh về máy trước để đảm bảo không bao giờ mất ảnh
                     let link = document.createElement('a');
                     link.href = URL.createObjectURL(blob);
                     link.download = `Hoa-Don-${Date.now()}.jpg`;
@@ -2187,8 +2187,10 @@
         function openSaleAddModal() {
             document.getElementById('sale-add-store-modal').classList.remove('hidden');
             ['s-shop','s-owner','s-phone','s-address','s-city','s-district'].forEach(i=>document.getElementById(i).value='');
+            newStoreLat = 20.4356;
+            newStoreLng = 106.3275;
+            document.getElementById('s-gps-text').innerText = '[20.4356, 106.3275] (Mặc định - Có thể gõ tay địa chỉ bên dưới)';
             storePhotoData = null; document.getElementById('store-img-preview-box').classList.add('hidden');
-            document.getElementById('s-gps-text').innerText = '[Chưa có tọa độ - Bấm "Lấy GPS thiết bị"]';
             initStoreCamera();
         }
         function closeSaleAddModal() { document.getElementById('sale-add-store-modal').classList.add('hidden'); if(storeMediaStream){storeMediaStream.getTracks().forEach(t=>t.stop());storeMediaStream=null;} }
@@ -2212,11 +2214,11 @@
                     if(gpsText) gpsText.innerText = `[${newStoreLat.toFixed(6)}, ${newStoreLng.toFixed(6)}]`;
                     reverseGeocode(newStoreLat, newStoreLng);
                 }, (err) => {
-                    alert('Không thể lấy GPS tự động từ thiết bị! Vui lòng kiểm tra quyền vị trí.');
-                    if(gpsText) gpsText.innerText = '[Lỗi lấy GPS]';
+                    alert('Không thể lấy GPS tự động! Bạn vẫn có thể gõ trực tiếp Tỉnh/Thành phố và Địa chỉ bằng tay.');
+                    if(gpsText) gpsText.innerText = '[Dùng tọa độ mặc định - Gõ tay địa chỉ bên dưới]';
                 }, {enableHighAccuracy:true, timeout: 10000, maximumAge: 0});
             } else {
-                alert('Trình duyệt không hỗ trợ GPS!');
+                alert('Trình duyệt không hỗ trợ GPS! Bạn có thể gõ tay.');
             }
         }
 
@@ -2264,13 +2266,39 @@
             if(storeMediaStream){storeMediaStream.getTracks().forEach(t=>t.stop());storeMediaStream=null;}
         }
         function handleSaleAddStore() {
-            const n=document.getElementById('s-shop').value.trim(), o=document.getElementById('s-owner').value.trim(), p=document.getElementById('s-phone').value.trim(), c=document.getElementById('s-city').value.trim(), d=document.getElementById('s-district').value.trim(), a=document.getElementById('s-address').value.trim();
-            if(!n||!o||!p||!a||!c||!d){alert('Vui lòng điền đủ thông tin Tỉnh/Thành phố và các mục khác!');return;} 
-            if(newStoreLat === 0 || newStoreLng === 0){alert('Vui lòng bấm nút "Lấy GPS thiết bị" để xác định tọa độ điểm bán!');return;}
-            if(!storePhotoData){alert('Chưa chụp ảnh cửa hàng!');return;}
+            const n = document.getElementById('s-shop').value.trim();
+            const o = document.getElementById('s-owner').value.trim();
+            const p = document.getElementById('s-phone').value.trim();
+            const c = document.getElementById('s-city').value.trim();
+            const d = document.getElementById('s-district').value.trim();
+            const a = document.getElementById('s-address').value.trim();
+
+            if(!n || !o || !p) { alert('Vui lòng điền Tên Shop, Tên Chủ shop và Số điện thoại!'); return; }
+            if(!c || !d || !a) { alert('Vui lòng điền đầy đủ Tỉnh/Thành phố, Quận/Huyện và Địa chỉ chi tiết (hoặc gõ tay vào ô)!'); return; }
+            if(!storePhotoData) { alert('Vui lòng chụp ảnh cửa hàng trước khi lưu!'); return; }
             
-            db.stores.unshift({id:Date.now(),name:n,owner:o,phone:p,city:c,district:d,address:a,lat:newStoreLat,lng:newStoreLng,visited:false,note:'',photo:'',checkinTime:null,storePhoto:storePhotoData,lastVisitDate:'',visitTimeStr:''});
-            saveData(); alert('Lưu Khách Hàng Thành Công!'); closeSaleAddModal(); render();
+            db.stores.unshift({
+                id: Date.now(), 
+                name: n, 
+                owner: o, 
+                phone: p, 
+                city: c, 
+                district: d, 
+                address: a, 
+                lat: newStoreLat, 
+                lng: newStoreLng, 
+                visited: false, 
+                note: '', 
+                photo: '', 
+                checkinTime: null, 
+                storePhoto: storePhotoData, 
+                lastVisitDate: '', 
+                visitTimeStr: ''
+            });
+            saveData(); 
+            alert('Lưu Khách Hàng Thành Công!'); 
+            closeSaleAddModal(); 
+            render();
         }
 
         function openCheckinModal(id) {
