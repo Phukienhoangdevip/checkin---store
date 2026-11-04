@@ -8,7 +8,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- html2canvas để xuất ảnh báo cáo -->
+    <!-- html2canvas để xuất ảnh JPG -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style> 
         body { -webkit-tap-highlight-color: transparent; } 
@@ -20,7 +20,7 @@
 
     <div id="app" class="flex-1 flex flex-col"></div>
 
-    <!-- MODAL CHỌN CÁCH THAY ĐỔI ẢNH (TẢI LÊN HOẶC MỞ CAMERA) -->
+    <!-- MODAL CHỌN CÁCH THAY ĐỔI ẢNH -->
     <div id="global-photo-edit-modal" class="fixed inset-0 bg-slate-950/85 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
         <div class="bg-theme-card border border-theme-border rounded-3xl max-w-xs w-full p-5 space-y-3 shadow-2xl text-center text-theme-text">
             <h3 class="font-bold text-sm border-b border-theme-border pb-2"><i class="fa-solid fa-image text-amber-500 mr-2"></i>Chỉnh sửa / Đổi ảnh</h3>
@@ -28,7 +28,7 @@
             <button onclick="triggerGlobalUpload()" class="w-full py-3 bg-theme-input hover:opacity-80 text-theme-text font-bold rounded-xl text-xs flex items-center justify-center space-x-2 transition border border-theme-border">
                 <i class="fa-solid fa-upload text-blue-400"></i><span>1. Tải ảnh mới lên</span>
             </button>
-            <button onclick="triggerGlobalCamera()" class="w-full py-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-xl text-xs flex items-center justify-center space-x-2 transition shadow-lg">
+            <button onclick="triggerGlobalCamera()" class="w-full. py-3 w-full py-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-xl text-xs flex items-center justify-center space-x-2 transition shadow-lg">
                 <i class="fa-solid fa-camera text-slate-950"></i><span>2. Mở camera</span>
             </button>
             <button onclick="closeGlobalPhotoEditModal()" class="w-full py-2 bg-theme-input hover:opacity-80 text-theme-text font-semibold rounded-xl text-xs transition mt-1">Đóng</button>
@@ -46,7 +46,11 @@
                 <video id="global-cam-stream" autoplay playsinline class="w-full h-full object-cover"></video>
                 <canvas id="global-cam-canvas" class="hidden"></canvas>
             </div>
-            <button type="button" onclick="captureGlobalCamera()" class="w-full py-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-xl text-xs shadow-lg">Chụp ảnh ngay</button>
+            <div class="flex justify-center pt-2">
+                <button type="button" onclick="captureGlobalCamera()" class="w-14 h-14 bg-amber-500 hover:bg-amber-600 rounded-full flex items-center justify-center text-slate-950 shadow-lg transition active:scale-95 border-4 border-slate-900" title="Chụp ảnh">
+                    <i class="fa-solid fa-camera text-lg"></i>
+                </button>
+            </div>
         </div>
     </div>
 
@@ -61,7 +65,7 @@
                 <div class="relative bg-black rounded-2xl overflow-hidden aspect-video flex items-center justify-center border border-theme-border">
                     <video id="camera-stream" autoplay playsinline class="w-full h-full object-cover"></video>
                     <canvas id="camera-canvas" class="hidden"></canvas>
-                    <div id="camera-placeholder" class="absolute text-slate-400 text-xs text-center p-4">Đang khởi động camera chụp cửa hàng...</div>
+                    <div id="camera-placeholder" class="absolute text-slate-400 text-xs text-center p-4">Đang khởi động camera...</div>
                 </div>
                 <div id="photo-preview-container" class="hidden space-y-2">
                     <p class="text-xs font-semibold">Ảnh thực tế tại điểm bán:</p>
@@ -72,19 +76,21 @@
                     <input type="text" id="checkin-note" class="w-full px-4 py-3 rounded-xl bg-theme-input border border-theme-border text-theme-text text-sm focus:outline-none" placeholder="VD: Đã kiểm hàng, tư vấn phụ kiện mới...">
                 </div>
             </div>
-            <div class="flex flex-col gap-2 pt-2">
-                <button id="btn-capture" onclick="capturePhoto()" class="w-full py-3 bg-theme-input hover:opacity-80 font-bold rounded-xl text-xs transition border border-theme-border"><i class="fa-solid fa-camera mr-1"></i>Chụp ảnh cửa hàng</button>
+            <div class="flex flex-col items-center gap-2 pt-2">
+                <button id="btn-capture" onclick="capturePhoto()" class="w-14 h-14 bg-amber-500 hover:bg-amber-600 rounded-full flex items-center justify-center text-slate-950 shadow-lg transition active:scale-95 border-4 border-slate-900" title="Chụp ảnh">
+                    <i class="fa-solid fa-camera text-lg"></i>
+                </button>
                 <button id="btn-retake" onclick="startCamera()" class="hidden w-full py-3 bg-theme-input hover:opacity-80 font-bold rounded-xl text-xs transition border border-theme-border">Chụp lại ảnh</button>
-                <button id="btn-submit-checkin" onclick="confirmCheckin()" disabled class="w-full py-3 bg-amber-500 text-slate-950 font-bold rounded-xl text-xs opacity-50 cursor-not-allowed transition shadow-lg">Xác nhận Check-in (Bắt đầu đếm thời gian)</button>
+                <button id="btn-submit-checkin" onclick="confirmCheckin()" disabled class="w-full py-3 bg-amber-500 text-slate-950 font-bold rounded-xl text-xs opacity-50 cursor-not-allowed transition shadow-lg mt-1">Xác nhận Check-in</button>
             </div>
         </div>
     </div>
 
-    <!-- MODAL THÊM KHÁCH HÀNG MỚI (GPS THÔNG MINH) -->
+    <!-- MODAL THÊM KHÁCH HÀNG MỚI (GPS THỰC TẾ) -->
     <div id="sale-add-store-modal" class="fixed inset-0 bg-slate-950/85 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
         <div class="bg-theme-card border border-theme-border rounded-3xl max-w-lg w-full p-5 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto hide-scrollbar text-theme-text">
             <div class="flex justify-between items-center border-b border-theme-border pb-3">
-                <h3 class="font-bold text-sm sm:text-base"><i class="fa-solid fa-map-pin text-amber-500 mr-2"></i>Thêm Khách Hàng Mới (GPS Thông Minh)</h3>
+                <h3 class="font-bold text-sm sm:text-base"><i class="fa-solid fa-map-pin text-amber-500 mr-2"></i>Thêm Khách Hàng Mới (GPS Thực Tế)</h3>
                 <button onclick="closeSaleAddModal()" class="text-theme-text opacity-75 hover:opacity-100 p-2"><i class="fa-solid fa-xmark text-lg"></i></button>
             </div>
             <div class="space-y-3">
@@ -105,15 +111,15 @@
                 
                 <div class="bg-amber-500/10 border border-amber-500/30 p-3.5 rounded-2xl space-y-2">
                     <div class="flex items-center justify-between">
-                        <label class="block text-xs font-bold text-amber-500 uppercase"><i class="fa-solid fa-location-crosshairs mr-1"></i> Tọa độ GPS & Tự động điền địa chỉ</label>
-                        <button type="button" onclick="getGPSAndReverseGeocode()" class="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs shadow flex items-center space-x-1 transition">
-                            <i class="fa-solid fa-crosshairs"></i><span>Cập nhật GPS & Điền tự động</span>
+                        <label class="block text-xs font-bold text-amber-500 uppercase"><i class="fa-solid fa-location-crosshairs mr-1"></i> Tọa độ GPS & Địa chỉ hiện tại</label>
+                        <button type="button" onclick="getRealGPSAndReverseGeocode()" class="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs shadow flex items-center space-x-1 transition">
+                            <i class="fa-solid fa-crosshairs"></i><span>Lấy GPS thiết bị thực tế</span>
                         </button>
                     </div>
                     <div class="flex gap-2 pt-1">
-                        <input type="text" id="s-gmap-input" placeholder="Hoặc dán link Google Maps / tọa độ..." class="flex-1 px-3 py-2 rounded-xl bg-theme-input border border-theme-border text-theme-text text-xs" oninput="parseGoogleMapInput(this.value)" />
+                        <input type="text" id="s-gmap-input" placeholder="Hoặc dán link Google Maps / tọa độ chính xác..." class="flex-1 px-3 py-2 rounded-xl bg-theme-input border border-theme-border text-theme-text text-xs" oninput="parseGoogleMapInput(this.value)" />
                     </div>
-                    <div class="text-xs font-mono">Tọa độ chuẩn: <span id="s-gps-text" class="text-amber-500 font-bold">[20.4356, 106.3275]</span></div>
+                    <div class="text-xs font-mono">Tọa độ đang bắt: <span id="s-gps-text" class="text-amber-500 font-bold">[Đang lấy GPS...]</span></div>
                 </div>
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -141,10 +147,12 @@
                     <div id="store-img-preview-box" class="hidden">
                         <img id="store-img-preview" class="w-full h-40 object-cover rounded-xl border border-theme-border shadow-sm cursor-pointer" onclick="openGlobalPhotoEdit('store_new')" title="Nhấn để đổi ảnh" />
                     </div>
-                    <div class="flex gap-2">
-                        <button type="button" onclick="captureStorePhoto()" id="btn-snap-store" class="flex-1 py-3 bg-theme-input hover:opacity-80 font-bold rounded-xl text-xs border border-theme-border"><i class="fa-solid fa-camera mr-1"></i>Chụp ảnh cửa hàng</button>
-                        <button type="button" onclick="initStoreCamera()" id="btn-resnap-store" class="hidden flex-1 py-3 bg-theme-input hover:opacity-80 font-bold rounded-xl text-xs border border-theme-border">Chụp lại</button>
+                    <div class="flex justify-center pt-2">
+                        <button type="button" onclick="captureStorePhoto()" id="btn-snap-store" class="w-14 h-14 bg-amber-500 hover:bg-amber-600 rounded-full flex items-center justify-center text-slate-950 shadow-lg transition active:scale-95 border-4 border-slate-900" title="Chụp ảnh cửa hàng">
+                            <i class="fa-solid fa-camera text-lg"></i>
+                        </button>
                     </div>
+                    <button type="button" onclick="initStoreCamera()" id="btn-resnap-store" class="hidden w-full py-3 bg-theme-input hover:opacity-80 font-bold rounded-xl text-xs border border-theme-border">Chụp lại ảnh</button>
                 </div>
                 <button type="button" onclick="handleSaleAddStore()" class="w-full py-4 mt-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-xl text-sm transition shadow-lg">Lưu Khách Hàng Mới</button>
             </div>
@@ -231,11 +239,11 @@
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                         <label class="block text-xs font-semibold uppercase mb-1">Tỉnh / Thành phố *</label>
-                        <input type="text" id="a-city" value="Thành phố Thái Bình" class="w-full px-4 py-2.5 rounded-xl bg-theme-input border border-theme-border text-theme-text text-sm outline-none">
+                        <input type="text" id="a-city" value="" class="w-full px-4 py-2.5 rounded-xl bg-theme-input border border-theme-border text-theme-text text-sm outline-none" placeholder="Nhập tỉnh/thành phố...">
                     </div>
                     <div>
                         <label class="block text-xs font-semibold uppercase mb-1">Quận / Huyện *</label>
-                        <input type="text" id="a-district" value="TP. Thái Bình" class="w-full px-4 py-2.5 rounded-xl bg-theme-input border border-theme-border text-theme-text text-sm outline-none">
+                        <input type="text" id="a-district" value="" class="w-full px-4 py-2.5 rounded-xl bg-theme-input border border-theme-border text-theme-text text-sm outline-none" placeholder="Nhập quận/huyện...">
                     </div>
                 </div>
                 <div>
@@ -245,11 +253,11 @@
                 <div class="grid grid-cols-2 gap-3 pt-2">
                     <div>
                         <label class="block text-xs font-semibold uppercase mb-1">Vĩ độ (Lat)</label>
-                        <input type="text" id="a-lat" value="20.4356" class="w-full px-4 py-2.5 rounded-xl bg-black border border-theme-border text-xs outline-none">
+                        <input type="text" id="a-lat" value="0" class="w-full px-4 py-2.5 rounded-xl bg-black border border-theme-border text-xs outline-none">
                     </div>
                     <div>
                         <label class="block text-xs font-semibold uppercase mb-1">Kinh độ (Lng)</label>
-                        <input type="text" id="a-lng" value="106.3275" class="w-full px-4 py-2.5 rounded-xl bg-black border border-theme-border text-xs outline-none">
+                        <input type="text" id="a-lng" value="0" class="w-full px-4 py-2.5 rounded-xl bg-black border border-theme-border text-xs outline-none">
                     </div>
                 </div>
                 <button type="button" onclick="handleAdminAddStore()" class="w-full py-4 mt-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-sm transition shadow-lg uppercase tracking-wide">
@@ -289,19 +297,16 @@
                     </div>
                 </div>
 
-                <!-- 1. BÁO CÁO KHO HÀNG TRONG NGÀY -->
                 <div class="border-t border-amber-500/30 pt-3">
                     <p class="text-xs font-bold text-amber-400 mb-2 uppercase"><i class="fa-solid fa-boxes-packing mr-1"></i> Báo cáo kho hàng trong ngày:</p>
                     <div id="report-warehouse-summary" class="text-xs space-y-1.5 max-h-[140px] overflow-y-auto hide-scrollbar text-slate-200"></div>
                 </div>
 
-                <!-- 2. DANH SÁCH CỬA HÀNG MỚI THÊM -->
                 <div class="border-t border-amber-500/30 pt-3">
                     <p class="text-xs font-bold text-amber-400 mb-2 uppercase"><i class="fa-solid fa-store mr-1"></i> Danh sách cửa hàng mới thêm:</p>
                     <div id="report-new-stores-list" class="text-xs space-y-1.5 max-h-[140px] overflow-y-auto hide-scrollbar text-slate-200"></div>
                 </div>
 
-                <!-- 3. DANH SÁCH CHECK-IN & ĐƠN HÀNG (CÓ TỌA ĐỘ & DOANH THU TỪNG CỬA HÀNG) -->
                 <div class="border-t border-amber-500/30 pt-3">
                     <p class="text-xs font-bold text-emerald-400 mb-2 uppercase"><i class="fa-solid fa-clipboard-check mr-1"></i> Danh sách cửa hàng check-in & đơn hàng:</p>
                     <div id="report-checkin-stores-list" class="text-xs space-y-2 max-h-[180px] overflow-y-auto hide-scrollbar text-slate-200"></div>
@@ -313,11 +318,11 @@
             </div>
 
             <div class="flex flex-col sm:flex-row gap-2 pt-2">
-                <button onclick="downloadReportImage()" class="flex-1 py-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-xl text-xs transition shadow-lg flex items-center justify-center space-x-2">
-                    <i class="fa-solid fa-download"></i><span>Tải ảnh về máy</span>
+                <button onclick="downloadReportJpg()" class="flex-1 py-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-xl text-xs transition shadow-lg flex items-center justify-center space-x-2">
+                    <i class="fa-solid fa-download"></i><span>Tải ảnh JPG về máy</span>
                 </button>
                 <button onclick="shareReportToZalo()" class="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs transition shadow-lg flex items-center justify-center space-x-2">
-                    <i class="fa-solid fa-share-nodes"></i><span>Chia sẻ sang Zalo</span>
+                    <i class="fa-solid fa-share-nodes"></i><span>Chia sẻ ảnh sang Zalo</span>
                 </button>
             </div>
         </div>
@@ -409,7 +414,11 @@
                 <video id="prod-cam-stream" autoplay playsinline class="w-full h-full object-cover"></video>
                 <canvas id="prod-cam-canvas" class="hidden"></canvas>
             </div>
-            <button type="button" onclick="captureProductCamera()" class="w-full py-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-xl text-xs shadow-lg">Chụp ảnh ngay</button>
+            <div class="flex justify-center pt-2">
+                <button type="button" onclick="captureProductCamera()" class="w-14 h-14 bg-amber-500 hover:bg-amber-600 rounded-full flex items-center justify-center text-slate-950 shadow-lg transition active:scale-95 border-4 border-slate-900" title="Chụp ảnh">
+                    <i class="fa-solid fa-camera text-lg"></i>
+                </button>
+            </div>
         </div>
     </div>
 
@@ -436,10 +445,12 @@
                     <video id="order-cam-stream" autoplay playsinline class="w-full h-full object-cover"></video>
                     <canvas id="order-cam-canvas" class="hidden"></canvas>
                 </div>
-                <div class="flex gap-2">
-                    <button type="button" id="btn-open-order-cam" onclick="startOrderCamera()" class="flex-1 py-2.5 bg-theme-input hover:opacity-80 font-bold rounded-xl text-xs border border-theme-border"><i class="fa-solid fa-camera mr-1"></i> Mở camera chụp ảnh</button>
-                    <button type="button" id="btn-snap-order-photo" onclick="captureOrderPhoto()" class="hidden flex-1 py-2.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-xl text-xs"><i class="fa-solid fa-circle-dot mr-1"></i> Chụp ngay</button>
+                <div class="flex justify-center pt-2">
+                    <button type="button" id="btn-snap-order-photo" onclick="captureOrderPhoto()" class="hidden w-14 h-14 bg-amber-500 hover:bg-amber-600 rounded-full flex items-center justify-center text-slate-950 shadow-lg transition active:scale-95 border-4 border-slate-900" title="Chụp ngay">
+                        <i class="fa-solid fa-camera text-lg"></i>
+                    </button>
                 </div>
+                <button type="button" id="btn-open-order-cam" onclick="startOrderCamera()" class="w-full py-2.5 bg-theme-input hover:opacity-80 font-bold rounded-xl text-xs border border-theme-border"><i class="fa-solid fa-camera mr-1"></i> Mở camera chụp ảnh</button>
             </div>
 
             <div class="bg-black/40 p-4 rounded-2xl border border-amber-500/30 space-y-3">
@@ -474,15 +485,15 @@
                     <span class="text-xs opacity-75">Tổng tiền thanh toán (Sau chiết khấu):</span>
                     <div class="text-lg font-black text-amber-500" id="order-total-price">0 đ</div>
                 </div>
-                <button onclick="submitSalesOrder()" class="px-6 py-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-xl text-xs shadow-lg">Hoàn tất & Xuất Bill</button>
+                <button onclick="submitSalesOrder()" class="px-6 py-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-xl text-xs shadow-lg">Hoàn tất & Xuất Bill JPG</button>
             </div>
         </div>
     </div>
 
-    <!-- MODAL HIỂN THỊ BILL THANH TOÁN (CÓ NÚT CHIA SẺ ZALO TRỰC TIẾP) -->
+    <!-- MODAL HIỂN THỊ BILL THANH TOÁN (ẢNH JPG) -->
     <div id="bill-modal" class="fixed inset-0 bg-slate-950/85 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
         <div class="bg-theme-card border border-theme-border rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto text-theme-text">
-            <div class="text-center font-bold text-emerald-400 text-sm mb-1"><i class="fa-solid fa-circle-check mr-1"></i> Tạo đơn hàng và xuất Bill thành công!</div>
+            <div class="text-center font-bold text-emerald-400 text-sm mb-1"><i class="fa-solid fa-circle-check mr-1"></i> Tạo đơn hàng thành công (Đã xuất file JPG)!</div>
             <div id="invoice-card" class="bg-black border-2 border-amber-500/40 rounded-2xl p-5 space-y-3 text-slate-100 shadow-inner">
                 <div class="text-center border-b border-amber-500/30 pb-3">
                     <h2 class="font-black text-amber-400 uppercase text-sm tracking-wider">PHỤ KIỆN HOÀNG ĐẾ</h2>
@@ -506,12 +517,15 @@
                 </div>
                 <div class="text-center pt-2 text-[10px] text-slate-300 italic">Cảm ơn quý khách đã hợp tác cùng Phụ Kiện Hoàng Đế!</div>
             </div>
-            <div class="flex gap-2 pt-2">
-                <button onclick="shareBillToZaloDirect()" class="flex-1 py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs transition shadow-lg flex items-center justify-center space-x-2">
-                    <i class="fa-solid fa-share-nodes text-sm"></i><span>Chia sẻ sang Zalo</span>
+            <div class="flex flex-col sm:flex-row gap-2 pt-2">
+                <button onclick="downloadBillJpg()" class="flex-1 py-3.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-xl text-xs transition shadow-lg flex items-center justify-center space-x-2">
+                    <i class="fa-solid fa-download"></i><span>Tải ảnh JPG về máy</span>
                 </button>
-                <button onclick="closeBillModal()" class="px-5 py-3.5 bg-theme-input hover:opacity-85 font-bold rounded-xl text-xs transition border border-theme-border">Đóng</button>
+                <button onclick="shareBillToZaloDirect()" class="flex-1 py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs transition shadow-lg flex items-center justify-center space-x-2">
+                    <i class="fa-solid fa-share-nodes text-sm"></i><span>Chia sẻ ảnh sang Zalo</span>
+                </button>
             </div>
+            <button onclick="closeBillModal()" class="w-full py-2 bg-theme-input hover:opacity-85 font-semibold rounded-xl text-xs transition border border-theme-border">Đóng</button>
         </div>
     </div>
 
@@ -554,7 +568,7 @@
             warehouse: [],
             salesHistory: [],
             checkinHistory: [],
-            importHistory: [], // Lưu lịch sử nhập kho trong ngày
+            importHistory: [],
             settings: { checkinRadius: 50, requiredMinutes: 5 },
             categories: ['Cáp sạc', 'Củ sạc', 'Tai nghe', 'Kính cường lực', 'Ốp lưng']
         };
@@ -564,7 +578,7 @@
         let warehouseSubTab = 'all'; 
         let authMode = 'login', currentLivePos = { lat: 20.4356, lng: 106.3275 };
         let activeCheckinStoreId = null, capturedImageData = null, mediaStream = null;
-        let newStoreLat = 20.4356, newStoreLng = 106.3275, storePhotoData = null, storeMediaStream = null;
+        let newStoreLat = 0, newStoreLng = 0, storePhotoData = null, storeMediaStream = null;
         let activeOrderStoreId = null, lastOrderShareText = "";
         let selectedCategory = '', uploadedProductImg = '', prodMediaStream = null;
         let orderPhotos = [], orderMediaStream = null;
@@ -590,23 +604,13 @@
                 if(!u.permissions) u.permissions = { stores: true, master: true, warehouse: true, history: true };
             });
 
-            if(db.stores) {
-                const nowTime = Date.now();
-                db.stores.forEach(s => {
-                    if(s.checkinTime) {
-                        if(s.checkinTime > nowTime || (nowTime - s.checkinTime) > 86400000) {
-                            s.checkinTime = nowTime;
-                        }
-                    }
-                });
-            }
-
             if (!CLOUD_API_URL || CLOUD_API_URL.includes("DÁN_LINK")) { render(); return; }
             fetch(CLOUD_API_URL, { method: 'GET', redirect: 'follow' })
                 .then(res => res.json())
                 .then(data => {
-                    if (data && data.productsMaster) {
-                        db.productsMaster = data.productsMaster;
+                    if (data && data.users && data.users.length > 0) {
+                        db.users = data.users;
+                        db.productsMaster = data.productsMaster || [];
                         db.stores = data.stores || [];
                         db.warehouse = data.warehouse || [];
                         db.salesHistory = data.salesHistory || data.history || [];
@@ -617,15 +621,6 @@
 
                         db.users.forEach(u => {
                             if(!u.permissions) u.permissions = { stores: true, master: true, warehouse: true, history: true };
-                        });
-
-                        const nowTime = Date.now();
-                        db.stores.forEach(s => {
-                            if(s.checkinTime) {
-                                if(s.checkinTime > nowTime || (nowTime - s.checkinTime) > 86400000) {
-                                    s.checkinTime = nowTime;
-                                }
-                            }
                         });
                     }
                     render();
@@ -778,7 +773,8 @@
 
         function handleLogin(e) { 
             e.preventDefault(); 
-            const u = document.getElementById('login-user').value.trim(), p = document.getElementById('login-pass').value.trim(), found = db.users.find(x => x.username === u && x.password === p); 
+            const u = document.getElementById('login-user').value.trim(), p = document.getElementById('login-pass').value.trim();
+            const found = db.users.find(x => x.username.toLowerCase() === u.toLowerCase() && x.password === p); 
             if (!found) { alert('Sai thông tin tài khoản hoặc mật khẩu!'); return; } 
             currentUsername = found.username; 
             saveData(); 
@@ -788,7 +784,7 @@
         function handleRegister(e) { 
             e.preventDefault(); 
             const name = document.getElementById('reg-name').value.trim(), u = document.getElementById('reg-user').value.trim(), p = document.getElementById('reg-pass').value.trim(); 
-            if (db.users.some(x => x.username === u)) { alert('Tên đăng nhập đã tồn tại!'); return; } 
+            if (db.users.some(x => x.username.toLowerCase() === u.toLowerCase())) { alert('Tên đăng nhập đã tồn tại!'); return; } 
             db.users.push({ username: u, password: p, role: 'sale', status: 'pending', fullname: name, permissions: { stores: true, master: true, warehouse: true, history: true } }); 
             saveData(); 
             alert('Đăng ký thành công! Vui lòng chờ quản trị viên duyệt.'); 
@@ -833,9 +829,6 @@
             `;
         }
 
-        // ==========================================
-        // MỤC ĐIỂM BÁN: CHƯA GHÉ THĂM (GẦN NHẤT) LÊN TRÊN, ĐÃ GHÉ THĂM TRÔI XUỐNG DƯỚI
-        // ==========================================
         function renderStoresView() {
             const isAdmin = getCurrentUser().role === 'admin';
             const cities = [...new Set(db.stores.map(s => s.city))];
@@ -1463,7 +1456,7 @@
                             </h3>
                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <button onclick="openReportModal()" class="py-3.5 px-4 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-xl text-xs transition shadow-lg flex items-center justify-center space-x-2">
-                                    <i class="fa-solid fa-receipt"></i><span>Xuất báo cáo ngày</span>
+                                    <i class="fa-solid fa-receipt"></i><span>Xuất báo cáo ngày (JPG)</span>
                                 </button>
                                 <button onclick="clearHistoryOnly()" class="py-3.5 px-4 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-bold rounded-xl text-xs transition border border-rose-500/30 flex items-center justify-center space-x-2">
                                     <i class="fa-solid fa-trash-can"></i><span>Xóa bộ nhớ đệm (Lịch sử)</span>
@@ -1529,7 +1522,7 @@
             if(!username || !password || !fullname) { alert('Vui lòng điền đủ thông tin tài khoản!'); return; }
 
             if(!editUser) {
-                if(db.users.some(x => x.username === username)) { alert('Tên tài khoản đã tồn tại!'); return; }
+                if(db.users.some(x => x.username.toLowerCase() === username.toLowerCase())) { alert('Tên tài khoản đã tồn tại!'); return; }
                 db.users.push({
                     username, password, role: 'sale', status: 'approved', fullname,
                     permissions: { stores: true, master: true, warehouse: true, history: true }
@@ -1667,16 +1660,11 @@
             }
         }
 
-        // ==========================================
-        // XUẤT BÁO CÁO (CÓ TỌA ĐỘ, SỐ LƯỢNG ĐƠN HÀNG, DOANH THU TỪNG CỬA HÀNG VÀ BÁO CÁO KHO)
-        // ==========================================
         function openReportModal() {
             const todayStr = new Date().toLocaleDateString('vi-VN');
             document.getElementById('report-date-str').innerText = todayStr;
 
             let totalRevenue = 0, totalBills = 0;
-            
-            // Map doanh thu và đơn hàng theo tên cửa hàng
             let storeOrderSummary = {};
             (db.salesHistory || []).forEach(h => {
                 totalBills++;
@@ -1701,7 +1689,6 @@
             document.getElementById('report-total-bills').innerText = totalBills + ' đơn hàng';
             document.getElementById('report-total-visits').innerText = visitedStoresCount + ' cửa hàng đã ghé thăm';
 
-            // 1. Báo cáo kho hàng trong ngày (Nhập kho & Xuất đi)
             const warehouseSummaryContainer = document.getElementById('report-warehouse-summary');
             let importHtml = '';
             if(!db.importHistory || db.importHistory.length === 0) {
@@ -1731,7 +1718,6 @@
             }
             warehouseSummaryContainer.innerHTML = importHtml;
 
-            // 2. Danh sách cửa hàng mới thêm (Ở TRÊN)
             const newStoresContainer = document.getElementById('report-new-stores-list');
             if(!db.stores || db.stores.length === 0) {
                 newStoresContainer.innerHTML = `<div class="opacity-50 italic">Không có cửa hàng nào.</div>`;
@@ -1745,7 +1731,6 @@
                 `).join('');
             }
 
-            // 3. Danh sách cửa hàng check-in & đơn hàng (Ở DƯỚI) - Có đầy đủ Tọa độ GPS, SĐT, Địa chỉ, Số lượng đơn hàng & Doanh thu
             const checkinStoresContainer = document.getElementById('report-checkin-stores-list');
             if(!db.checkinHistory || db.checkinHistory.length === 0) {
                 checkinStoresContainer.innerHTML = `<div class="opacity-50 italic">Chưa có lịch sử check-in cửa hàng nào trong hôm nay.</div>`;
@@ -1781,21 +1766,21 @@
             document.getElementById('report-modal').classList.add('hidden');
         }
 
-        function downloadReportImage() {
+        function downloadReportJpg() {
             const card = document.getElementById('report-card');
-            html2canvas(card, { scale: 2 }).then(canvas => {
+            html2canvas(card, { scale: 2, backgroundColor: '#020617' }).then(canvas => {
                 let link = document.createElement('a');
-                link.download = `Bao-Cao-Phu-Kien-Hoang-De-${Date.now()}.png`;
-                link.href = canvas.toDataURL('image/png');
+                link.download = `Bao-Cao-Phu-Kien-Hoang-De-${Date.now()}.jpg`;
+                link.href = canvas.toDataURL('image/jpeg', 0.9);
                 link.click();
             });
         }
 
         function shareReportToZalo() {
             const card = document.getElementById('report-card');
-            html2canvas(card, { scale: 2 }).then(canvas => {
+            html2canvas(card, { scale: 2, backgroundColor: '#020617' }).then(canvas => {
                 canvas.toBlob(blob => {
-                    let file = new File([blob], "bao-cao.png", { type: "image/png" });
+                    let file = new File([blob], "bao-cao.jpg", { type: "image/jpeg" });
                     if(navigator.canShare && navigator.canShare({ files: [file] })) {
                         navigator.share({
                             files: [file],
@@ -1805,12 +1790,12 @@
                     } else {
                         let link = document.createElement('a');
                         link.href = URL.createObjectURL(blob);
-                        link.download = `Bao-Cao-${Date.now()}.png`;
+                        link.download = `Bao-Cao-${Date.now()}.jpg`;
                         link.click();
-                        alert('Đã tải ảnh báo cáo về máy! Đang mở Zalo để bạn gửi cho kế toán.');
+                        alert('Đã tải ảnh JPG báo cáo về máy! Đang mở Zalo để bạn gửi cho kế toán.');
                         window.location.href = "zalo://";
                     }
-                });
+                }, 'image/jpeg', 0.9);
             });
         }
 
@@ -1827,11 +1812,9 @@
 
         function openAdminAddStoreModal() {
             document.getElementById('admin-add-store-modal').classList.remove('hidden');
-            ['a-shop','a-owner','a-phone','a-address'].forEach(i=>document.getElementById(i).value='');
-            document.getElementById('a-city').value = 'Thành phố Thái Bình';
-            document.getElementById('a-district').value = 'TP. Thái Bình';
-            document.getElementById('a-lat').value = '20.4356';
-            document.getElementById('a-lng').value = '106.3275';
+            ['a-shop','a-owner','a-phone','a-address','a-city','a-district'].forEach(i=>document.getElementById(i).value='');
+            document.getElementById('a-lat').value = currentLivePos.lat.toFixed(6);
+            document.getElementById('a-lng').value = currentLivePos.lng.toFixed(6);
         }
         function closeAdminAddStoreModal() { document.getElementById('admin-add-store-modal').classList.add('hidden'); }
         function handleAdminAddStore() {
@@ -1845,8 +1828,8 @@
 
             db.stores.unshift({
                 id: Date.now(), name, owner, phone, city, district, address,
-                lat: parseFloat(document.getElementById('a-lat').value) || 20.4356,
-                lng: parseFloat(document.getElementById('a-lng').value) || 106.3275,
+                lat: parseFloat(document.getElementById('a-lat').value) || currentLivePos.lat,
+                lng: parseFloat(document.getElementById('a-lng').value) || currentLivePos.lng,
                 visited: false, note: '', photo: '', checkinTime: null, storePhoto: '', lastVisitDate: '', visitTimeStr: ''
             });
             saveData(); alert('Thêm khách hàng thủ công thành công!');
@@ -2169,29 +2152,52 @@
         }
 
         function closeBillModal(){ document.getElementById('bill-modal').classList.add('hidden'); }
+        
+        function downloadBillJpg() {
+            const card = document.getElementById('invoice-card');
+            html2canvas(card, { scale: 2, backgroundColor: '#000000' }).then(canvas => {
+                let link = document.createElement('a');
+                link.download = `Hoa-Don-Phu-Kien-Hoang-De-${Date.now()}.jpg`;
+                link.href = canvas.toDataURL('image/jpeg', 0.9);
+                link.click();
+            });
+        }
+
         function shareBillToZaloDirect(){ 
-            if(navigator.share){
-                navigator.share({title:'Hóa đơn bán hàng', text:lastOrderShareText}).catch(()=>{});
-            } else {
-                navigator.clipboard.writeText(lastOrderShareText).then(()=>{
-                    alert('Đã copy nội dung hóa đơn! Đang mở Zalo để bạn dán gửi.');
-                    window.location.href = "zalo://";
-                });
-            } 
+            const card = document.getElementById('invoice-card');
+            html2canvas(card, { scale: 2, backgroundColor: '#000000' }).then(canvas => {
+                canvas.toBlob(blob => {
+                    let file = new File([blob], "hoa-don.jpg", { type: "image/jpeg" });
+                    if(navigator.canShare && navigator.canShare({ files: [file] })) {
+                        navigator.share({
+                            files: [file],
+                            title: 'Hóa đơn bán hàng Phụ Kiện Hoàng Đế',
+                            text: lastOrderShareText
+                        }).catch(() => {});
+                    } else {
+                        let link = document.createElement('a');
+                        link.href = URL.createObjectURL(blob);
+                        link.download = `Hoa-Don-${Date.now()}.jpg`;
+                        link.click();
+                        alert('Đã tải ảnh hóa đơn JPG về máy! Đang mở Zalo để bạn gửi cho khách hàng.');
+                        window.location.href = "zalo://";
+                    }
+                }, 'image/jpeg', 0.9);
+            });
         }
 
         function openSaleAddModal() {
             document.getElementById('sale-add-store-modal').classList.remove('hidden');
             ['s-shop','s-owner','s-phone','s-address','s-city','s-district','s-gmap-input'].forEach(i=>document.getElementById(i).value='');
             storePhotoData = null; document.getElementById('store-img-preview-box').classList.add('hidden');
-            getGPSAndReverseGeocode(); 
+            getRealGPSAndReverseGeocode(); 
             initStoreCamera();
         }
         function closeSaleAddModal() { document.getElementById('sale-add-store-modal').classList.add('hidden'); if(storeMediaStream){storeMediaStream.getTracks().forEach(t=>t.stop());storeMediaStream=null;} }
         
-        function getGPSAndReverseGeocode() {
+        function getRealGPSAndReverseGeocode() {
             const gpsText = document.getElementById('s-gps-text');
-            if(gpsText) gpsText.innerText = 'Đang quét tọa độ & phân giải địa chỉ...';
+            if(gpsText) gpsText.innerText = 'Đang bắt GPS thực tế từ thiết bị của bạn...';
             
             if(navigator.geolocation){
                 navigator.geolocation.getCurrentPosition(p => {
@@ -2199,14 +2205,12 @@
                     newStoreLng = p.coords.longitude;
                     if(gpsText) gpsText.innerText = `[${newStoreLat.toFixed(6)}, ${newStoreLng.toFixed(6)}]`;
                     reverseGeocode(newStoreLat, newStoreLng);
-                }, () => {
-                    newStoreLat = 20.4356;
-                    newStoreLng = 106.3275;
-                    if(gpsText) gpsText.innerText = `[${newStoreLat.toFixed(6)}, ${newStoreLng.toFixed(6)}] (Mặc định)`;
-                    reverseGeocode(newStoreLat, newStoreLng);
-                }, {enableHighAccuracy:true, timeout: 10000, maximumAge: 0});
+                }, (err) => {
+                    alert('Không thể lấy GPS tự động từ thiết bị! Vui lòng bật định vị hoặc dán link Google Maps vào ô bên dưới.');
+                    if(gpsText) gpsText.innerText = '[Chưa có tọa độ GPS]';
+                }, {enableHighAccuracy:true, timeout: 15000, maximumAge: 0});
             } else {
-                reverseGeocode(newStoreLat, newStoreLng);
+                alert('Trình duyệt của bạn không hỗ trợ định vị GPS!');
             }
         }
 
@@ -2218,8 +2222,8 @@
             .then(data => {
                 if(data && data.address) {
                     const addr = data.address;
-                    const city = addr.city || addr.province || addr.state || addr.region || 'Thành phố Thái Bình';
-                    const district = addr.county || addr.district || addr.city_district || addr.town || 'TP. Thái Bình';
+                    const city = addr.city || addr.province || addr.state || addr.region || '';
+                    const district = addr.county || addr.district || addr.city_district || addr.town || '';
                     
                     const road = addr.road || '';
                     const houseNumber = addr.house_number || '';
@@ -2231,16 +2235,13 @@
                     else if(suburb) detailedAddress = suburb;
                     else detailedAddress = data.display_name ? data.display_name.split(',')[0] : '';
 
-                    document.getElementById('s-city').value = city;
-                    document.getElementById('s-district').value = district;
+                    if(city) document.getElementById('s-city').value = city;
+                    if(district) document.getElementById('s-district').value = district;
                     if(detailedAddress) document.getElementById('s-address').value = detailedAddress;
                 }
             })
             .catch(err => {
-                console.log('Sử dụng định vị nội bộ:', err);
-                document.getElementById('s-city').value = "Thành phố Thái Bình";
-                document.getElementById('s-district').value = "TP. Thái Bình";
-                document.getElementById('s-address').value = "Đường Lê Quý Đôn";
+                console.log('Không phân giải được địa chỉ tự động:', err);
             });
         }
 
@@ -2258,7 +2259,10 @@
         }
         function handleSaleAddStore() {
             const n=document.getElementById('s-shop').value.trim(), o=document.getElementById('s-owner').value.trim(), p=document.getElementById('s-phone').value.trim(), c=document.getElementById('s-city').value.trim(), d=document.getElementById('s-district').value.trim(), a=document.getElementById('s-address').value.trim();
-            if(!n||!o||!p||!a||!c||!d){alert('Vui lòng điền đủ thông tin Tỉnh/Thành phố và các mục khác!');return;} if(!storePhotoData){alert('Chưa chụp ảnh cửa hàng!');return;}
+            if(!n||!o||!p||!a||!c||!d){alert('Vui lòng điền đủ thông tin Tỉnh/Thành phố và các mục khác!');return;} 
+            if(newStoreLat === 0 || newStoreLng === 0){alert('Vui lòng bấm nút "Lấy GPS thiết bị thực tế" hoặc dán link Google Maps để xác định đúng tọa độ điểm bán!');return;}
+            if(!storePhotoData){alert('Chưa chụp ảnh cửa hàng!');return;}
+            
             db.stores.unshift({id:Date.now(),name:n,owner:o,phone:p,city:c,district:d,address:a,lat:newStoreLat,lng:newStoreLng,visited:false,note:'',photo:'',checkinTime:null,storePhoto:storePhotoData,lastVisitDate:'',visitTimeStr:''});
             saveData(); alert('Lưu Khách Hàng Thành Công!'); closeSaleAddModal(); render();
         }
@@ -2336,9 +2340,21 @@
         }
 
         function calculateDistance(lat1,lon1,lat2,lon2){ const R=6371e3,dLat=(lat2-lat1)*Math.PI/180,dLon=(lon2-lon1)*Math.PI/180,a=Math.sin(dLat/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2; return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a)); }
-        function requestUserGPS(){ const b = document.getElementById('gps-btn-text'); if(b) b.innerText = "Đang lấy..."; navigator.geolocation.getCurrentPosition(p=>{currentLivePos={lat:p.coords.latitude,lng:p.coords.longitude};alert('GPS OK!'); if(b) b.innerText="GPS OK"; render();},()=>{alert('Lỗi GPS!'); if(b) b.innerText="Lỗi GPS";},{enableHighAccuracy:true}); }
-        function approveUser(u){db.users.find(x=>x.username===u).status='approved'; saveData(); render();}
-        function rejectUser(u){db.users=db.users.filter(x=>x.username!==u); saveData(); render();}
+        function requestUserGPS(){ 
+            const b = document.getElementById('gps-btn-text'); 
+            if(b) b.innerText = "Đang lấy..."; 
+            navigator.geolocation.getCurrentPosition(p => {
+                currentLivePos = { lat: p.coords.latitude, lng: p.coords.longitude };
+                alert(`Đã cập nhật GPS hiện tại: [${currentLivePos.lat.toFixed(4)}, ${currentLivePos.lng.toFixed(4)}]`); 
+                if(b) b.innerText="GPS OK"; 
+                render();
+            }, () => {
+                alert('Không thể lấy GPS từ thiết bị của bạn!'); 
+                if(b) b.innerText="Lỗi GPS";
+            }, {enableHighAccuracy:true, timeout: 10000}); 
+        }
+        function approveUser(u){db.users.find(x=>x.username === u).status='approved'; saveData(); render();}
+        function rejectUser(u){db.users=db.users.filter(x=>x.username !== u); saveData(); render();}
 
         setInterval(() => {
             const user = getCurrentUser();
