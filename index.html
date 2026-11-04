@@ -28,7 +28,7 @@
             <button onclick="triggerGlobalUpload()" class="w-full py-3 bg-theme-input hover:opacity-80 text-theme-text font-bold rounded-xl text-xs flex items-center justify-center space-x-2 transition border border-theme-border">
                 <i class="fa-solid fa-upload text-blue-400"></i><span>1. Tải ảnh mới lên</span>
             </button>
-            <button onclick="triggerGlobalCamera()" class="w-full. py-3 w-full py-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-xl text-xs flex items-center justify-center space-x-2 transition shadow-lg">
+            <button onclick="triggerGlobalCamera()" class="w-full py-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-xl text-xs flex items-center justify-center space-x-2 transition shadow-lg">
                 <i class="fa-solid fa-camera text-slate-950"></i><span>2. Mở camera</span>
             </button>
             <button onclick="closeGlobalPhotoEditModal()" class="w-full py-2 bg-theme-input hover:opacity-80 text-theme-text font-semibold rounded-xl text-xs transition mt-1">Đóng</button>
@@ -86,11 +86,11 @@
         </div>
     </div>
 
-    <!-- MODAL THÊM KHÁCH HÀNG MỚI (GPS THỰC TẾ) -->
+    <!-- MODAL THÊM KHÁCH HÀNG MỚI (GPS 1 CHẠM TỰ ĐỘNG) -->
     <div id="sale-add-store-modal" class="fixed inset-0 bg-slate-950/85 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
         <div class="bg-theme-card border border-theme-border rounded-3xl max-w-lg w-full p-5 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto hide-scrollbar text-theme-text">
             <div class="flex justify-between items-center border-b border-theme-border pb-3">
-                <h3 class="font-bold text-sm sm:text-base"><i class="fa-solid fa-map-pin text-amber-500 mr-2"></i>Thêm Khách Hàng Mới (GPS Thực Tế)</h3>
+                <h3 class="font-bold text-sm sm:text-base"><i class="fa-solid fa-map-pin text-amber-500 mr-2"></i>Thêm Khách Hàng Mới</h3>
                 <button onclick="closeSaleAddModal()" class="text-theme-text opacity-75 hover:opacity-100 p-2"><i class="fa-solid fa-xmark text-lg"></i></button>
             </div>
             <div class="space-y-3">
@@ -110,26 +110,23 @@
                 </div>
                 
                 <div class="bg-amber-500/10 border border-amber-500/30 p-3.5 rounded-2xl space-y-2">
-                    <div class="flex items-center justify-between">
-                        <label class="block text-xs font-bold text-amber-500 uppercase"><i class="fa-solid fa-location-crosshairs mr-1"></i> Tọa độ GPS & Địa chỉ hiện tại</label>
-                        <button type="button" onclick="getRealGPSAndReverseGeocode()" class="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs shadow flex items-center space-x-1 transition">
-                            <i class="fa-solid fa-crosshairs"></i><span>Lấy GPS thiết bị thực tế</span>
+                    <div class="flex items-center justify-between flex-wrap gap-2">
+                        <label class="block text-xs font-bold text-amber-500 uppercase"><i class="fa-solid fa-location-crosshairs mr-1"></i> Tọa độ GPS & Địa chỉ tự động</label>
+                        <button type="button" onclick="getRealGPSAndReverseGeocode()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs shadow flex items-center space-x-1.5 transition">
+                            <i class="fa-solid fa-crosshairs"></i><span>Lấy GPS thiết bị (1 Chạm)</span>
                         </button>
                     </div>
-                    <div class="flex gap-2 pt-1">
-                        <input type="text" id="s-gmap-input" placeholder="Hoặc dán link Google Maps / tọa độ chính xác..." class="flex-1 px-3 py-2 rounded-xl bg-theme-input border border-theme-border text-theme-text text-xs" oninput="parseGoogleMapInput(this.value)" />
-                    </div>
-                    <div class="text-xs font-mono">Tọa độ đang bắt: <span id="s-gps-text" class="text-amber-500 font-bold">[Đang lấy GPS...]</span></div>
+                    <div class="text-xs font-mono">Tọa độ đang bắt: <span id="s-gps-text" class="text-amber-500 font-bold">[Chưa có tọa độ]</span></div>
                 </div>
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                         <label class="block text-xs font-semibold uppercase mb-1">Tỉnh / Thành phố *</label>
-                        <input type="text" id="s-city" class="w-full px-4 py-2.5 rounded-xl bg-theme-input border border-theme-border text-theme-text text-sm focus:outline-none" placeholder="VD: Thái Bình, Hà Nội...">
+                        <input type="text" id="s-city" class="w-full px-4 py-2.5 rounded-xl bg-theme-input border border-theme-border text-theme-text text-sm focus:outline-none" placeholder="Tự động điền...">
                     </div>
                     <div>
                         <label class="block text-xs font-semibold uppercase mb-1">Quận / Huyện *</label>
-                        <input type="text" id="s-district" class="w-full px-4 py-2.5 rounded-xl bg-theme-input border border-theme-border text-theme-text text-sm focus:outline-none" placeholder="VD: TP. Thái Bình...">
+                        <input type="text" id="s-district" class="w-full px-4 py-2.5 rounded-xl bg-theme-input border border-theme-border text-theme-text text-sm focus:outline-none" placeholder="Tự động điền...">
                     </div>
                 </div>
                 <div>
@@ -522,7 +519,7 @@
                     <i class="fa-solid fa-download"></i><span>Tải ảnh JPG về máy</span>
                 </button>
                 <button onclick="shareBillToZaloDirect()" class="flex-1 py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs transition shadow-lg flex items-center justify-center space-x-2">
-                    <i class="fa-solid fa-share-nodes text-sm"></i><span>Chia sẻ ảnh sang Zalo</span>
+                    <i class="fa-solid fa-share-nodes text-sm"></i><span>Gửi ảnh sang Zalo</span>
                 </button>
             </div>
             <button onclick="closeBillModal()" class="w-full py-2 bg-theme-input hover:opacity-85 font-semibold rounded-xl text-xs transition border border-theme-border">Đóng</button>
@@ -569,7 +566,7 @@
             salesHistory: [],
             checkinHistory: [],
             importHistory: [],
-            settings: { checkinRadius: 50, requiredMinutes: 5 },
+            settings: { checkinRadius: 50, requiredMinutes: 5, deviceMode: 'mobile' },
             categories: ['Cáp sạc', 'Củ sạc', 'Tai nghe', 'Kính cường lực', 'Ốp lưng']
         };
 
@@ -598,7 +595,8 @@
             if(!db.salesHistory && db.history) db.salesHistory = db.history;
             if(!db.checkinHistory) db.checkinHistory = [];
             if(!db.importHistory) db.importHistory = [];
-            if(!db.settings) db.settings = { checkinRadius: 50, requiredMinutes: 5 };
+            if(!db.settings) db.settings = { checkinRadius: 50, requiredMinutes: 5, deviceMode: 'mobile' };
+            if(!db.settings.deviceMode) db.settings.deviceMode = 'mobile';
 
             db.users.forEach(u => {
                 if(!u.permissions) u.permissions = { stores: true, master: true, warehouse: true, history: true };
@@ -616,7 +614,10 @@
                         db.salesHistory = data.salesHistory || data.history || [];
                         db.checkinHistory = data.checkinHistory || [];
                         db.importHistory = data.importHistory || [];
-                        if(data.settings) db.settings = data.settings;
+                        if(data.settings) {
+                            db.settings = data.settings;
+                            if(!db.settings.deviceMode) db.settings.deviceMode = 'mobile';
+                        }
                         if (data.categories && data.categories.length > 0) db.categories = data.categories;
 
                         db.users.forEach(u => {
@@ -690,16 +691,6 @@
                     table tr th { background-color: #020617 !important; color: #94a3b8 !important; }
                     table tr td { border-color: #1e293b !important; }
                 `;
-            }
-        }
-
-        function parseGoogleMapInput(inputStr) {
-            let match = inputStr.trim().match(/(-?\d+\.\d+),\s*(-?\d+\.\d+)/) || inputStr.trim().match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
-            if (match) { 
-                newStoreLat = parseFloat(match[1]); 
-                newStoreLng = parseFloat(match[2]); 
-                document.getElementById('s-gps-text').innerText = `[${newStoreLat.toFixed(6)}, ${newStoreLng.toFixed(6)}]`;
-                reverseGeocode(newStoreLat, newStoreLng);
             }
         }
 
@@ -808,7 +799,7 @@
                         </div>
                         <div>
                             <h1 class="font-black text-xs sm:text-sm uppercase tracking-wider">PHỤ KIỆN HOÀNG ĐẾ</h1>
-                            <p class="text-[11px] sm:text-xs opacity-75">Nhân sự: <span class="font-bold text-amber-500">${user.fullname}</span></p>
+                            <p class="text-[11px] sm:text-xs opacity-75">Nhân sự: <span class="font-bold text-amber-500">${user.fullname}</span> (${db.settings?.deviceMode === 'pc' ? 'Chế độ PC' : 'Chế độ Mobile'})</p>
                         </div>
                     </div>
                     <div class="flex space-x-2 w-full sm:w-auto justify-end">
@@ -861,7 +852,7 @@
                         </div>
                         <div class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                             <button onclick="openSaleAddModal()" class="w-full sm:w-auto px-4 py-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-xl text-xs transition shadow-lg flex items-center justify-center space-x-2">
-                                <i class="fa-solid fa-map-pin"></i><span>+ Thêm Mới (GPS)</span>
+                                <i class="fa-solid fa-map-pin"></i><span>+ Thêm Mới (GPS 1 Chạm)</span>
                             </button>
                             ${isAdmin ? `
                                 <button onclick="openAdminAddStoreModal()" class="w-full sm:w-auto px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs transition shadow-lg flex items-center justify-center space-x-2">
@@ -1273,10 +1264,28 @@
         function renderSettingsView() {
             const user = getCurrentUser();
             const isAdmin = user.role === 'admin';
-            const s = db.settings || { checkinRadius: 50, requiredMinutes: 5 };
+            const s = db.settings || { checkinRadius: 50, requiredMinutes: 5, deviceMode: 'mobile' };
 
             return `
                 <div class="space-y-6 max-w-4xl mx-auto text-theme-text">
+                    <!-- CÀI ĐẶT CHẾ ĐỘ THIẾT BỊ (MOBILE / PC) -->
+                    <div class="bg-theme-card border border-theme-border p-6 rounded-3xl shadow-xl space-y-4">
+                        <h3 class="font-bold text-base flex items-center space-x-2 border-b border-theme-border pb-3">
+                            <i class="fa-solid fa-laptop-mobile text-amber-500"></i><span>Cài đặt Chế độ Thiết bị (Mobile / PC)</span>
+                        </h3>
+                        <p class="text-xs opacity-75">Chọn chế độ phù hợp với thiết bị bạn đang sử dụng:</p>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <button onclick="setDeviceMode('mobile')" class="py-3.5 px-4 rounded-xl border text-xs font-bold transition flex items-center justify-center space-x-2 ${s.deviceMode==='mobile'?'bg-amber-500 text-slate-950 border-amber-500':'bg-theme-input border-theme-border'}">
+                                <i class="fa-solid fa-mobile-screen text-base"></i>
+                                <span>Chế độ Điện thoại (GPS chuẩn)</span>
+                            </button>
+                            <button onclick="setDeviceMode('pc')" class="py-3.5 px-4 rounded-xl border text-xs font-bold transition flex items-center justify-center space-x-2 ${s.deviceMode==='pc'?'bg-amber-500 text-slate-950 border-amber-500':'bg-theme-input border-theme-border'}">
+                                <i class="fa-solid fa-desktop text-base"></i>
+                                <span>Chế độ Máy tính / GitHub (Giả lập GPS)</span>
+                            </button>
+                        </div>
+                    </div>
+
                     ${isAdmin ? `
                         <div class="bg-theme-card border border-theme-border p-6 rounded-3xl shadow-xl space-y-4">
                             <h3 class="font-bold text-base flex items-center space-x-2 border-b border-theme-border pb-3">
@@ -1334,20 +1343,16 @@
                             </button>
                         </div>
                     </div>
-
-                    <div class="bg-theme-card border border-theme-border p-6 rounded-3xl shadow-xl space-y-4">
-                        <h3 class="font-bold text-base flex items-center space-x-2 border-b border-theme-border pb-3">
-                            <i class="fa-solid fa-server text-amber-500"></i><span>Kiểm tra dữ liệu & Kết nối hệ thống</span>
-                        </h3>
-                        <div class="space-y-3">
-                            <button onclick="runSystemCheck()" class="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs transition shadow flex items-center justify-center space-x-2">
-                                <i class="fa-solid fa-stethoscope"></i><span>Bấm vào đây để kiểm tra hệ thống ngay</span>
-                            </button>
-                            <div id="system-check-result" class="hidden bg-theme-input p-4 rounded-2xl border border-theme-border text-xs space-y-2"></div>
-                        </div>
-                    </div>
                 </div>
             `;
+        }
+
+        function setDeviceMode(mode) {
+            if(!db.settings) db.settings = {};
+            db.settings.deviceMode = mode;
+            saveData();
+            alert(`Đã chuyển sang ${mode === 'pc' ? 'Chế độ Máy tính / GitHub' : 'Chế độ Điện thoại'}!`);
+            render();
         }
 
         function handleSaveCheckinSettings() {
@@ -1380,20 +1385,6 @@
             saveData();
             alert('Đổi mật khẩu thành công!');
             ['set-old-pass','set-new-pass','set-confirm-pass'].forEach(id => document.getElementById(id).value = '');
-        }
-
-        function runSystemCheck() {
-            let appSize = new Blob([JSON.stringify(db)]).size;
-            let sizeKb = (appSize / 1024).toFixed(2);
-            let resBox = document.getElementById('system-check-result');
-            resBox.classList.remove('hidden');
-            resBox.innerHTML = `
-                <div class="font-bold text-amber-500 mb-1"><i class="fa-solid fa-circle-check mr-1"></i> KẾT QUẢ KIỂM TRA HỆ THỐNG:</div>
-                <div>1. <b>Sao lưu dữ liệu (Backup):</b> Hoạt động tốt (Đã lưu tự động trên LocalStorage & Cloud).</div>
-                <div>2. <b>Kết nối Google Sheet (Cloud):</b> Đã liên kết API endpoint (${CLOUD_API_URL.substring(0, 35)}...).</div>
-                <div>3. <b>Dung lượng Web App:</b> Đang sử dụng <b>${sizeKb} KB</b> / 5000 KB (Dung lượng rất thoải mái).</div>
-                <div>4. <b>Trạng thái hệ thống:</b> Toàn bộ cơ sở dữ liệu ổn định, không có lỗi xung đột.</div>
-            `;
         }
 
         function renderAdminView() {
@@ -1781,6 +1772,11 @@
             html2canvas(card, { scale: 2, backgroundColor: '#020617' }).then(canvas => {
                 canvas.toBlob(blob => {
                     let file = new File([blob], "bao-cao.jpg", { type: "image/jpeg" });
+                    let link = document.createElement('a');
+                    link.href = URL.createObjectURL(blob);
+                    link.download = `Bao-Cao-${Date.now()}.jpg`;
+                    link.click();
+
                     if(navigator.canShare && navigator.canShare({ files: [file] })) {
                         navigator.share({
                             files: [file],
@@ -1788,11 +1784,7 @@
                             text: 'Gửi kế toán báo cáo doanh thu và thị trường trong ngày!'
                         }).catch(() => {});
                     } else {
-                        let link = document.createElement('a');
-                        link.href = URL.createObjectURL(blob);
-                        link.download = `Bao-Cao-${Date.now()}.jpg`;
-                        link.click();
-                        alert('Đã tải ảnh JPG báo cáo về máy! Đang mở Zalo để bạn gửi cho kế toán.');
+                        alert('Đã tải ảnh báo cáo về máy! Đang mở Zalo để bạn gửi cho kế toán.');
                         window.location.href = "zalo://";
                     }
                 }, 'image/jpeg', 0.9);
@@ -2168,18 +2160,24 @@
             html2canvas(card, { scale: 2, backgroundColor: '#000000' }).then(canvas => {
                 canvas.toBlob(blob => {
                     let file = new File([blob], "hoa-don.jpg", { type: "image/jpeg" });
+                    
+                    // Luôn tự động tải ảnh về máy trước để đảm bảo không bao giờ mất ảnh
+                    let link = document.createElement('a');
+                    link.href = URL.createObjectURL(blob);
+                    link.download = `Hoa-Don-${Date.now()}.jpg`;
+                    link.click();
+
                     if(navigator.canShare && navigator.canShare({ files: [file] })) {
                         navigator.share({
                             files: [file],
                             title: 'Hóa đơn bán hàng Phụ Kiện Hoàng Đế',
                             text: lastOrderShareText
-                        }).catch(() => {});
+                        }).catch(() => {
+                            alert('Đã tải ảnh hóa đơn JPG về máy! Vui lòng mở Zalo và gửi ảnh vừa tải cho khách hàng.');
+                            window.location.href = "zalo://";
+                        });
                     } else {
-                        let link = document.createElement('a');
-                        link.href = URL.createObjectURL(blob);
-                        link.download = `Hoa-Don-${Date.now()}.jpg`;
-                        link.click();
-                        alert('Đã tải ảnh hóa đơn JPG về máy! Đang mở Zalo để bạn gửi cho khách hàng.');
+                        alert('Đã tải ảnh hóa đơn JPG về máy thành công! Đang mở Zalo để bạn gửi cho khách hàng.');
                         window.location.href = "zalo://";
                     }
                 }, 'image/jpeg', 0.9);
@@ -2188,16 +2186,24 @@
 
         function openSaleAddModal() {
             document.getElementById('sale-add-store-modal').classList.remove('hidden');
-            ['s-shop','s-owner','s-phone','s-address','s-city','s-district','s-gmap-input'].forEach(i=>document.getElementById(i).value='');
+            ['s-shop','s-owner','s-phone','s-address','s-city','s-district'].forEach(i=>document.getElementById(i).value='');
             storePhotoData = null; document.getElementById('store-img-preview-box').classList.add('hidden');
-            getRealGPSAndReverseGeocode(); 
+            document.getElementById('s-gps-text').innerText = '[Chưa có tọa độ - Bấm "Lấy GPS thiết bị"]';
             initStoreCamera();
         }
         function closeSaleAddModal() { document.getElementById('sale-add-store-modal').classList.add('hidden'); if(storeMediaStream){storeMediaStream.getTracks().forEach(t=>t.stop());storeMediaStream=null;} }
-        
+
         function getRealGPSAndReverseGeocode() {
             const gpsText = document.getElementById('s-gps-text');
-            if(gpsText) gpsText.innerText = 'Đang bắt GPS thực tế từ thiết bị của bạn...';
+            if(db.settings?.deviceMode === 'pc') {
+                newStoreLat = 20.4356;
+                newStoreLng = 106.3275;
+                if(gpsText) gpsText.innerText = `[${newStoreLat.toFixed(6)}, ${newStoreLng.toFixed(6)}] (PC Demo)`;
+                reverseGeocode(newStoreLat, newStoreLng);
+                return;
+            }
+
+            if(gpsText) gpsText.innerText = 'Đang bắt GPS thực tế từ thiết bị...';
             
             if(navigator.geolocation){
                 navigator.geolocation.getCurrentPosition(p => {
@@ -2206,11 +2212,11 @@
                     if(gpsText) gpsText.innerText = `[${newStoreLat.toFixed(6)}, ${newStoreLng.toFixed(6)}]`;
                     reverseGeocode(newStoreLat, newStoreLng);
                 }, (err) => {
-                    alert('Không thể lấy GPS tự động từ thiết bị! Vui lòng bật định vị hoặc dán link Google Maps vào ô bên dưới.');
-                    if(gpsText) gpsText.innerText = '[Chưa có tọa độ GPS]';
-                }, {enableHighAccuracy:true, timeout: 15000, maximumAge: 0});
+                    alert('Không thể lấy GPS tự động từ thiết bị! Vui lòng kiểm tra quyền vị trí.');
+                    if(gpsText) gpsText.innerText = '[Lỗi lấy GPS]';
+                }, {enableHighAccuracy:true, timeout: 10000, maximumAge: 0});
             } else {
-                alert('Trình duyệt của bạn không hỗ trợ định vị GPS!');
+                alert('Trình duyệt không hỗ trợ GPS!');
             }
         }
 
@@ -2260,7 +2266,7 @@
         function handleSaleAddStore() {
             const n=document.getElementById('s-shop').value.trim(), o=document.getElementById('s-owner').value.trim(), p=document.getElementById('s-phone').value.trim(), c=document.getElementById('s-city').value.trim(), d=document.getElementById('s-district').value.trim(), a=document.getElementById('s-address').value.trim();
             if(!n||!o||!p||!a||!c||!d){alert('Vui lòng điền đủ thông tin Tỉnh/Thành phố và các mục khác!');return;} 
-            if(newStoreLat === 0 || newStoreLng === 0){alert('Vui lòng bấm nút "Lấy GPS thiết bị thực tế" hoặc dán link Google Maps để xác định đúng tọa độ điểm bán!');return;}
+            if(newStoreLat === 0 || newStoreLng === 0){alert('Vui lòng bấm nút "Lấy GPS thiết bị" để xác định tọa độ điểm bán!');return;}
             if(!storePhotoData){alert('Chưa chụp ảnh cửa hàng!');return;}
             
             db.stores.unshift({id:Date.now(),name:n,owner:o,phone:p,city:c,district:d,address:a,lat:newStoreLat,lng:newStoreLng,visited:false,note:'',photo:'',checkinTime:null,storePhoto:storePhotoData,lastVisitDate:'',visitTimeStr:''});
@@ -2270,7 +2276,7 @@
         function openCheckinModal(id) {
             const store = db.stores.find(s=>String(s.id)===String(id)), d = calculateDistance(currentLivePos.lat,currentLivePos.lng,store.lat,store.lng);
             const radius = db.settings?.checkinRadius || 50;
-            if(d>radius){alert(`Quá xa (${Math.round(d)}m)! Tiến lại gần cửa hàng hơn để check-in.`);return;}
+            if(d>radius && db.settings?.deviceMode !== 'pc'){alert(`Quá xa (${Math.round(d)}m)! Tiến lại gần cửa hàng hơn để check-in.`);return;}
             activeCheckinStoreId = id; capturedImageData = null;
             document.getElementById('photo-modal').classList.remove('hidden'); document.getElementById('photo-preview-container').classList.add('hidden'); document.getElementById('btn-capture').classList.remove('hidden'); document.getElementById('btn-retake').classList.add('hidden'); document.getElementById('btn-submit-checkin').disabled=true; document.getElementById('btn-submit-checkin').classList.add('opacity-50');
             startCamera();
@@ -2302,8 +2308,8 @@
             
             const currentDist = calculateDistance(currentLivePos.lat, currentLivePos.lng, s.lat, s.lng);
             const radius = db.settings?.checkinRadius || 50;
-            if(currentDist > radius) {
-                alert(`Không thể Check-out! Bạn đang ở cách cửa hàng ${Math.round(currentDist)}m (vượt quá bán kính cho phép ${radius}m). Vui lòng di chuyển lại gần điểm bán để thực hiện Checkout.`);
+            if(currentDist > radius && db.settings?.deviceMode !== 'pc') {
+                alert(`Không thể Check-out! Bạn đang ở cách cửa hàng ${Math.round(currentDist)}m (vượt quá bán kính cho phép ${radius}m).`);
                 return;
             }
 
@@ -2312,7 +2318,7 @@
             if(rawElapsedSec < 0 || rawElapsedSec > 86400) rawElapsedSec = reqMins * 60;
 
             const elapsedMinutes = Math.floor(rawElapsedSec / 60); 
-            if(elapsedMinutes < reqMins){
+            if(elapsedMinutes < reqMins && db.settings?.deviceMode !== 'pc'){
                 alert(`Chưa đủ thời gian tối thiểu (${reqMins} phút). Vui lòng đợi thêm.`);
                 return;
             } 
@@ -2335,7 +2341,7 @@
                 photo: s.photo
             }); 
             saveData(); 
-            alert('Check-out thành công (Đã khớp GPS tại điểm bán)! Đã lưu vào lịch sử check-in.'); 
+            alert('Check-out thành công! Đã lưu vào lịch sử check-in.'); 
             render(); 
         }
 
@@ -2349,7 +2355,7 @@
                 if(b) b.innerText="GPS OK"; 
                 render();
             }, () => {
-                alert('Không thể lấy GPS từ thiết bị của bạn!'); 
+                alert('Không thể lấy GPS. Vui lòng bật định vị trên thiết bị.');
                 if(b) b.innerText="Lỗi GPS";
             }, {enableHighAccuracy:true, timeout: 10000}); 
         }
