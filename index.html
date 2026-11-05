@@ -527,6 +527,15 @@
         </div>
     </div>
 
+    <!-- MODAL XEM ẢNH (DỰ PHÒNG KHI KHÔNG CHIA SẺ ĐƯỢC) -->
+    <div id="image-viewer-modal" class="fixed inset-0 bg-slate-950/90 z-[60] hidden flex items-center justify-center p-4">
+        <div class="bg-theme-card border border-theme-border rounded-3xl max-w-md w-full p-5 space-y-3 shadow-2xl max-h-[92vh] overflow-y-auto text-theme-text">
+            <p id="viewer-msg" class="text-xs font-semibold text-amber-500 text-center"></p>
+            <img id="viewer-img" class="w-full rounded-xl border border-theme-border" />
+            <button onclick="document.getElementById('image-viewer-modal').classList.add('hidden')" class="w-full py-3 bg-amber-500 text-slate-950 font-bold rounded-xl text-xs">Đóng</button>
+        </div>
+    </div>
+
     <!-- MODAL THÊM / SỬA TÀI KHOẢN SALE (ADMIN) -->
     <div id="admin-user-modal" class="fixed inset-0 bg-slate-950/85 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
         <div class="bg-theme-card border border-theme-border rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl text-theme-text">
@@ -587,7 +596,7 @@
         let globalTargetId = null;
         let globalTargetId2 = null;
         let globalCamStreamObj = null;
-        let currentGpsAccuracy = null, hasRealGPS = false, gpsCaptured = false, lastGpsRender = 0, gpsWatchId = null;
+        let lastGpsTime = 0, currentGpsAccuracy = null, hasRealGPS = false, gpsCaptured = false, lastGpsRender = 0, gpsWatchId = null;
 
         function getCurrentUser() { return currentUsername ? db.users.find(u => u.username === currentUsername) || null : null; }
 
@@ -941,7 +950,7 @@
                                             </div>
                                         </div>
                                         <div class="text-right flex flex-col items-end">
-                                            <span class="px-2.5 py-1 rounded-full text-[11px] font-semibold whitespace-nowrap ${isTodayVisited?'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30':isCheckedIn?'bg-blue-500/20 text-blue-400 border border-blue-500/30 animate-pulse':'bg-amber-500/20 text-amber-500 border border-amber-500/30'}">
+                                            <span id="cd-badge-${s.id}" class="px-2.5 py-1 rounded-full text-[11px] font-semibold whitespace-nowrap ${isTodayVisited?'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30':isCheckedIn?'bg-blue-500/20 text-blue-400 border border-blue-500/30 animate-pulse':'bg-amber-500/20 text-amber-500 border border-amber-500/30'}">
                                                 ${isTodayVisited?'<i class="fa-solid fa-check mr-1"></i> Đã ghé thăm':isCheckedIn?`Đang làm việc (${elapsedMinutes}p)`:'Chưa ghé'}
                                             </span>
                                             ${isTodayVisited && s.visitTimeStr ? `<span class="text-[10px] opacity-60 mt-1">${s.visitTimeStr}</span>` : ''}
@@ -952,9 +961,9 @@
                                         <div class="bg-blue-950/60 border border-blue-800/60 p-3.5 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-blue-200">
                                             <div class="space-y-0.5">
                                                 <div class="font-bold flex items-center"><i class="fa-solid fa-stopwatch mr-1.5 text-blue-400"></i> Đang đếm ngược thời gian tại điểm bán (Yêu cầu tối thiểu ${requiredMins} phút)</div>
-                                                <div class="opacity-75">${canCheckout ? 'Đã đủ thời gian! Bấm Checkout để kiểm tra GPS.' : `Còn lại: ${Math.floor(remainingSeconds/60)} phút ${remainingSeconds%60} giây`}</div>
+                                                <div id="cd-text-${s.id}" class="opacity-75">${canCheckout ? 'Đã đủ thời gian! Bấm Checkout để kiểm tra GPS.' : `Còn lại: ${Math.floor(remainingSeconds/60)} phút ${remainingSeconds%60} giây`}</div>
                                             </div>
-                                            <button onclick="doCheckout(${s.id})" ${canCheckout?'':'disabled'} class="w-full sm:w-auto px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow transition ${canCheckout?'':'opacity-50 cursor-not-allowed'}">
+                                            <button id="cd-btn-${s.id}" onclick="doCheckout(${s.id})" ${canCheckout?'':'disabled'} class="w-full sm:w-auto px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow transition ${canCheckout?'':'opacity-50 cursor-not-allowed'}">
                                                 ${canCheckout?'Bấm Check-out':'Đang tính giờ...'}
                                             </button>
                                         </div>
@@ -1782,45 +1791,64 @@
             }
 
             document.getElementById('report-modal').classList.remove('hidden');
+            setTimeout(() => prepareShare('report','report-card','#020617','Bao-Cao-'+Date.now()+'.jpg'), 500);
         }
 
         function closeReportModal() {
             document.getElementById('report-modal').classList.add('hidden');
         }
 
-        function downloadReportJpg() {
-            const card = document.getElementById('report-card');
-            html2canvas(card, { scale: 2, backgroundColor: '#020617' }).then(canvas => {
-                let link = document.createElement('a');
-                link.download = `Bao-Cao-Phu-Kien-Hoang-De-${Date.now()}.jpg`;
-                link.href = canvas.toDataURL('image/jpeg', 0.9);
-                link.click();
-            });
-        }
-
-        function shareReportToZalo() {
-            const card = document.getElementById('report-card');
-            html2canvas(card, { scale: 2, backgroundColor: '#020617' }).then(canvas => {
+        let shareCache = {};
+        function prepareShare(key, elId, bg, filename) {
+            shareCache[key] = null;
+            const el = document.getElementById(elId);
+            if (!el || typeof html2canvas === 'undefined') return;
+            html2canvas(el, {
+                scale: 2, backgroundColor: bg, useCORS: true, logging: false,
+                onclone: (doc) => {
+                    doc.querySelectorAll('#' + elId + ' [class*="max-h-"]').forEach(e => { e.style.maxHeight = 'none'; e.style.overflow = 'visible'; });
+                }
+            }).then(canvas => {
                 canvas.toBlob(blob => {
-                    let file = new File([blob], "bao-cao.jpg", { type: "image/jpeg" });
-                    let link = document.createElement('a');
-                    link.href = URL.createObjectURL(blob);
-                    link.download = `Bao-Cao-${Date.now()}.jpg`;
-                    link.click();
-
-                    if(navigator.canShare && navigator.canShare({ files: [file] })) {
-                        navigator.share({
-                            files: [file],
-                            title: 'Báo cáo doanh thu Phụ Kiện Hoàng Đế',
-                            text: 'Gửi kế toán báo cáo doanh thu và thị trường trong ngày!'
-                        }).catch(() => {});
-                    } else {
-                        alert('Đã tải ảnh báo cáo về máy! Đang mở Zalo để bạn gửi cho kế toán.');
-                        window.location.href = "zalo://";
-                    }
+                    if (!blob) return;
+                    shareCache[key] = { blob, dataUrl: canvas.toDataURL('image/jpeg', 0.9), file: new File([blob], filename, { type: 'image/jpeg' }) };
                 }, 'image/jpeg', 0.9);
-            });
+            }).catch(err => console.warn('Không tạo được ảnh', err));
         }
+
+        function showImageViewer(dataUrl, msg) {
+            document.getElementById('viewer-img').src = dataUrl;
+            document.getElementById('viewer-msg').innerText = msg || 'Nhấn giữ vào ảnh → chọn "Lưu ảnh" hoặc "Chia sẻ" rồi gửi qua Zalo.';
+            document.getElementById('image-viewer-modal').classList.remove('hidden');
+        }
+
+        function saveImageFromCache(key, filename) {
+            const c = shareCache[key];
+            if (!c) { alert('Ảnh đang được tạo, vui lòng đợi 1-2 giây rồi bấm lại.'); return; }
+            const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+            if (isIOS) { showImageViewer(c.dataUrl, 'Nhấn giữ vào ảnh → chọn "Lưu vào Ảnh" để lưu về máy.'); return; }
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(c.blob); a.download = filename;
+            document.body.appendChild(a); a.click();
+            setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(a.href); }, 1500);
+            setTimeout(() => alert('Đã lưu ảnh vào thư mục Tải xuống của máy.'), 400);
+        }
+
+        function shareImageFromCache(key, title, text) {
+            const c = shareCache[key];
+            if (!c) { alert('Ảnh đang được tạo, vui lòng đợi 1-2 giây rồi bấm lại.'); return; }
+            if (navigator.canShare && navigator.canShare({ files: [c.file] })) {
+                navigator.share({ files: [c.file], title: title, text: text }).catch(err => {
+                    if (err && err.name === 'AbortError') return;
+                    showImageViewer(c.dataUrl);
+                });
+            } else {
+                showImageViewer(c.dataUrl, 'Thiết bị chưa hỗ trợ chia sẻ trực tiếp. Nhấn giữ vào ảnh → Lưu ảnh / Chia sẻ, rồi chọn Zalo để gửi.');
+            }
+        }
+
+        function downloadReportJpg() { saveImageFromCache('report', 'Bao-Cao-Phu-Kien-Hoang-De-' + Date.now() + '.jpg'); }
+        function shareReportToZalo() { shareImageFromCache('report', 'Báo cáo doanh thu Phụ Kiện Hoàng Đế', 'Báo cáo doanh thu và thị trường trong ngày'); }
 
         function clearHistoryOnly() {
             if(confirm("Bạn có chắc chắn muốn xóa toàn bộ Lịch sử bán hàng, Lịch sử check-in và Lịch sử nhập kho trong ngày không?\n\n(Lưu ý: Dữ liệu Khách hàng, Sản phẩm, Tồn kho và Sản phẩm thêm mới sẽ được GIỮ NGUYÊN tuyệt đối).")) {
@@ -2170,49 +2198,15 @@
             document.getElementById('bill-items-list').innerHTML = billHtml; 
             document.getElementById('bill-grand-total').innerText = grandTotal.toLocaleString() + ' đ';
             
-            document.getElementById('bill-modal').classList.remove('hidden'); 
+            document.getElementById('bill-modal').classList.remove('hidden');
+            setTimeout(() => prepareShare('bill','invoice-card','#000000','Hoa-Don-'+Date.now()+'.jpg'), 400); 
             render();
         }
 
         function closeBillModal(){ document.getElementById('bill-modal').classList.add('hidden'); }
-        
-        function downloadBillJpg() {
-            const card = document.getElementById('invoice-card');
-            html2canvas(card, { scale: 2, backgroundColor: '#000000' }).then(canvas => {
-                let link = document.createElement('a');
-                link.download = `Hoa-Don-Phu-Kien-Hoang-De-${Date.now()}.jpg`;
-                link.href = canvas.toDataURL('image/jpeg', 0.9);
-                link.click();
-            });
-        }
 
-        function shareBillToZaloDirect(){ 
-            const card = document.getElementById('invoice-card');
-            html2canvas(card, { scale: 2, backgroundColor: '#000000' }).then(canvas => {
-                canvas.toBlob(blob => {
-                    let file = new File([blob], "hoa-don.jpg", { type: "image/jpeg" });
-                    
-                    let link = document.createElement('a');
-                    link.href = URL.createObjectURL(blob);
-                    link.download = `Hoa-Don-${Date.now()}.jpg`;
-                    link.click();
-
-                    if(navigator.canShare && navigator.canShare({ files: [file] })) {
-                        navigator.share({
-                            files: [file],
-                            title: 'Hóa đơn bán hàng Phụ Kiện Hoàng Đế',
-                            text: lastOrderShareText
-                        }).catch(() => {
-                            alert('Đã tải ảnh hóa đơn JPG về máy! Vui lòng mở Zalo và gửi ảnh vừa tải cho khách hàng.');
-                            window.location.href = "zalo://";
-                        });
-                    } else {
-                        alert('Đã tải ảnh hóa đơn JPG về máy thành công! Đang mở Zalo để bạn gửi cho khách hàng.');
-                        window.location.href = "zalo://";
-                    }
-                }, 'image/jpeg', 0.9);
-            });
-        }
+        function downloadBillJpg() { saveImageFromCache('bill', 'Hoa-Don-Phu-Kien-Hoang-De-' + Date.now() + '.jpg'); }
+        function shareBillToZaloDirect() { shareImageFromCache('bill', 'Hóa đơn bán hàng Phụ Kiện Hoàng Đế', lastOrderShareText); }
 
         function openSaleAddModal() {
             document.getElementById('sale-add-store-modal').classList.remove('hidden');
@@ -2358,7 +2352,13 @@
         }
 
         function closePhotoModal() { document.getElementById('photo-modal').classList.add('hidden'); if(mediaStream){mediaStream.getTracks().forEach(t=>t.stop());mediaStream=null;} }
-        function startCamera() { const v = document.getElementById('camera-stream'); v.parentElement.classList.remove('hidden'); navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}}).then(s=>{mediaStream=s;v.srcObject=s;}); }
+        function startCamera() {
+            const v = document.getElementById('camera-stream');
+            v.parentElement.classList.remove('hidden');
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { alert('Trình duyệt không hỗ trợ camera! Hãy mở bằng Chrome/Safari qua https.'); return; }
+            navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}}).then(s=>{mediaStream=s;v.srcObject=s;}).catch(()=>alert('Không mở được camera! Hãy cấp quyền camera cho trình duyệt.'));
+        }
+
         function capturePhoto() {
             const v = document.getElementById('camera-stream'), c = document.getElementById('camera-canvas');
             c.width = 640; c.height = (v.videoHeight||480)*(640/(v.videoWidth||640)); c.getContext('2d').drawImage(v,0,0,c.width,c.height);
@@ -2417,6 +2417,39 @@
             render();
         }
 
+        function startGPSWatch() {
+            if (!navigator.geolocation || gpsWatchId !== null || db.settings?.deviceMode === 'pc') return;
+            gpsWatchId = navigator.geolocation.watchPosition(p => {
+                currentLivePos = { lat: p.coords.latitude, lng: p.coords.longitude };
+                currentGpsAccuracy = p.coords.accuracy;
+                hasRealGPS = true; lastGpsTime = Date.now();
+                const ae = document.activeElement;
+                const typing = ae && ['INPUT', 'SELECT', 'TEXTAREA'].includes(ae.tagName);
+                if (currentTab === 'stores' && !typing && Date.now() - lastGpsRender > 30000 && !document.querySelector('.fixed.inset-0.z-50:not(.hidden)')) {
+                    lastGpsRender = Date.now();
+                    render();
+                }
+            }, () => {}, { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 });
+        }
+
+        function getFreshPosition() {
+            return new Promise(resolve => {
+                if (db.settings?.deviceMode === 'pc' || !navigator.geolocation) { resolve(null); return; }
+                if (hasRealGPS && Date.now() - lastGpsTime < 20000) { resolve(true); return; }
+                navigator.geolocation.getCurrentPosition(p => {
+                    currentLivePos = { lat: p.coords.latitude, lng: p.coords.longitude };
+                    currentGpsAccuracy = p.coords.accuracy;
+                    hasRealGPS = true; lastGpsTime = Date.now();
+                    resolve(p);
+                }, () => resolve(null), { enableHighAccuracy: true, timeout: 8000, maximumAge: 5000 });
+            });
+        }
+
+        function effectiveDistance(store) {
+            const d = calculateDistance(currentLivePos.lat, currentLivePos.lng, store.lat, store.lng);
+            return Math.max(0, d - Math.min(currentGpsAccuracy || 0, 30));
+        }
+
         function calculateDistance(lat1,lon1,lat2,lon2){ const R=6371e3,dLat=(lat2-lat1)*Math.PI/180,dLon=(lon2-lon1)*Math.PI/180,a=Math.sin(dLat/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2; return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a)); }
         function requestUserGPS(){ 
             const b = document.getElementById('gps-btn-text'); 
@@ -2436,12 +2469,25 @@
         function rejectUser(u){db.users=db.users.filter(x=>x.username !== u); saveData(); render();}
 
         setInterval(() => {
-            const user = getCurrentUser();
-            if(user && currentTab === 'stores') {
-                const activeCheckin = db.stores.find(s => s.checkinTime && !s.visited);
-                if(activeCheckin) { render(); }
-            }
+            if (!getCurrentUser() || currentTab !== 'stores') return;
+            const reqSec = (db.settings?.requiredMinutes || 5) * 60;
+            const today = new Date().toDateString();
+            db.stores.forEach(s => {
+                if (!s.checkinTime || (s.visited && s.lastVisitDate === today)) return;
+                let el = Math.floor((Date.now() - s.checkinTime) / 1000);
+                if (el < 0 || el > 86400) el = 0;
+                const rem = Math.max(0, reqSec - el);
+                const t = document.getElementById('cd-text-' + s.id);
+                const b = document.getElementById('cd-btn-' + s.id);
+                const bd = document.getElementById('cd-badge-' + s.id);
+                if (!t || !b) return;
+                if (rem === 0 && b.disabled) { render(); return; }
+                if (rem > 0) t.innerText = `Còn lại: ${Math.floor(rem / 60)} phút ${rem % 60} giây`;
+                if (bd) bd.innerText = `Đang làm việc (${Math.floor(el / 60)}p)`;
+            });
         }, 1000);
+
+        
 
         loadCloudData();
         startGPSWatch();
