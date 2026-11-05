@@ -8,7 +8,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- html2canvas để xuất ảnh báo cáo -->
+    <!-- html2canvas để xuất ảnh JPG -->
+    
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style> 
         body { -webkit-tap-highlight-color: transparent; } 
@@ -46,7 +47,11 @@
                 <video id="global-cam-stream" autoplay playsinline class="w-full h-full object-cover"></video>
                 <canvas id="global-cam-canvas" class="hidden"></canvas>
             </div>
-            <button type="button" onclick="captureGlobalCamera()" class="w-full py-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-xl text-xs shadow-lg">Chụp ảnh ngay</button>
+            <div class="flex justify-center pt-2">
+                <button type="button" onclick="captureGlobalCamera()" class="w-14 h-14 bg-amber-500 hover:bg-amber-600 rounded-full flex items-center justify-center text-slate-950 shadow-lg transition active:scale-95 border-4 border-slate-900" title="Chụp ảnh">
+                    <i class="fa-solid fa-camera text-lg"></i>
+                </button>
+            </div>
         </div>
     </div>
 
@@ -61,7 +66,7 @@
                 <div class="relative bg-black rounded-2xl overflow-hidden aspect-video flex items-center justify-center border border-theme-border">
                     <video id="camera-stream" autoplay playsinline class="w-full h-full object-cover"></video>
                     <canvas id="camera-canvas" class="hidden"></canvas>
-                    <div id="camera-placeholder" class="absolute text-slate-400 text-xs text-center p-4">Đang khởi động camera chụp cửa hàng...</div>
+                    <div id="camera-placeholder" class="absolute text-slate-400 text-xs text-center p-4">Đang khởi động camera...</div>
                 </div>
                 <div id="photo-preview-container" class="hidden space-y-2">
                     <p class="text-xs font-semibold">Ảnh thực tế tại điểm bán:</p>
@@ -72,19 +77,21 @@
                     <input type="text" id="checkin-note" class="w-full px-4 py-3 rounded-xl bg-theme-input border border-theme-border text-theme-text text-sm focus:outline-none" placeholder="VD: Đã kiểm hàng, tư vấn phụ kiện mới...">
                 </div>
             </div>
-            <div class="flex flex-col gap-2 pt-2">
-                <button id="btn-capture" onclick="capturePhoto()" class="w-full py-3 bg-theme-input hover:opacity-80 font-bold rounded-xl text-xs transition border border-theme-border"><i class="fa-solid fa-camera mr-1"></i>Chụp ảnh cửa hàng</button>
+            <div class="flex flex-col items-center gap-2 pt-2">
+                <button id="btn-capture" onclick="capturePhoto()" class="w-14 h-14 bg-amber-500 hover:bg-amber-600 rounded-full flex items-center justify-center text-slate-950 shadow-lg transition active:scale-95 border-4 border-slate-900" title="Chụp ảnh">
+                    <i class="fa-solid fa-camera text-lg"></i>
+                </button>
                 <button id="btn-retake" onclick="startCamera()" class="hidden w-full py-3 bg-theme-input hover:opacity-80 font-bold rounded-xl text-xs transition border border-theme-border">Chụp lại ảnh</button>
-                <button id="btn-submit-checkin" onclick="confirmCheckin()" disabled class="w-full py-3 bg-amber-500 text-slate-950 font-bold rounded-xl text-xs opacity-50 cursor-not-allowed transition shadow-lg">Xác nhận Check-in (Bắt đầu đếm thời gian)</button>
+                <button id="btn-submit-checkin" onclick="confirmCheckin()" disabled class="w-full py-3 bg-amber-500 text-slate-950 font-bold rounded-xl text-xs opacity-50 cursor-not-allowed transition shadow-lg mt-1">Xác nhận Check-in</button>
             </div>
         </div>
     </div>
 
-    <!-- MODAL THÊM KHÁCH HÀNG MỚI (GPS THỰC TẾ 100%) -->
+    <!-- MODAL THÊM KHÁCH HÀNG MỚI (LƯU ĐƯỢC CẢ GÕ TAY & GPS) -->
     <div id="sale-add-store-modal" class="fixed inset-0 bg-slate-950/85 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
         <div class="bg-theme-card border border-theme-border rounded-3xl max-w-lg w-full p-5 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto hide-scrollbar text-theme-text">
             <div class="flex justify-between items-center border-b border-theme-border pb-3">
-                <h3 class="font-bold text-sm sm:text-base"><i class="fa-solid fa-map-pin text-amber-500 mr-2"></i>Thêm Khách Hàng Mới (GPS Thực Tế)</h3>
+                <h3 class="font-bold text-sm sm:text-base"><i class="fa-solid fa-map-pin text-amber-500 mr-2"></i>Thêm Khách Hàng Mới</h3>
                 <button onclick="closeSaleAddModal()" class="text-theme-text opacity-75 hover:opacity-100 p-2"><i class="fa-solid fa-xmark text-lg"></i></button>
             </div>
             <div class="space-y-3">
@@ -104,30 +111,27 @@
                 </div>
                 
                 <div class="bg-amber-500/10 border border-amber-500/30 p-3.5 rounded-2xl space-y-2">
-                    <div class="flex items-center justify-between">
-                        <label class="block text-xs font-bold text-amber-500 uppercase"><i class="fa-solid fa-location-crosshairs mr-1"></i> Tọa độ GPS & Địa chỉ hiện tại</label>
-                        <button type="button" onclick="getRealGPSAndReverseGeocode()" class="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs shadow flex items-center space-x-1 transition">
-                            <i class="fa-solid fa-crosshairs"></i><span>Lấy GPS thiết bị thực tế</span>
+                    <div class="flex items-center justify-between flex-wrap gap-2">
+                        <label class="block text-xs font-bold text-amber-500 uppercase"><i class="fa-solid fa-location-crosshairs mr-1"></i> Tọa độ GPS (Tự động hoặc Gõ tay)</label>
+                        <button type="button" onclick="getRealGPSAndReverseGeocode()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs shadow flex items-center space-x-1.5 transition">
+                            <i class="fa-solid fa-crosshairs"></i><span>Lấy GPS thiết bị (1 Chạm)</span>
                         </button>
                     </div>
-                    <div class="flex gap-2 pt-1">
-                        <input type="text" id="s-gmap-input" placeholder="Hoặc dán link Google Maps / tọa độ chính xác..." class="flex-1 px-3 py-2 rounded-xl bg-theme-input border border-theme-border text-theme-text text-xs" oninput="parseGoogleMapInput(this.value)" />
-                    </div>
-                    <div class="text-xs font-mono">Tọa độ đang bắt: <span id="s-gps-text" class="text-amber-500 font-bold">[Đang lấy GPS...]</span></div>
+                    <div class="text-xs font-mono">Tọa độ hiện tại: <span id="s-gps-text" class="text-amber-500 font-bold">[20.4356, 106.3275] (Mặc định hoặc GPS)</span></div>
                 </div>
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                        <label class="block text-xs font-semibold uppercase mb-1">Tỉnh / Thành phố *</label>
-                        <input type="text" id="s-city" class="w-full px-4 py-2.5 rounded-xl bg-theme-input border border-theme-border text-theme-text text-sm focus:outline-none" placeholder="VD: Thái Bình, Hà Nội...">
+                        <label class="block text-xs font-semibold uppercase mb-1">Tỉnh / Thành phố * (Có thể gõ tay)</label>
+                        <input type="text" id="s-city" class="w-full px-4 py-2.5 rounded-xl bg-theme-input border border-theme-border text-theme-text text-sm focus:outline-none" placeholder="VD: Thái Bình, Nam Định...">
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold uppercase mb-1">Quận / Huyện *</label>
-                        <input type="text" id="s-district" class="w-full px-4 py-2.5 rounded-xl bg-theme-input border border-theme-border text-theme-text text-sm focus:outline-none" placeholder="VD: TP. Thái Bình...">
+                        <label class="block text-xs font-semibold uppercase mb-1">Quận / Huyện * (Có thể gõ tay)</label>
+                        <input type="text" id="s-district" class="w-full px-4 py-2.5 rounded-xl bg-theme-input border border-theme-border text-theme-text text-sm focus:outline-none" placeholder="VD: TP Thái Bình, Vũ Thư...">
                     </div>
                 </div>
                 <div>
-                    <label class="block text-xs font-semibold uppercase mb-1">Địa chỉ chi tiết *</label>
+                    <label class="block text-xs font-semibold uppercase mb-1">Địa chỉ chi tiết * (Có thể gõ tay)</label>
                     <input type="text" id="s-address" class="w-full px-4 py-2.5 rounded-xl bg-theme-input border border-theme-border text-theme-text text-sm focus:outline-none" placeholder="Số nhà, tên đường, thôn xóm...">
                 </div>
 
@@ -141,10 +145,12 @@
                     <div id="store-img-preview-box" class="hidden">
                         <img id="store-img-preview" class="w-full h-40 object-cover rounded-xl border border-theme-border shadow-sm cursor-pointer" onclick="openGlobalPhotoEdit('store_new')" title="Nhấn để đổi ảnh" />
                     </div>
-                    <div class="flex gap-2">
-                        <button type="button" onclick="captureStorePhoto()" id="btn-snap-store" class="flex-1 py-3 bg-theme-input hover:opacity-80 font-bold rounded-xl text-xs border border-theme-border"><i class="fa-solid fa-camera mr-1"></i>Chụp ảnh cửa hàng</button>
-                        <button type="button" onclick="initStoreCamera()" id="btn-resnap-store" class="hidden flex-1 py-3 bg-theme-input hover:opacity-80 font-bold rounded-xl text-xs border border-theme-border">Chụp lại</button>
+                    <div class="flex justify-center pt-2">
+                        <button type="button" onclick="captureStorePhoto()" id="btn-snap-store" class="w-14 h-14 bg-amber-500 hover:bg-amber-600 rounded-full flex items-center justify-center text-slate-950 shadow-lg transition active:scale-95 border-4 border-slate-900" title="Chụp ảnh cửa hàng">
+                            <i class="fa-solid fa-camera text-lg"></i>
+                        </button>
                     </div>
+                    <button type="button" onclick="initStoreCamera()" id="btn-resnap-store" class="hidden w-full py-3 bg-theme-input hover:opacity-80 font-bold rounded-xl text-xs border border-theme-border">Chụp lại ảnh</button>
                 </div>
                 <button type="button" onclick="handleSaleAddStore()" class="w-full py-4 mt-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-xl text-sm transition shadow-lg">Lưu Khách Hàng Mới</button>
             </div>
@@ -310,11 +316,11 @@
             </div>
 
             <div class="flex flex-col sm:flex-row gap-2 pt-2">
-                <button onclick="downloadReportImage()" class="flex-1 py-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-xl text-xs transition shadow-lg flex items-center justify-center space-x-2">
-                    <i class="fa-solid fa-download"></i><span>Tải ảnh về máy</span>
+                <button onclick="downloadReportJpg()" class="flex-1 py-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-xl text-xs transition shadow-lg flex items-center justify-center space-x-2">
+                    <i class="fa-solid fa-download"></i><span>Tải ảnh JPG về máy</span>
                 </button>
                 <button onclick="shareReportToZalo()" class="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs transition shadow-lg flex items-center justify-center space-x-2">
-                    <i class="fa-solid fa-share-nodes"></i><span>Chia sẻ sang Zalo</span>
+                    <i class="fa-solid fa-share-nodes"></i><span>Chia sẻ ảnh sang Zalo</span>
                 </button>
             </div>
         </div>
@@ -406,7 +412,11 @@
                 <video id="prod-cam-stream" autoplay playsinline class="w-full h-full object-cover"></video>
                 <canvas id="prod-cam-canvas" class="hidden"></canvas>
             </div>
-            <button type="button" onclick="captureProductCamera()" class="w-full py-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-xl text-xs shadow-lg">Chụp ảnh ngay</button>
+            <div class="flex justify-center pt-2">
+                <button type="button" onclick="captureProductCamera()" class="w-14 h-14 bg-amber-500 hover:bg-amber-600 rounded-full flex items-center justify-center text-slate-950 shadow-lg transition active:scale-95 border-4 border-slate-900" title="Chụp ảnh">
+                    <i class="fa-solid fa-camera text-lg"></i>
+                </button>
+            </div>
         </div>
     </div>
 
@@ -433,10 +443,12 @@
                     <video id="order-cam-stream" autoplay playsinline class="w-full h-full object-cover"></video>
                     <canvas id="order-cam-canvas" class="hidden"></canvas>
                 </div>
-                <div class="flex gap-2">
-                    <button type="button" id="btn-open-order-cam" onclick="startOrderCamera()" class="flex-1 py-2.5 bg-theme-input hover:opacity-80 font-bold rounded-xl text-xs border border-theme-border"><i class="fa-solid fa-camera mr-1"></i> Mở camera chụp ảnh</button>
-                    <button type="button" id="btn-snap-order-photo" onclick="captureOrderPhoto()" class="hidden flex-1 py-2.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-xl text-xs"><i class="fa-solid fa-circle-dot mr-1"></i> Chụp ngay</button>
+                <div class="flex justify-center pt-2">
+                    <button type="button" id="btn-snap-order-photo" onclick="captureOrderPhoto()" class="hidden w-14 h-14 bg-amber-500 hover:bg-amber-600 rounded-full flex items-center justify-center text-slate-950 shadow-lg transition active:scale-95 border-4 border-slate-900" title="Chụp ngay">
+                        <i class="fa-solid fa-camera text-lg"></i>
+                    </button>
                 </div>
+                <button type="button" id="btn-open-order-cam" onclick="startOrderCamera()" class="w-full py-2.5 bg-theme-input hover:opacity-80 font-bold rounded-xl text-xs border border-theme-border"><i class="fa-solid fa-camera mr-1"></i> Mở camera chụp ảnh</button>
             </div>
 
             <div class="bg-black/40 p-4 rounded-2xl border border-amber-500/30 space-y-3">
@@ -471,15 +483,15 @@
                     <span class="text-xs opacity-75">Tổng tiền thanh toán (Sau chiết khấu):</span>
                     <div class="text-lg font-black text-amber-500" id="order-total-price">0 đ</div>
                 </div>
-                <button onclick="submitSalesOrder()" class="px-6 py-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-xl text-xs shadow-lg">Hoàn tất & Xuất Bill</button>
+                <button onclick="submitSalesOrder()" class="px-6 py-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-xl text-xs shadow-lg">Hoàn tất & Xuất Bill JPG</button>
             </div>
         </div>
     </div>
 
-    <!-- MODAL HIỂN THỊ BILL THANH TOÁN -->
+    <!-- MODAL HIỂN THỊ BILL THANH TOÁN (ẢNH JPG) -->
     <div id="bill-modal" class="fixed inset-0 bg-slate-950/85 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
         <div class="bg-theme-card border border-theme-border rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto text-theme-text">
-            <div class="text-center font-bold text-emerald-400 text-sm mb-1"><i class="fa-solid fa-circle-check mr-1"></i> Tạo đơn hàng và xuất Bill thành công!</div>
+            <div class="text-center font-bold text-emerald-400 text-sm mb-1"><i class="fa-solid fa-circle-check mr-1"></i> Tạo đơn hàng thành công (Đã xuất file JPG)!</div>
             <div id="invoice-card" class="bg-black border-2 border-amber-500/40 rounded-2xl p-5 space-y-3 text-slate-100 shadow-inner">
                 <div class="text-center border-b border-amber-500/30 pb-3">
                     <h2 class="font-black text-amber-400 uppercase text-sm tracking-wider">PHỤ KIỆN HOÀNG ĐẾ</h2>
@@ -503,12 +515,15 @@
                 </div>
                 <div class="text-center pt-2 text-[10px] text-slate-300 italic">Cảm ơn quý khách đã hợp tác cùng Phụ Kiện Hoàng Đế!</div>
             </div>
-            <div class="flex gap-2 pt-2">
-                <button onclick="shareBillToZaloDirect()" class="flex-1 py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs transition shadow-lg flex items-center justify-center space-x-2">
-                    <i class="fa-solid fa-share-nodes text-sm"></i><span>Chia sẻ sang Zalo</span>
+            <div class="flex flex-col sm:flex-row gap-2 pt-2">
+                <button onclick="downloadBillJpg()" class="flex-1 py-3.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-xl text-xs transition shadow-lg flex items-center justify-center space-x-2">
+                    <i class="fa-solid fa-download"></i><span>Tải ảnh JPG về máy</span>
                 </button>
-                <button onclick="closeBillModal()" class="px-5 py-3.5 bg-theme-input hover:opacity-85 font-bold rounded-xl text-xs transition border border-theme-border">Đóng</button>
+                <button onclick="shareBillToZaloDirect()" class="flex-1 py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs transition shadow-lg flex items-center justify-center space-x-2">
+                    <i class="fa-solid fa-share-nodes text-sm"></i><span>Gửi ảnh sang Zalo</span>
+                </button>
             </div>
+            <button onclick="closeBillModal()" class="w-full py-2 bg-theme-input hover:opacity-85 font-semibold rounded-xl text-xs transition border border-theme-border">Đóng</button>
         </div>
     </div>
 
@@ -552,7 +567,7 @@
             salesHistory: [],
             checkinHistory: [],
             importHistory: [],
-            settings: { checkinRadius: 50, requiredMinutes: 5 },
+            settings: { checkinRadius: 50, requiredMinutes: 5, deviceMode: 'mobile' },
             categories: ['Cáp sạc', 'Củ sạc', 'Tai nghe', 'Kính cường lực', 'Ốp lưng']
         };
 
@@ -561,7 +576,7 @@
         let warehouseSubTab = 'all'; 
         let authMode = 'login', currentLivePos = { lat: 20.4356, lng: 106.3275 };
         let activeCheckinStoreId = null, capturedImageData = null, mediaStream = null;
-        let newStoreLat = 0, newStoreLng = 0, storePhotoData = null, storeMediaStream = null;
+        let newStoreLat = 20.4356, newStoreLng = 106.3275, storePhotoData = null, storeMediaStream = null;
         let activeOrderStoreId = null, lastOrderShareText = "";
         let selectedCategory = '', uploadedProductImg = '', prodMediaStream = null;
         let orderPhotos = [], orderMediaStream = null;
@@ -572,6 +587,7 @@
         let globalTargetId = null;
         let globalTargetId2 = null;
         let globalCamStreamObj = null;
+        let currentGpsAccuracy = null, hasRealGPS = false, gpsCaptured = false, lastGpsRender = 0, gpsWatchId = null;
 
         function getCurrentUser() { return currentUsername ? db.users.find(u => u.username === currentUsername) || null : null; }
 
@@ -581,7 +597,8 @@
             if(!db.salesHistory && db.history) db.salesHistory = db.history;
             if(!db.checkinHistory) db.checkinHistory = [];
             if(!db.importHistory) db.importHistory = [];
-            if(!db.settings) db.settings = { checkinRadius: 50, requiredMinutes: 5 };
+            if(!db.settings) db.settings = { checkinRadius: 50, requiredMinutes: 5, deviceMode: 'mobile' };
+            if(!db.settings.deviceMode) db.settings.deviceMode = 'mobile';
 
             db.users.forEach(u => {
                 if(!u.permissions) u.permissions = { stores: true, master: true, warehouse: true, history: true };
@@ -599,7 +616,10 @@
                         db.salesHistory = data.salesHistory || data.history || [];
                         db.checkinHistory = data.checkinHistory || [];
                         db.importHistory = data.importHistory || [];
-                        if(data.settings) db.settings = data.settings;
+                        if(data.settings) {
+                            db.settings = data.settings;
+                            if(!db.settings.deviceMode) db.settings.deviceMode = 'mobile';
+                        }
                         if (data.categories && data.categories.length > 0) db.categories = data.categories;
 
                         db.users.forEach(u => {
@@ -612,9 +632,18 @@
         }
 
         function saveData() {
-            if (currentUsername) localStorage.setItem('hoangde_current_username_cloud', currentUsername);
-            else localStorage.removeItem('hoangde_current_username_cloud');
-            localStorage.setItem('hoangde_safe_fallback_db', JSON.stringify(db));
+            try {
+                if (currentUsername) localStorage.setItem('hoangde_current_username_cloud', currentUsername);
+                else localStorage.removeItem('hoangde_current_username_cloud');
+            } catch (e) {}
+            try {
+                localStorage.setItem('hoangde_safe_fallback_db', JSON.stringify(db));
+            } catch (e) {
+                try {
+                    const lite = JSON.stringify(db, (k, v) => ['photo', 'photos', 'storePhoto', 'img'].includes(k) ? (Array.isArray(v) ? [] : '') : v);
+                    localStorage.setItem('hoangde_safe_fallback_db', lite);
+                } catch (e2) { console.warn('Không thể lưu localStorage', e2); }
+            }
             if (CLOUD_API_URL && !CLOUD_API_URL.includes("DÁN_LINK")) {
                 fetch(CLOUD_API_URL, {
                     method: 'POST', mode: 'no-cors',
@@ -676,17 +705,25 @@
             }
         }
 
-        function parseGoogleMapInput(inputStr) {
-            let match = inputStr.trim().match(/(-?\d+\.\d+),\s*(-?\d+\.\d+)/) || inputStr.trim().match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
-            if (match) { 
-                newStoreLat = parseFloat(match[1]); 
-                newStoreLng = parseFloat(match[2]); 
-                document.getElementById('s-gps-text').innerText = `[${newStoreLat.toFixed(6)}, ${newStoreLng.toFixed(6)}]`;
-                reverseGeocode(newStoreLat, newStoreLng);
-            }
+        function resetDailyStatus() {
+            const today = new Date().toDateString();
+            let changed = false;
+            (db.stores || []).forEach(s => {
+                const staleVisit = s.visited && s.lastVisitDate !== today;
+                const staleCheckin = s.checkinTime && new Date(s.checkinTime).toDateString() !== today;
+                if (staleVisit || staleCheckin) {
+                    s.visited = false; s.checkinTime = null;
+                    s.note = ''; s.photo = ''; s.visitTimeStr = '';
+                    changed = true;
+                } else if (s.checkinTime === undefined) {
+                    s.checkinTime = null;
+                }
+            });
+            return changed;
         }
 
         function render() {
+            if (resetDailyStatus()) saveData();
             applyThemeToBody();
             const app = document.getElementById('app');
             if(!app) return;
@@ -791,7 +828,7 @@
                         </div>
                         <div>
                             <h1 class="font-black text-xs sm:text-sm uppercase tracking-wider">PHỤ KIỆN HOÀNG ĐẾ</h1>
-                            <p class="text-[11px] sm:text-xs opacity-75">Nhân sự: <span class="font-bold text-amber-500">${user.fullname}</span></p>
+                            <p class="text-[11px] sm:text-xs opacity-75">Nhân sự: <span class="font-bold text-amber-500">${user.fullname}</span> (${db.settings?.deviceMode === 'pc' ? 'Chế độ PC' : 'Chế độ Mobile'})</p>
                         </div>
                     </div>
                     <div class="flex space-x-2 w-full sm:w-auto justify-end">
@@ -844,7 +881,7 @@
                         </div>
                         <div class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                             <button onclick="openSaleAddModal()" class="w-full sm:w-auto px-4 py-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-xl text-xs transition shadow-lg flex items-center justify-center space-x-2">
-                                <i class="fa-solid fa-map-pin"></i><span>+ Thêm Mới (GPS)</span>
+                                <i class="fa-solid fa-map-pin"></i><span>+ Thêm Mới (GPS hoặc Gõ tay)</span>
                             </button>
                             ${isAdmin ? `
                                 <button onclick="openAdminAddStoreModal()" class="w-full sm:w-auto px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs transition shadow-lg flex items-center justify-center space-x-2">
@@ -872,14 +909,14 @@
                     </div>
 
                     <div class="space-y-4">
-                        ${filteredStores.length === 0 ? `<div class="bg-theme-card border border-theme-border p-10 text-center rounded-2xl opacity-75 text-sm">Không tìm thấy điểm bán nào trên Cloud.</div>` : ''}
+                        ${filteredStores.length === 0 ? `<div class="bg-theme-card border border-theme-border p-10 text-center rounded-2xl opacity-75 text-sm">Không tìm thấy điểm bán nào trên hệ thống.</div>` : ''}
                         ${filteredStores.map((s, index) => {
                             const distance = s.calculatedDistance;
-                            const canCheckin = distance <= (db.settings?.checkinRadius || 50);
+                            const canCheckin = db.settings?.deviceMode === 'pc' || Math.max(0, distance - Math.min(currentGpsAccuracy || 0, 30)) <= (db.settings?.checkinRadius || 50);
                             const googleMapUrl = `https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lng}&travelmode=driving`;
                             
                             const isTodayVisited = s.lastVisitDate === todayStr && s.visited === true;
-                            const isCheckedIn = s.checkinTime !== null && !isTodayVisited;
+                            const isCheckedIn = !!s.checkinTime && !isTodayVisited;
                             
                             let rawElapsedSec = isCheckedIn ? Math.floor((Date.now() - s.checkinTime) / 1000) : 0;
                             if (rawElapsedSec < 0 || rawElapsedSec > 86400) rawElapsedSec = 0;
@@ -1032,6 +1069,8 @@
             s.city = document.getElementById('e-city').value.trim();
             s.district = document.getElementById('e-district').value.trim();
             s.address = document.getElementById('e-address').value.trim();
+            s.lat = parseFloat(document.getElementById('e-lat').value) || s.lat;
+            s.lng = parseFloat(document.getElementById('e-lng').value) || s.lng;
             saveData();
             document.getElementById('edit-store-modal').classList.add('hidden');
             alert('Cập nhật thông tin cửa hàng thành công!');
@@ -1256,10 +1295,28 @@
         function renderSettingsView() {
             const user = getCurrentUser();
             const isAdmin = user.role === 'admin';
-            const s = db.settings || { checkinRadius: 50, requiredMinutes: 5 };
+            const s = db.settings || { checkinRadius: 50, requiredMinutes: 5, deviceMode: 'mobile' };
 
             return `
                 <div class="space-y-6 max-w-4xl mx-auto text-theme-text">
+                    <!-- CÀI ĐẶT CHẾ ĐỘ THIẾT BỊ (MOBILE / PC) -->
+                    <div class="bg-theme-card border border-theme-border p-6 rounded-3xl shadow-xl space-y-4">
+                        <h3 class="font-bold text-base flex items-center space-x-2 border-b border-theme-border pb-3">
+                            <i class="fa-solid fa-laptop-mobile text-amber-500"></i><span>Cài đặt Chế độ Thiết bị (Mobile / PC)</span>
+                        </h3>
+                        <p class="text-xs opacity-75">Chọn chế độ phù hợp với thiết bị bạn đang sử dụng:</p>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <button onclick="setDeviceMode('mobile')" class="py-3.5 px-4 rounded-xl border text-xs font-bold transition flex items-center justify-center space-x-2 ${s.deviceMode==='mobile'?'bg-amber-500 text-slate-950 border-amber-500':'bg-theme-input border-theme-border'}">
+                                <i class="fa-solid fa-mobile-screen text-base"></i>
+                                <span>Chế độ Điện thoại (GPS chuẩn)</span>
+                            </button>
+                            <button onclick="setDeviceMode('pc')" class="py-3.5 px-4 rounded-xl border text-xs font-bold transition flex items-center justify-center space-x-2 ${s.deviceMode==='pc'?'bg-amber-500 text-slate-950 border-amber-500':'bg-theme-input border-theme-border'}">
+                                <i class="fa-solid fa-desktop text-base"></i>
+                                <span>Chế độ Máy tính / GitHub (Giả lập GPS)</span>
+                            </button>
+                        </div>
+                    </div>
+
                     ${isAdmin ? `
                         <div class="bg-theme-card border border-theme-border p-6 rounded-3xl shadow-xl space-y-4">
                             <h3 class="font-bold text-base flex items-center space-x-2 border-b border-theme-border pb-3">
@@ -1317,20 +1374,16 @@
                             </button>
                         </div>
                     </div>
-
-                    <div class="bg-theme-card border border-theme-border p-6 rounded-3xl shadow-xl space-y-4">
-                        <h3 class="font-bold text-base flex items-center space-x-2 border-b border-theme-border pb-3">
-                            <i class="fa-solid fa-server text-amber-500"></i><span>Kiểm tra dữ liệu & Kết nối hệ thống</span>
-                        </h3>
-                        <div class="space-y-3">
-                            <button onclick="runSystemCheck()" class="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs transition shadow flex items-center justify-center space-x-2">
-                                <i class="fa-solid fa-stethoscope"></i><span>Bấm vào đây để kiểm tra hệ thống ngay</span>
-                            </button>
-                            <div id="system-check-result" class="hidden bg-theme-input p-4 rounded-2xl border border-theme-border text-xs space-y-2"></div>
-                        </div>
-                    </div>
                 </div>
             `;
+        }
+
+        function setDeviceMode(mode) {
+            if(!db.settings) db.settings = {};
+            db.settings.deviceMode = mode;
+            saveData();
+            alert(`Đã chuyển sang ${mode === 'pc' ? 'Chế độ Máy tính / GitHub' : 'Chế độ Điện thoại'}!`);
+            render();
         }
 
         function handleSaveCheckinSettings() {
@@ -1363,20 +1416,6 @@
             saveData();
             alert('Đổi mật khẩu thành công!');
             ['set-old-pass','set-new-pass','set-confirm-pass'].forEach(id => document.getElementById(id).value = '');
-        }
-
-        function runSystemCheck() {
-            let appSize = new Blob([JSON.stringify(db)]).size;
-            let sizeKb = (appSize / 1024).toFixed(2);
-            let resBox = document.getElementById('system-check-result');
-            resBox.classList.remove('hidden');
-            resBox.innerHTML = `
-                <div class="font-bold text-amber-500 mb-1"><i class="fa-solid fa-circle-check mr-1"></i> KẾT QUẢ KIỂM TRA HỆ THỐNG:</div>
-                <div>1. <b>Sao lưu dữ liệu (Backup):</b> Hoạt động tốt (Đã lưu tự động trên LocalStorage & Cloud).</div>
-                <div>2. <b>Kết nối Google Sheet (Cloud):</b> Đã liên kết API endpoint (${CLOUD_API_URL.substring(0, 35)}...).</div>
-                <div>3. <b>Dung lượng Web App:</b> Đang sử dụng <b>${sizeKb} KB</b> / 5000 KB (Dung lượng rất thoải mái).</div>
-                <div>4. <b>Trạng thái hệ thống:</b> Toàn bộ cơ sở dữ liệu ổn định, không có lỗi xung đột.</div>
-            `;
         }
 
         function renderAdminView() {
@@ -1426,7 +1465,7 @@
                                                 </td>
                                             </tr>
                                         `;
-                                    })}
+                                    }).join('')}
                                 </tbody>
                             </table>
                         </div>
@@ -1439,7 +1478,7 @@
                             </h3>
                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <button onclick="openReportModal()" class="py-3.5 px-4 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-xl text-xs transition shadow-lg flex items-center justify-center space-x-2">
-                                    <i class="fa-solid fa-receipt"></i><span>Xuất báo cáo ngày</span>
+                                    <i class="fa-solid fa-receipt"></i><span>Xuất báo cáo ngày (JPG)</span>
                                 </button>
                                 <button onclick="clearHistoryOnly()" class="py-3.5 px-4 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-bold rounded-xl text-xs transition border border-rose-500/30 flex items-center justify-center space-x-2">
                                     <i class="fa-solid fa-trash-can"></i><span>Xóa bộ nhớ đệm (Lịch sử)</span>
@@ -1666,7 +1705,7 @@
                 storeOrderSummary[h.storeName].details.push(h.note);
             });
 
-            let visitedStoresCount = (db.stores || []).filter(s => s.visited).length;
+            let visitedStoresCount = (db.stores || []).filter(s => s.visited && s.lastVisitDate === new Date().toDateString()).length;
 
             document.getElementById('report-total-revenue').innerText = totalRevenue.toLocaleString() + ' đ';
             document.getElementById('report-total-bills').innerText = totalBills + ' đơn hàng';
@@ -1749,21 +1788,26 @@
             document.getElementById('report-modal').classList.add('hidden');
         }
 
-        function downloadReportImage() {
+        function downloadReportJpg() {
             const card = document.getElementById('report-card');
-            html2canvas(card, { scale: 2 }).then(canvas => {
+            html2canvas(card, { scale: 2, backgroundColor: '#020617' }).then(canvas => {
                 let link = document.createElement('a');
-                link.download = `Bao-Cao-Phu-Kien-Hoang-De-${Date.now()}.png`;
-                link.href = canvas.toDataURL('image/png');
+                link.download = `Bao-Cao-Phu-Kien-Hoang-De-${Date.now()}.jpg`;
+                link.href = canvas.toDataURL('image/jpeg', 0.9);
                 link.click();
             });
         }
 
         function shareReportToZalo() {
             const card = document.getElementById('report-card');
-            html2canvas(card, { scale: 2 }).then(canvas => {
+            html2canvas(card, { scale: 2, backgroundColor: '#020617' }).then(canvas => {
                 canvas.toBlob(blob => {
-                    let file = new File([blob], "bao-cao.png", { type: "image/png" });
+                    let file = new File([blob], "bao-cao.jpg", { type: "image/jpeg" });
+                    let link = document.createElement('a');
+                    link.href = URL.createObjectURL(blob);
+                    link.download = `Bao-Cao-${Date.now()}.jpg`;
+                    link.click();
+
                     if(navigator.canShare && navigator.canShare({ files: [file] })) {
                         navigator.share({
                             files: [file],
@@ -1771,14 +1815,10 @@
                             text: 'Gửi kế toán báo cáo doanh thu và thị trường trong ngày!'
                         }).catch(() => {});
                     } else {
-                        let link = document.createElement('a');
-                        link.href = URL.createObjectURL(blob);
-                        link.download = `Bao-Cao-${Date.now()}.png`;
-                        link.click();
                         alert('Đã tải ảnh báo cáo về máy! Đang mở Zalo để bạn gửi cho kế toán.');
                         window.location.href = "zalo://";
                     }
-                });
+                }, 'image/jpeg', 0.9);
             });
         }
 
@@ -2135,44 +2175,80 @@
         }
 
         function closeBillModal(){ document.getElementById('bill-modal').classList.add('hidden'); }
+        
+        function downloadBillJpg() {
+            const card = document.getElementById('invoice-card');
+            html2canvas(card, { scale: 2, backgroundColor: '#000000' }).then(canvas => {
+                let link = document.createElement('a');
+                link.download = `Hoa-Don-Phu-Kien-Hoang-De-${Date.now()}.jpg`;
+                link.href = canvas.toDataURL('image/jpeg', 0.9);
+                link.click();
+            });
+        }
+
         function shareBillToZaloDirect(){ 
-            if(navigator.share){
-                navigator.share({title:'Hóa đơn bán hàng', text:lastOrderShareText}).catch(()=>{});
-            } else {
-                navigator.clipboard.writeText(lastOrderShareText).then(()=>{
-                    alert('Đã copy nội dung hóa đơn! Đang mở Zalo để bạn dán gửi.');
-                    window.location.href = "zalo://";
-                });
-            } 
+            const card = document.getElementById('invoice-card');
+            html2canvas(card, { scale: 2, backgroundColor: '#000000' }).then(canvas => {
+                canvas.toBlob(blob => {
+                    let file = new File([blob], "hoa-don.jpg", { type: "image/jpeg" });
+                    
+                    let link = document.createElement('a');
+                    link.href = URL.createObjectURL(blob);
+                    link.download = `Hoa-Don-${Date.now()}.jpg`;
+                    link.click();
+
+                    if(navigator.canShare && navigator.canShare({ files: [file] })) {
+                        navigator.share({
+                            files: [file],
+                            title: 'Hóa đơn bán hàng Phụ Kiện Hoàng Đế',
+                            text: lastOrderShareText
+                        }).catch(() => {
+                            alert('Đã tải ảnh hóa đơn JPG về máy! Vui lòng mở Zalo và gửi ảnh vừa tải cho khách hàng.');
+                            window.location.href = "zalo://";
+                        });
+                    } else {
+                        alert('Đã tải ảnh hóa đơn JPG về máy thành công! Đang mở Zalo để bạn gửi cho khách hàng.');
+                        window.location.href = "zalo://";
+                    }
+                }, 'image/jpeg', 0.9);
+            });
         }
 
         function openSaleAddModal() {
             document.getElementById('sale-add-store-modal').classList.remove('hidden');
-            ['s-shop','s-owner','s-phone','s-address','s-city','s-district','s-gmap-input'].forEach(i=>document.getElementById(i).value='');
+            ['s-shop','s-owner','s-phone','s-address','s-city','s-district'].forEach(i=>document.getElementById(i).value='');
+            gpsCaptured = false;
+            newStoreLat = currentLivePos.lat;
+            newStoreLng = currentLivePos.lng;
+            document.getElementById('s-gps-text').innerText = 'Đang lấy GPS thực tế...';
             storePhotoData = null; document.getElementById('store-img-preview-box').classList.add('hidden');
-            getRealGPSAndReverseGeocode(); 
             initStoreCamera();
+            getRealGPSAndReverseGeocode();
         }
+
         function closeSaleAddModal() { document.getElementById('sale-add-store-modal').classList.add('hidden'); if(storeMediaStream){storeMediaStream.getTracks().forEach(t=>t.stop());storeMediaStream=null;} }
-        
-        // HÀM LẤY CHUẨN GPS THỰC TẾ TỪ THIẾT BỊ NGƯỜI DÙNG ĐANG ĐỨNG
+
         function getRealGPSAndReverseGeocode() {
             const gpsText = document.getElementById('s-gps-text');
-            if(gpsText) gpsText.innerText = 'Đang bắt GPS thực tế từ thiết bị của bạn...';
-            
-            if(navigator.geolocation){
-                navigator.geolocation.getCurrentPosition(p => {
-                    newStoreLat = p.coords.latitude;
-                    newStoreLng = p.coords.longitude;
-                    if(gpsText) gpsText.innerText = `[${newStoreLat.toFixed(6)}, ${newStoreLng.toFixed(6)}]`;
-                    reverseGeocode(newStoreLat, newStoreLng);
-                }, (err) => {
-                    alert('Không thể lấy GPS tự động từ thiết bị! Vui lòng bật định vị hoặc dán link Google Maps vào ô bên dưới.');
-                    if(gpsText) gpsText.innerText = '[Chưa có tọa độ GPS]';
-                }, {enableHighAccuracy:true, timeout: 15000, maximumAge: 0});
-            } else {
-                alert('Trình duyệt của bạn không hỗ trợ định vị GPS!');
+            if (db.settings?.deviceMode === 'pc') {
+                newStoreLat = 20.4356; newStoreLng = 106.3275; gpsCaptured = true;
+                if (gpsText) gpsText.innerText = `[${newStoreLat.toFixed(6)}, ${newStoreLng.toFixed(6)}] (PC Demo)`;
+                reverseGeocode(newStoreLat, newStoreLng);
+                return;
             }
+            if (!navigator.geolocation) { alert('Trình duyệt không hỗ trợ GPS! Bạn có thể gõ tay.'); return; }
+            if (gpsText) gpsText.innerText = 'Đang bắt GPS thực tế từ thiết bị...';
+            navigator.geolocation.getCurrentPosition(p => {
+                newStoreLat = p.coords.latitude;
+                newStoreLng = p.coords.longitude;
+                currentLivePos = { lat: newStoreLat, lng: newStoreLng };
+                currentGpsAccuracy = p.coords.accuracy;
+                hasRealGPS = true; gpsCaptured = true;
+                if (gpsText) gpsText.innerText = `[${newStoreLat.toFixed(6)}, ${newStoreLng.toFixed(6)}] (sai số ~${Math.round(p.coords.accuracy)}m)`;
+                reverseGeocode(newStoreLat, newStoreLng);
+            }, () => {
+                if (gpsText) gpsText.innerText = 'Không lấy được GPS - hãy bật định vị rồi bấm lại nút xanh';
+            }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
         }
 
         function reverseGeocode(lat, lng) {
@@ -2219,23 +2295,68 @@
             if(storeMediaStream){storeMediaStream.getTracks().forEach(t=>t.stop());storeMediaStream=null;}
         }
         function handleSaleAddStore() {
-            const n=document.getElementById('s-shop').value.trim(), o=document.getElementById('s-owner').value.trim(), p=document.getElementById('s-phone').value.trim(), c=document.getElementById('s-city').value.trim(), d=document.getElementById('s-district').value.trim(), a=document.getElementById('s-address').value.trim();
-            if(!n||!o||!p||!a||!c||!d){alert('Vui lòng điền đủ thông tin Tỉnh/Thành phố và các mục khác!');return;} 
-            if(newStoreLat === 0 || newStoreLng === 0){alert('Vui lòng bấm nút "Lấy GPS thiết bị thực tế" hoặc dán link Google Maps để xác định đúng tọa độ điểm bán!');return;}
-            if(!storePhotoData){alert('Chưa chụp ảnh cửa hàng!');return;}
+            const n = document.getElementById('s-shop').value.trim();
+            const o = document.getElementById('s-owner').value.trim();
+            const p = document.getElementById('s-phone').value.trim();
+            const c = document.getElementById('s-city').value.trim();
+            const d = document.getElementById('s-district').value.trim();
+            const a = document.getElementById('s-address').value.trim();
+
+            if(!n || !o || !p) { alert('Vui lòng điền Tên Shop, Tên Chủ shop và Số điện thoại!'); return; }
+            if(!c || !d || !a) { alert('Vui lòng điền đầy đủ Tỉnh/Thành phố, Quận/Huyện và Địa chỉ chi tiết (hoặc gõ tay vào ô)!'); return; }
+            if(!storePhotoData) { alert('Vui lòng chụp ảnh cửa hàng trước khi lưu!'); return; }
+            if (db.settings?.deviceMode !== 'pc' && !gpsCaptured) {
+                alert('Chưa lấy được GPS thực tế! Hãy bật định vị và bấm nút "Lấy GPS thiết bị" trước khi lưu, nếu không cửa hàng sẽ bị sai tọa độ.');
+                return;
+            }
             
-            db.stores.unshift({id:Date.now(),name:n,owner:o,phone:p,city:c,district:d,address:a,lat:newStoreLat,lng:newStoreLng,visited:false,note:'',photo:'',checkinTime:null,storePhoto:storePhotoData,lastVisitDate:'',visitTimeStr:''});
-            saveData(); alert('Lưu Khách Hàng Thành Công!'); closeSaleAddModal(); render();
+            db.stores.unshift({
+                id: Date.now(), 
+                name: n, 
+                owner: o, 
+                phone: p, 
+                city: c, 
+                district: d, 
+                address: a, 
+                lat: newStoreLat, 
+                lng: newStoreLng, 
+                visited: false, 
+                note: '', 
+                photo: '', 
+                checkinTime: null, 
+                storePhoto: storePhotoData, 
+                lastVisitDate: '', 
+                visitTimeStr: ''
+            });
+            saveData(); 
+            alert('Lưu Khách Hàng Thành Công!'); 
+            closeSaleAddModal(); 
+            render();
         }
 
-        function openCheckinModal(id) {
-            const store = db.stores.find(s=>String(s.id)===String(id)), d = calculateDistance(currentLivePos.lat,currentLivePos.lng,store.lat,store.lng);
+        async function openCheckinModal(id) {
+            const store = db.stores.find(s => String(s.id) === String(id));
+            if (!store) return;
             const radius = db.settings?.checkinRadius || 50;
-            if(d>radius){alert(`Quá xa (${Math.round(d)}m)! Tiến lại gần cửa hàng hơn để check-in.`);return;}
+            if (db.settings?.deviceMode !== 'pc') {
+                await getFreshPosition();
+                if (!hasRealGPS) { alert('Chưa có GPS! Hãy bật định vị trên điện thoại rồi thử lại.'); return; }
+                const raw = calculateDistance(currentLivePos.lat, currentLivePos.lng, store.lat, store.lng);
+                if (effectiveDistance(store) > radius) {
+                    alert(`Quá xa (${Math.round(raw)}m, sai số GPS ~${Math.round(currentGpsAccuracy || 0)}m)! Tiến lại gần cửa hàng hơn để check-in.`);
+                    render(); return;
+                }
+            }
             activeCheckinStoreId = id; capturedImageData = null;
-            document.getElementById('photo-modal').classList.remove('hidden'); document.getElementById('photo-preview-container').classList.add('hidden'); document.getElementById('btn-capture').classList.remove('hidden'); document.getElementById('btn-retake').classList.add('hidden'); document.getElementById('btn-submit-checkin').disabled=true; document.getElementById('btn-submit-checkin').classList.add('opacity-50');
+            document.getElementById('photo-modal').classList.remove('hidden');
+            document.getElementById('photo-preview-container').classList.add('hidden');
+            document.getElementById('btn-capture').classList.remove('hidden');
+            document.getElementById('btn-retake').classList.add('hidden');
+            document.getElementById('btn-submit-checkin').disabled = true;
+            document.getElementById('btn-submit-checkin').classList.add('opacity-50');
             startCamera();
         }
+
         function closePhotoModal() { document.getElementById('photo-modal').classList.add('hidden'); if(mediaStream){mediaStream.getTracks().forEach(t=>t.stop());mediaStream=null;} }
         function startCamera() { const v = document.getElementById('camera-stream'); v.parentElement.classList.remove('hidden'); navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}}).then(s=>{mediaStream=s;v.srcObject=s;}); }
         function capturePhoto() {
@@ -2258,46 +2379,42 @@
             closePhotoModal(); 
             render(); 
         }
-        function doCheckout(id) { 
-            const s = db.stores.find(x=>String(x.id)===String(id)), u = getCurrentUser();
-            
-            const currentDist = calculateDistance(currentLivePos.lat, currentLivePos.lng, s.lat, s.lng);
+        async function doCheckout(id) {
+            const s = db.stores.find(x => String(x.id) === String(id)), u = getCurrentUser();
+            if (!s) return;
             const radius = db.settings?.checkinRadius || 50;
-            if(currentDist > radius) {
-                alert(`Không thể Check-out! Bạn đang ở cách cửa hàng ${Math.round(currentDist)}m (vượt quá bán kính cho phép ${radius}m). Vui lòng di chuyển lại gần điểm bán để thực hiện Checkout.`);
-                return;
-            }
-
             const reqMins = db.settings?.requiredMinutes || 5;
+            if (db.settings?.deviceMode !== 'pc') {
+                await getFreshPosition();
+                if (effectiveDistance(s) > radius) {
+                    const raw = calculateDistance(currentLivePos.lat, currentLivePos.lng, s.lat, s.lng);
+                    alert(`Không thể Check-out! Bạn đang cách cửa hàng ~${Math.round(raw)}m (cho phép ${radius}m).`);
+                    return;
+                }
+            }
             let rawElapsedSec = Math.floor((Date.now() - s.checkinTime) / 1000);
-            if(rawElapsedSec < 0 || rawElapsedSec > 86400) rawElapsedSec = reqMins * 60;
-
-            const elapsedMinutes = Math.floor(rawElapsedSec / 60); 
-            if(elapsedMinutes < reqMins){
+            if (rawElapsedSec < 0 || rawElapsedSec > 86400) rawElapsedSec = reqMins * 60;
+            const elapsedMinutes = Math.floor(rawElapsedSec / 60);
+            if (elapsedMinutes < reqMins && db.settings?.deviceMode !== 'pc') {
                 alert(`Chưa đủ thời gian tối thiểu (${reqMins} phút). Vui lòng đợi thêm.`);
                 return;
-            } 
-            s.visited = true; 
-            const now = new Date();
-            const timeStr = now.toLocaleString('vi-VN');
-            s.lastVisitDate = now.toDateString(); 
+            }
+            const now = new Date(), timeStr = now.toLocaleString('vi-VN');
+            s.visited = true;
+            s.checkinTime = null;
+            s.lastVisitDate = now.toDateString();
             s.visitTimeStr = timeStr;
-
-            if(!db.checkinHistory) db.checkinHistory = [];
+            if (!db.checkinHistory) db.checkinHistory = [];
             db.checkinHistory.unshift({
-                time: timeStr, 
-                username: u.username, 
-                storeName: s.name, 
-                address: `${s.address}, ${s.district}, ${s.city}`,
-                phone: s.phone || 'N/A',
-                lat: s.lat,
-                lng: s.lng,
-                note: `[ĐÃ GHÉ THĂM] Thời gian làm việc: ${elapsedMinutes} phút. Ghi chú: ${s.note || 'Không có'}`, 
+                time: timeStr, username: u.username, storeName: s.name,
+                address: `${s.address}, ${s.district}, ${s.city}`, phone: s.phone || 'N/A',
+                lat: s.lat, lng: s.lng,
+                note: `[ĐÃ GHÉ THĂM] Thời gian làm việc: ${elapsedMinutes} phút. Ghi chú: ${s.note || 'Không có'}`,
                 photo: s.photo
-            }); 
-            saveData(); 
-            alert('Check-out thành công (Đã khớp GPS tại điểm bán)! Đã lưu vào lịch sử check-in.'); 
-            render(); 
+            });
+            saveData();
+            alert('Check-out thành công! Đã lưu vào lịch sử check-in.');
+            render();
         }
 
         function calculateDistance(lat1,lon1,lat2,lon2){ const R=6371e3,dLat=(lat2-lat1)*Math.PI/180,dLon=(lon2-lon1)*Math.PI/180,a=Math.sin(dLat/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2; return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a)); }
@@ -2306,11 +2423,12 @@
             if(b) b.innerText = "Đang lấy..."; 
             navigator.geolocation.getCurrentPosition(p => {
                 currentLivePos = { lat: p.coords.latitude, lng: p.coords.longitude };
+                currentGpsAccuracy = p.coords.accuracy; hasRealGPS = true;
                 alert(`Đã cập nhật GPS hiện tại: [${currentLivePos.lat.toFixed(4)}, ${currentLivePos.lng.toFixed(4)}]`); 
                 if(b) b.innerText="GPS OK"; 
                 render();
             }, () => {
-                alert('Không thể lấy GPS từ thiết bị của bạn!'); 
+                alert('Không thể lấy GPS. Vui lòng bật định vị trên thiết bị.');
                 if(b) b.innerText="Lỗi GPS";
             }, {enableHighAccuracy:true, timeout: 10000}); 
         }
@@ -2320,12 +2438,13 @@
         setInterval(() => {
             const user = getCurrentUser();
             if(user && currentTab === 'stores') {
-                const activeCheckin = db.stores.find(s => s.checkinTime !== null && !s.visited);
+                const activeCheckin = db.stores.find(s => s.checkinTime && !s.visited);
                 if(activeCheckin) { render(); }
             }
         }, 1000);
 
         loadCloudData();
+        startGPSWatch();
     </script>
 </body>
 </html>
