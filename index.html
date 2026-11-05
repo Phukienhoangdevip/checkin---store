@@ -45,12 +45,13 @@
             </div>
             <div class="relative bg-black rounded-2xl overflow-hidden aspect-video flex items-center justify-center border border-theme-border">
                 <video id="global-cam-stream" autoplay playsinline class="w-full h-full object-cover"></video>
+                    <button type="button" onclick="captureGlobalCamera()" class="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 w-14 h-14 bg-amber-500 hover:bg-amber-600 rounded-full flex items-center justify-center text-slate-950 shadow-lg transition active:scale-95 border-4 border-slate-900" title="Chụp ảnh">
+                    <i class="fa-solid fa-camera text-lg"></i>
+                </button>
                 <canvas id="global-cam-canvas" class="hidden"></canvas>
             </div>
             <div class="flex justify-center pt-2">
-                <button type="button" onclick="captureGlobalCamera()" class="w-14 h-14 bg-amber-500 hover:bg-amber-600 rounded-full flex items-center justify-center text-slate-950 shadow-lg transition active:scale-95 border-4 border-slate-900" title="Chụp ảnh">
-                    <i class="fa-solid fa-camera text-lg"></i>
-                </button>
+                
             </div>
         </div>
     </div>
@@ -65,6 +66,9 @@
             <div class="space-y-3">
                 <div class="relative bg-black rounded-2xl overflow-hidden aspect-video flex items-center justify-center border border-theme-border">
                     <video id="camera-stream" autoplay playsinline class="w-full h-full object-cover"></video>
+                    <button id="btn-capture" onclick="capturePhoto()" class="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 w-14 h-14 bg-amber-500 hover:bg-amber-600 rounded-full flex items-center justify-center text-slate-950 shadow-lg transition active:scale-95 border-4 border-slate-900" title="Chụp ảnh">
+                    <i class="fa-solid fa-camera text-lg"></i>
+                </button>
                     <canvas id="camera-canvas" class="hidden"></canvas>
                     <div id="camera-placeholder" class="absolute text-slate-400 text-xs text-center p-4">Đang khởi động camera...</div>
                 </div>
@@ -78,9 +82,7 @@
                 </div>
             </div>
             <div class="flex flex-col items-center gap-2 pt-2">
-                <button id="btn-capture" onclick="capturePhoto()" class="w-14 h-14 bg-amber-500 hover:bg-amber-600 rounded-full flex items-center justify-center text-slate-950 shadow-lg transition active:scale-95 border-4 border-slate-900" title="Chụp ảnh">
-                    <i class="fa-solid fa-camera text-lg"></i>
-                </button>
+                
                 <button id="btn-retake" onclick="startCamera()" class="hidden w-full py-3 bg-theme-input hover:opacity-80 font-bold rounded-xl text-xs transition border border-theme-border">Chụp lại ảnh</button>
                 <button id="btn-submit-checkin" onclick="confirmCheckin()" disabled class="w-full py-3 bg-amber-500 text-slate-950 font-bold rounded-xl text-xs opacity-50 cursor-not-allowed transition shadow-lg mt-1">Xác nhận Check-in</button>
             </div>
@@ -139,16 +141,18 @@
                     <label class="block text-xs font-semibold uppercase">Hình ảnh cửa hàng (Bắt buộc) *</label>
                     <div class="relative bg-black rounded-xl overflow-hidden aspect-video flex items-center justify-center border border-theme-border">
                         <video id="store-cam-stream" autoplay playsinline class="w-full h-full object-cover"></video>
+                    <button type="button" onclick="captureStorePhoto()" id="btn-snap-store" class="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 w-14 h-14 bg-amber-500 hover:bg-amber-600 rounded-full flex items-center justify-center text-slate-950 shadow-lg transition active:scale-95 border-4 border-slate-900" title="Chụp ảnh cửa hàng">
+                            <i class="fa-solid fa-camera text-lg"></i>
+                        </button>
                         <canvas id="store-cam-canvas" class="hidden"></canvas>
                         <div id="store-cam-placeholder" class="absolute text-slate-400 text-xs">Đang mở camera...</div>
                     </div>
                     <div id="store-img-preview-box" class="hidden">
                         <img id="store-img-preview" class="w-full h-40 object-cover rounded-xl border border-theme-border shadow-sm cursor-pointer" onclick="openGlobalPhotoEdit('store_new')" title="Nhấn để đổi ảnh" />
+                        <button type="button" onclick="viewFullscreenPhoto(document.getElementById('store-img-preview').src)" class="mt-2 w-full py-2.5 bg-blue-500/10 border border-blue-500/20 text-blue-400 rounded-xl text-xs font-semibold"><i class="fa-solid fa-expand mr-1"></i>Xem ảnh toàn màn hình</button>
                     </div>
                     <div class="flex justify-center pt-2">
-                        <button type="button" onclick="captureStorePhoto()" id="btn-snap-store" class="w-14 h-14 bg-amber-500 hover:bg-amber-600 rounded-full flex items-center justify-center text-slate-950 shadow-lg transition active:scale-95 border-4 border-slate-900" title="Chụp ảnh cửa hàng">
-                            <i class="fa-solid fa-camera text-lg"></i>
-                        </button>
+                        
                     </div>
                     <button type="button" onclick="initStoreCamera()" id="btn-resnap-store" class="hidden w-full py-3 bg-theme-input hover:opacity-80 font-bold rounded-xl text-xs border border-theme-border">Chụp lại ảnh</button>
                 </div>
@@ -390,6 +394,7 @@
                     </div>
                     <div id="product-img-preview-box" class="hidden relative aspect-video bg-black rounded-xl overflow-hidden border border-theme-border">
                         <img id="product-img-preview" class="w-full h-full object-cover cursor-pointer" onclick="openGlobalPhotoEdit('product_new')" title="Nhấn để đổi ảnh">
+                        <button type="button" onclick="viewFullscreenPhoto(document.getElementById('product-img-preview').src)" class="absolute bottom-2 left-2 px-2.5 py-1.5 bg-black/60 text-white rounded-lg text-[11px] font-semibold"><i class="fa-solid fa-expand mr-1"></i>Xem ảnh</button>
                         <button type="button" onclick="clearProductImage()" class="absolute top-2 right-2 bg-rose-600 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold"><i class="fa-solid fa-xmark"></i></button>
                     </div>
                 </div>
@@ -410,12 +415,13 @@
             </div>
             <div class="relative bg-black rounded-2xl overflow-hidden aspect-video flex items-center justify-center border border-theme-border">
                 <video id="prod-cam-stream" autoplay playsinline class="w-full h-full object-cover"></video>
+                    <button type="button" onclick="captureProductCamera()" class="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 w-14 h-14 bg-amber-500 hover:bg-amber-600 rounded-full flex items-center justify-center text-slate-950 shadow-lg transition active:scale-95 border-4 border-slate-900" title="Chụp ảnh">
+                    <i class="fa-solid fa-camera text-lg"></i>
+                </button>
                 <canvas id="prod-cam-canvas" class="hidden"></canvas>
             </div>
             <div class="flex justify-center pt-2">
-                <button type="button" onclick="captureProductCamera()" class="w-14 h-14 bg-amber-500 hover:bg-amber-600 rounded-full flex items-center justify-center text-slate-950 shadow-lg transition active:scale-95 border-4 border-slate-900" title="Chụp ảnh">
-                    <i class="fa-solid fa-camera text-lg"></i>
-                </button>
+                
             </div>
         </div>
     </div>
@@ -441,12 +447,13 @@
                 <div id="order-photos-container" class="grid grid-cols-3 gap-2"></div>
                 <div id="order-camera-box" class="relative bg-black rounded-xl overflow-hidden aspect-video hidden items-center justify-center border border-theme-border">
                     <video id="order-cam-stream" autoplay playsinline class="w-full h-full object-cover"></video>
+                    <button type="button" id="btn-snap-order-photo" onclick="captureOrderPhoto()" class="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 hidden w-14 h-14 bg-amber-500 hover:bg-amber-600 rounded-full flex items-center justify-center text-slate-950 shadow-lg transition active:scale-95 border-4 border-slate-900" title="Chụp ngay">
+                        <i class="fa-solid fa-camera text-lg"></i>
+                    </button>
                     <canvas id="order-cam-canvas" class="hidden"></canvas>
                 </div>
                 <div class="flex justify-center pt-2">
-                    <button type="button" id="btn-snap-order-photo" onclick="captureOrderPhoto()" class="hidden w-14 h-14 bg-amber-500 hover:bg-amber-600 rounded-full flex items-center justify-center text-slate-950 shadow-lg transition active:scale-95 border-4 border-slate-900" title="Chụp ngay">
-                        <i class="fa-solid fa-camera text-lg"></i>
-                    </button>
+                    
                 </div>
                 <button type="button" id="btn-open-order-cam" onclick="startOrderCamera()" class="w-full py-2.5 bg-theme-input hover:opacity-80 font-bold rounded-xl text-xs border border-theme-border"><i class="fa-solid fa-camera mr-1"></i> Mở camera chụp ảnh</button>
             </div>
@@ -525,6 +532,12 @@
             </div>
             <button onclick="closeBillModal()" class="w-full py-2 bg-theme-input hover:opacity-85 font-semibold rounded-xl text-xs transition border border-theme-border">Đóng</button>
         </div>
+    </div>
+
+    <!-- MODAL XEM ẢNH TOÀN MÀN HÌNH -->
+    <div id="fullscreen-photo-modal" class="fixed inset-0 bg-black z-[70] hidden flex items-center justify-center" onclick="closeFullscreenPhoto()">
+        <img id="fullscreen-photo-img" class="max-w-full max-h-full object-contain" />
+        <button type="button" onclick="closeFullscreenPhoto()" class="absolute right-3 w-11 h-11 bg-white/20 hover:bg-white/30 text-white rounded-full flex items-center justify-center text-lg" style="top: calc(env(safe-area-inset-top, 0px) + 12px)"><i class="fa-solid fa-xmark"></i></button>
     </div>
 
     <!-- MODAL XEM ẢNH (DỰ PHÒNG KHI KHÔNG CHIA SẺ ĐƯỢC) -->
@@ -740,6 +753,7 @@
             if (!user) { app.innerHTML = renderAuthScreen(); return; }
             if (user.status !== 'approved' && user.role !== 'admin') { app.innerHTML = renderPendingScreen(); return; }
             app.innerHTML = renderMainLayout();
+            decorateImages();
         }
 
         function renderAuthScreen() {
@@ -2355,6 +2369,13 @@
         function startCamera() {
             const v = document.getElementById('camera-stream');
             v.parentElement.classList.remove('hidden');
+            capturedImageData = null;
+            document.getElementById('photo-preview-container').classList.add('hidden');
+            document.getElementById('btn-capture').classList.remove('hidden');
+            document.getElementById('btn-retake').classList.add('hidden');
+            const sb = document.getElementById('btn-submit-checkin');
+            sb.disabled = true; sb.classList.add('opacity-50');
+            if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; }
             if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { alert('Trình duyệt không hỗ trợ camera! Hãy mở bằng Chrome/Safari qua https.'); return; }
             navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}}).then(s=>{mediaStream=s;v.srcObject=s;}).catch(()=>alert('Không mở được camera! Hãy cấp quyền camera cho trình duyệt.'));
         }
@@ -2448,6 +2469,34 @@
         function effectiveDistance(store) {
             const d = calculateDistance(currentLivePos.lat, currentLivePos.lng, store.lat, store.lng);
             return Math.max(0, d - Math.min(currentGpsAccuracy || 0, 30));
+        }
+
+        function viewFullscreenPhoto(src) {
+            if (!src) return;
+            document.getElementById('fullscreen-photo-img').src = src;
+            document.getElementById('fullscreen-photo-modal').classList.remove('hidden');
+        }
+        function closeFullscreenPhoto() {
+            document.getElementById('fullscreen-photo-modal').classList.add('hidden');
+            document.getElementById('fullscreen-photo-img').removeAttribute('src');
+        }
+        document.addEventListener('keydown', e => { if (e.key === 'Escape') closeFullscreenPhoto(); });
+
+        function decorateImages() {
+            document.querySelectorAll('#app img[onclick*="openGlobalPhotoEdit"]').forEach(img => {
+                if (img.dataset.viewAdded) return;
+                img.dataset.viewAdded = '1';
+                const wrap = document.createElement('div');
+                wrap.style.cssText = 'display:inline-flex;flex-direction:column;align-items:flex-start;gap:4px;vertical-align:top';
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'px-2 py-1 bg-blue-500/10 border border-blue-500/20 text-blue-400 rounded-lg text-[11px] font-semibold whitespace-nowrap';
+                btn.innerHTML = '<i class="fa-solid fa-expand mr-1"></i>Xem ảnh';
+                btn.onclick = e => { e.stopPropagation(); viewFullscreenPhoto(img.src); };
+                img.parentNode.insertBefore(wrap, img);
+                wrap.appendChild(img);
+                wrap.appendChild(btn);
+            });
         }
 
         function calculateDistance(lat1,lon1,lat2,lon2){ const R=6371e3,dLat=(lat2-lat1)*Math.PI/180,dLon=(lon2-lon1)*Math.PI/180,a=Math.sin(dLat/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2; return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a)); }
