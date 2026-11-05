@@ -566,7 +566,7 @@
         // ==========================================
         // 🔒 VÙNG KHÓA CỐ ĐỊNH HỆ THỐNG (IMMUTABLE CORE)
         // ==========================================
-        const CLOUD_API_URL = "https://script.google.com/macros/s/AKfycbxeQW26fVy__15HzsjhDhVpN54IXBficsxgA1f53rTN7LCEncCRILeoWxmBu3m6X-fKpQ/exec";
+        const CLOUD_API_URL = "https://script.google.com/macros/s/AKfycbxmtZW98POremuUO1pejcIqb7Q_s5opipeewciDaMhi3WEdsZ4P-bbBYUzbNfji8s63vQ/exec";
 
         let db = {
             users: [{ username: 'admin', password: '123', role: 'admin', status: 'approved', fullname: 'Quản trị viên (Hoàng Đế)', permissions: { stores: true, master: true, warehouse: true, history: true } }],
@@ -600,7 +600,7 @@
 
         function getCurrentUser() { return currentUsername ? db.users.find(u => u.username === currentUsername) || null : null; }
 
-        let cloudState = 'loading', cloudOk = false, cloudVersion = 0, pushTimer = null, pushing = false, pendingPush = false, pulling = false, lastSyncText = '';
+        let lastSyncError = '', cloudState = 'loading', cloudOk = false, cloudVersion = 0, pushTimer = null, pushing = false, pendingPush = false, pulling = false, lastSyncText = '';
         const isCloudConfigured = () => !!CLOUD_API_URL && !CLOUD_API_URL.includes('DÁN_LINK');
         const isDirty = () => { try { return localStorage.getItem('hoangde_dirty') === '1'; } catch (e) { return false; } };
         const setDirty = v => { try { v ? localStorage.setItem('hoangde_dirty', '1') : localStorage.removeItem('hoangde_dirty'); } catch (e) {} };
@@ -623,6 +623,13 @@
             }
         }
 
+        function describeSyncError(e) {
+            const m = String((e && e.message) || e || '');
+            if (/JSON|Unexpected token|DOCTYPE|<html/i.test(m)) return 'Link trả về một trang web thay vì dữ liệu. Thường do script chưa chọn quyền "Bất kỳ ai" (Anyone) hoặc chưa Triển khai phiên bản mới.';
+            if (/Failed to fetch|Load failed|NetworkError|network/i.test(m)) return 'Không kết nối được tới link Google Script. Có thể: link trong CLOUD_API_URL bị sai, điện thoại mất mạng, hoặc quyền script chưa là "Bất kỳ ai".';
+            return m || 'Lỗi không rõ';
+        }
+
         function syncBadgeHtml() {
             let cls, icon, txt;
             if (!isCloudConfigured()) { cls = 'bg-slate-500/15 text-slate-400 border-slate-500/30'; icon = 'fa-cloud'; txt = 'Chưa nối cloud'; }
@@ -635,7 +642,7 @@
         function updateSyncBadge() {
             const el = document.getElementById('sync-badge'); if (el) el.outerHTML = syncBadgeHtml();
             const st = document.getElementById('sync-status-text');
-            if (st) st.innerText = (isCloudConfigured() ? (cloudState === 'ok' ? 'Đã kết nối cloud.' : cloudState === 'error' ? 'Chưa kết nối được cloud.' : 'Đang kết nối...') : 'Chưa cấu hình link cloud.') + (lastSyncText ? ' Lần đồng bộ gần nhất: ' + lastSyncText : '');
+            if (st) st.innerText = (isCloudConfigured() ? (cloudState === 'ok' ? 'Đã kết nối cloud.' : cloudState === 'error' ? 'Chưa kết nối được cloud. Lý do: ' + lastSyncError : 'Đang kết nối...') : 'Chưa cấu hình link cloud.') + (lastSyncText ? ' Lần đồng bộ gần nhất: ' + lastSyncText : '');
         }
         function safeRender() {
             const ae = document.activeElement;
@@ -698,7 +705,7 @@
                 if (changed) safeRender();
             } catch (e) {
                 console.warn('Không tải được cloud', e);
-                cloudState = 'error';
+                cloudState = 'error'; lastSyncError = describeSyncError(e);
             }
             pulling = false;
             updateSyncBadge();
@@ -737,8 +744,8 @@
                         alert('Dữ liệu trên cloud đã được cập nhật từ thiết bị khác, app vừa tải bản mới nhất về.\nNếu thao tác bạn vừa làm bị mất, hãy làm lại giúp mình nhé.');
                         pushing = false; safeRender(); return;
                     }
-                } else { cloudState = 'error'; }
-            } catch (e) { console.warn('Lỗi đẩy cloud', e); cloudState = 'error'; }
+                } else { cloudState = 'error'; lastSyncError = 'Máy chủ báo lỗi: ' + ((r && (r.message || r.reason)) || 'không rõ'); }
+            } catch (e) { console.warn('Lỗi đẩy cloud', e); cloudState = 'error'; lastSyncError = describeSyncError(e); }
             pushing = false;
             updateSyncBadge();
             if (pendingPush) { pendingPush = false; schedulePush(); }
@@ -746,6 +753,7 @@
 
         function syncNow() {
             if (!isCloudConfigured()) { alert('Chưa cấu hình link Google Apps Script trong file index.html (biến CLOUD_API_URL).'); return; }
+            if (cloudState === 'error' && lastSyncError) alert('Lý do lỗi đồng bộ:\n\n' + lastSyncError + '\n\nLink đang dùng:\n' + CLOUD_API_URL.slice(0, 60) + '...');
             if (cloudOk && isDirty()) pushCloud(); else { cloudOk = false; pullCloud('init'); }
         }
 
@@ -956,7 +964,7 @@
                         </div>
                         <div>
                             <h1 class="font-black text-xs sm:text-sm uppercase tracking-wider">PHỤ KIỆN HOÀNG ĐẾ</h1>
-                            <p class="text-[11px] sm:text-xs opacity-75">Nhân sự: <span class="font-bold text-amber-500">${user.fullname}</span> (${db.settings?.deviceMode === 'pc' ? 'Chế độ PC' : 'Chế độ Mobile'} • Bản 11)</p>
+                            <p class="text-[11px] sm:text-xs opacity-75">Nhân sự: <span class="font-bold text-amber-500">${user.fullname}</span> (${db.settings?.deviceMode === 'pc' ? 'Chế độ PC' : 'Chế độ Mobile'} • Bản 12)</p>
                         </div>
                     </div>
                     <div class="flex space-x-2 w-full sm:w-auto justify-end">
