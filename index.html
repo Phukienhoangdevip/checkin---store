@@ -504,8 +504,8 @@
                 <button onclick="quickParseText()" class="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl text-sm"><i class="fa-solid fa-magnifying-glass mr-2"></i>Đọc & phân loại</button>
             </div>
             <div id="qi-pane-img" class="space-y-2 hidden">
-                <p class="text-[11px] opacity-75">Chọn ảnh chụp/ảnh màn hình đơn hàng. Với hóa đơn dạng bảng (Sapo…), app chỉ lấy tên sản phẩm, số lượng, đơn giá, thành tiền và tự đối chiếu với tổng hóa đơn; bỏ hết phần còn lại. Lần đầu cần có mạng để tải bộ đọc chữ tiếng Việt.</p>
-                <input type="file" id="qi-file" accept="image/*" onchange="qiFilePicked(this)" class="w-full text-xs file:mr-3 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:bg-amber-500 file:text-slate-950 file:font-bold">
+                <p class="text-[11px] opacity-75">Chọn tối đa 15 ảnh chụp/ảnh màn hình đơn hàng (chọn nhiều ảnh cùng lúc). Với hóa đơn dạng bảng (Sapo…), app chỉ lấy tên sản phẩm, số lượng, đơn giá, thành tiền và tự đối chiếu với tổng hóa đơn; bỏ hết phần còn lại. Lần đầu cần có mạng để tải bộ đọc chữ tiếng Việt.</p>
+                <input type="file" id="qi-file" accept="image/*" multiple onchange="qiFilePicked(this)" class="w-full text-xs file:mr-3 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:bg-amber-500 file:text-slate-950 file:font-bold">
                 <img id="qi-preview" class="hidden w-full max-h-56 object-contain rounded-xl border border-theme-border">
                 <p id="qi-progress" class="text-[11px] text-center font-semibold text-amber-500"></p>
                 <button id="qi-ocr-btn" onclick="quickOcr()" class="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl text-sm"><i class="fa-solid fa-image mr-2"></i>Đọc ảnh đơn hàng</button>
@@ -2223,9 +2223,12 @@
 
         // ----- đọc ảnh (OCR) -----
         function qiFilePicked(inp) {
-            const f = inp.files && inp.files[0]; const pv = document.getElementById('qi-preview');
-            if (!f) { pv.classList.add('hidden'); return; }
+            const files = Array.from(inp.files || []); const pv = document.getElementById('qi-preview');
+            if (files.length > 15) { alert('Chỉ chọn được tối đa 15 ảnh. Đã giữ lại ' + 15 + ' ảnh đầu tiên.'); try { const dt = new DataTransfer(); files.slice(0, 15).forEach(x => dt.items.add(x)); inp.files = dt.files; } catch (e) {} }
+            const f = files[0];
+            if (!f) { pv.classList.add('hidden'); document.getElementById('qi-progress').innerText = ''; return; }
             pv.src = URL.createObjectURL(f); pv.classList.remove('hidden');
+            document.getElementById('qi-progress').innerText = 'Đã chọn ' + Math.min(files.length, 15) + '/15 ảnh';
         }
         function loadTesseract() {
             return new Promise((res, rej) => {
@@ -2261,16 +2264,20 @@
             });
         }
         async function quickOcr() {
-            const f = document.getElementById('qi-file').files[0];
-            if (!f) { alert('Hãy chọn ảnh đơn hàng trước.'); return; }
+            const files = Array.from(document.getElementById('qi-file').files || []).slice(0, 15);
+            if (!files.length) { alert('Hãy chọn ảnh đơn hàng trước.'); return; }
             const prog = document.getElementById('qi-progress'), btn = document.getElementById('qi-ocr-btn'); btn.disabled = true;
             try {
-                prog.innerText = 'Đang chuẩn bị ảnh...'; const canvas = await ocrPrep(f);
                 prog.innerText = 'Đang tải bộ đọc chữ (lần đầu hơi lâu)...'; await loadTesseract();
-                const r = await Tesseract.recognize(canvas, 'vie+eng', { logger: m => { if (m && m.status) prog.innerText = (m.status === 'recognizing text' ? 'Đang đọc chữ ' + Math.round((m.progress || 0) * 100) + '%' : 'Đang xử lý: ' + m.status); } });
-                const text = (r && r.data && r.data.text) || '';
+                const texts = [], n = files.length;
+                for (let i = 0; i < n; i++) {
+                    const tag = n > 1 ? 'Ảnh ' + (i + 1) + '/' + n + ': ' : '';
+                    prog.innerText = tag + 'đang chuẩn bị ảnh...'; const canvas = await ocrPrep(files[i]);
+                    const r = await Tesseract.recognize(canvas, 'vie+eng', { logger: m => { if (m && m.status) prog.innerText = tag + (m.status === 'recognizing text' ? 'đang đọc chữ ' + Math.round((m.progress || 0) * 100) + '%' : 'đang xử lý: ' + m.status); } });
+                    texts.push((r && r.data && r.data.text) || '');
+                }
                 prog.innerText = '';
-                openQuickConfirm(text);
+                openQuickConfirm(texts.join('\n'));
             } catch (e) { prog.innerText = ''; alert('Lỗi đọc ảnh: ' + (e && e.message ? e.message : e)); }
             btn.disabled = false;
         }
