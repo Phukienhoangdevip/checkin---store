@@ -13,10 +13,15 @@
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
     <style> 
         body { -webkit-tap-highlight-color: transparent; } 
         .hide-scrollbar::-webkit-scrollbar { display: none; }
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        #map-box .leaflet-tile-pane .leaflet-tile-loaded { visibility: visible !important; opacity: 1 !important; }
+        #map-box .leaflet-control-layers { font-size: 12px; color: #0f172a; }
+        #map-box .leaflet-control-layers label { color: #0f172a; margin: 0; }
     </style>
 </head>
 <body id="app-body" class="bg-slate-950 text-slate-100 font-sans antialiased min-h-screen flex flex-col transition-colors duration-300">
@@ -282,10 +287,15 @@
     <div id="report-modal" class="fixed inset-0 bg-slate-950/85 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
         <div class="bg-theme-card border border-theme-border rounded-3xl max-w-2xl w-full p-3 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto text-theme-text">
             <div class="flex justify-between items-center border-b border-theme-border pb-3">
-                <h3 class="font-bold text-base"><i class="fa-solid fa-file-invoice-dollar text-amber-500 mr-2"></i>Báo Cáo Doanh Thu & Thị Trường Trong Ngày</h3>
+                <h3 class="font-bold text-base" id="report-title"><i class="fa-solid fa-file-invoice-dollar text-amber-500 mr-2"></i>Báo Cáo Doanh Thu & Thị Trường Trong Ngày</h3>
                 <button onclick="closeReportModal()" class="text-theme-text opacity-75 hover:opacity-100 p-2"><i class="fa-solid fa-xmark text-lg"></i></button>
             </div>
             
+            <div class="flex gap-2 px-1">
+                <button id="rp-tab-day" onclick="openReportModal('day')" class="flex-1 py-2.5 rounded-xl text-xs font-bold border bg-theme-input border-theme-border">Báo cáo trong ngày</button>
+                <button id="rp-tab-all" onclick="openReportModal('all')" class="flex-1 py-2.5 rounded-xl text-xs font-bold border bg-theme-input border-theme-border">Toàn bộ lịch sử</button>
+            </div>
+            <p id="rp-progress" class="text-[11px] text-center font-semibold text-amber-500"></p>
             <p class="text-[11px] opacity-75 text-center">Báo cáo được tự chia thành nhiều ảnh vừa màn hình điện thoại. Bấm Chia sẻ để gửi tất cả các ảnh.</p>
             <div id="report-pages" class="flex flex-col items-center gap-4"></div>
 
@@ -321,7 +331,12 @@
                     </div>
                 </div>
                 <p class="text-xs font-bold uppercase pt-2">Hoặc chọn sản phẩm có sẵn từ Bảng Tổng:</p>
-                <div class="space-y-2 max-h-[280px] overflow-y-auto hide-scrollbar" id="import-product-list"></div>
+                <div class="relative">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-xs opacity-60"></i>
+                    <input type="text" id="import-search" oninput="importSearchInput(this.value)" placeholder="Tìm theo tên hoặc mã sản phẩm..." class="w-full pl-9 pr-3 py-2.5 rounded-xl bg-theme-input border border-theme-border text-theme-text text-sm outline-none">
+                </div>
+                <div class="flex gap-2 overflow-x-auto pb-1 hide-scrollbar" id="import-cat-chips"></div>
+                <div class="space-y-2 max-h-[300px] overflow-y-auto hide-scrollbar" id="import-product-list"></div>
             </div>
         </div>
     </div>
@@ -342,6 +357,14 @@
                         <button type="button" onclick="editCategory()" class="text-[10px] text-blue-400 font-bold bg-blue-500/10 border border-blue-500/20 px-2 py-1 rounded"><i class="fa-solid fa-pen mr-1"></i> Sửa tên nhóm chọn</button>
                     </div>
                     <div class="flex space-x-2 overflow-x-auto pb-1 hide-scrollbar" id="category-list-container"></div>
+                </div>
+                <div class="space-y-1.5">
+                    <label class="block text-xs font-semibold uppercase">Màu sắc <span class="opacity-60 normal-case font-normal">(không bắt buộc)</span></label>
+                    <div class="flex flex-wrap gap-1.5" id="color-chips"></div>
+                </div>
+                <div id="variant-row" class="hidden space-y-1.5">
+                    <label class="block text-xs font-semibold uppercase">Biến thể cáp sạc <span class="opacity-60 normal-case font-normal">(không bắt buộc)</span></label>
+                    <div class="flex flex-wrap gap-1.5" id="variant-chips"></div>
                 </div>
                 <div>
                     <label class="block text-xs font-semibold uppercase mb-1">Tên / Mẫu mã sản phẩm *</label>
@@ -399,6 +422,148 @@
         </div>
     </div>
 
+    <!-- MODAL TOÀN MÀN HÌNH CHỌN SẢN PHẨM BÁN -->
+    <div id="product-picker-modal" class="fixed inset-0 bg-theme-card text-theme-text z-[60] hidden flex flex-col">
+        <div class="flex items-center justify-between px-4 py-3 border-b border-theme-border">
+            <h3 class="font-bold text-base"><i class="fa-solid fa-boxes-stacked text-amber-500 mr-2"></i>Chọn sản phẩm bán</h3>
+            <button onclick="closeProductPicker()" class="p-2 opacity-75 hover:opacity-100"><i class="fa-solid fa-xmark text-xl"></i></button>
+        </div>
+        <div class="px-4 pt-3 pb-2 space-y-2 border-b border-theme-border">
+            <div class="relative">
+                <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-xs opacity-60"></i>
+                <input type="text" id="picker-search" oninput="renderPicker()" placeholder="Nhập mã hoặc tên sản phẩm..." class="w-full pl-9 pr-3 py-3 rounded-xl bg-theme-input border border-theme-border text-theme-text text-sm outline-none">
+            </div>
+            <div class="flex gap-2 overflow-x-auto pb-1 hide-scrollbar" id="picker-cat-chips"></div>
+            <div class="flex gap-2 overflow-x-auto pb-1 hide-scrollbar items-center" id="picker-color-chips"></div>
+        </div>
+        <div id="picker-list" class="flex-1 overflow-y-auto px-4 py-3 space-y-2"></div>
+        <div class="px-4 py-3 border-t border-theme-border space-y-2" style="padding-bottom:max(12px, env(safe-area-inset-bottom))">
+            <div class="flex justify-between items-center">
+                <span class="text-xs font-bold uppercase opacity-75">Tổng tiền (<span id="picker-count">0</span> món)</span>
+                <span id="picker-total" class="text-xl font-extrabold text-amber-500">0 đ</span>
+            </div>
+            <button onclick="confirmProductPicker()" class="w-full py-3.5 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold rounded-2xl text-sm"><i class="fa-solid fa-check mr-2"></i>Xác nhận đơn hàng</button>
+        </div>
+    </div>
+
+    <!-- MODAL NHẬP SỐ LƯỢNG (+ BIẾN THỂ CÁP SẠC) KHI CHỌN NHANH TỪ BẢNG TỔNG -->
+    <div id="import-qty-modal" class="fixed inset-0 bg-slate-950/85 backdrop-blur-sm z-[58] hidden flex items-center justify-center p-4">
+        <div class="bg-theme-card border border-theme-border rounded-3xl max-w-md w-full p-5 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto text-theme-text">
+            <div class="flex justify-between items-start border-b border-theme-border pb-3">
+                <div>
+                    <h3 class="font-bold text-base">Nhập thêm vào kho</h3>
+                    <p class="text-sm font-bold text-amber-500" id="iq-name"></p>
+                </div>
+                <button onclick="closeImportQty()" class="p-2 opacity-75 hover:opacity-100"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <div id="iq-variant-box" class="hidden space-y-2">
+                <label class="block text-xs font-semibold uppercase">Chọn biến thể</label>
+                <div class="flex flex-wrap gap-2" id="iq-variant-chips"></div>
+            </div>
+            <div class="space-y-2">
+                <label class="block text-xs font-semibold uppercase">Màu sắc <span class="opacity-60 normal-case font-normal">(không bắt buộc)</span></label>
+                <div class="flex flex-wrap gap-2" id="iq-color-chips"></div>
+            </div>
+            <div>
+                <label class="block text-xs font-semibold uppercase mb-1">Số lượng nhập</label>
+                <input type="number" inputmode="numeric" min="1" id="iq-qty" placeholder="Nhập số lượng" class="w-full px-4 py-3 rounded-xl bg-theme-input border border-theme-border text-theme-text text-base outline-none">
+            </div>
+            <button onclick="confirmImportQty()" class="w-full py-3.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-2xl text-sm">Xác nhận nhập kho</button>
+        </div>
+    </div>
+
+    <!-- MODAL CHỌN TỈNH / QUẬN CÓ TÌM KIẾM -->
+    <div id="pick-modal" class="fixed inset-0 bg-slate-950/85 backdrop-blur-sm z-[58] hidden flex items-end sm:items-center justify-center p-0 sm:p-4">
+        <div class="bg-theme-card border border-theme-border rounded-t-3xl sm:rounded-3xl max-w-md w-full p-5 space-y-3 shadow-2xl max-h-[85vh] flex flex-col text-theme-text">
+            <div class="flex justify-between items-center">
+                <h3 class="font-bold text-base" id="pick-title">Chọn</h3>
+                <button onclick="document.getElementById('pick-modal').classList.add('hidden')" class="p-2 opacity-75 hover:opacity-100"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <div class="relative">
+                <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-xs opacity-60"></i>
+                <input type="text" id="pick-search" oninput="renderPicker2()" placeholder="Gõ để tìm nhanh..." class="w-full pl-9 pr-3 py-3 rounded-xl bg-theme-input border border-theme-border text-theme-text text-sm outline-none">
+            </div>
+            <div id="pick-list" class="overflow-y-auto space-y-2 flex-1"></div>
+        </div>
+    </div>
+
+    <!-- NHẬP HÀNG NHANH (VĂN BẢN / ẢNH) -->
+    <div id="quick-import-modal" class="fixed inset-0 bg-slate-950/85 backdrop-blur-sm z-[58] hidden flex items-center justify-center p-4">
+        <div class="bg-theme-card border border-theme-border rounded-3xl max-w-md w-full p-5 space-y-3 shadow-2xl max-h-[92vh] overflow-y-auto text-theme-text">
+            <div class="flex justify-between items-center border-b border-theme-border pb-3">
+                <h3 class="font-bold text-base"><i class="fa-solid fa-wand-magic-sparkles text-blue-400 mr-2"></i>Nhập hàng nhanh</h3>
+                <button onclick="closeQuickImport()" class="p-2 opacity-75 hover:opacity-100"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <div class="flex gap-2">
+                <button id="qi-tab-text" onclick="setQiTab('text')" class="flex-1 py-2.5 rounded-xl text-xs font-bold border">Dán văn bản</button>
+                <button id="qi-tab-img" onclick="setQiTab('img')" class="flex-1 py-2.5 rounded-xl text-xs font-bold border">Từ hình ảnh</button>
+            </div>
+            <div id="qi-pane-text" class="space-y-2">
+                <p class="text-[11px] opacity-75">Dán nguyên đơn hàng vào đây. App tự đọc tên, số lượng, màu, loại cáp và phân nhóm. Bạn sẽ được xem và sửa trước khi nhập kho.</p>
+                <textarea id="qi-text" rows="9" placeholder="VD:&#10;Cáp iPhone Type C to Lightning đen x20&#10;Củ sạc 20W: 10 cái&#10;5 tai nghe bluetooth trắng&#10;Ốp lưng iPhone 15 - SL 8" class="w-full px-3 py-3 rounded-xl bg-theme-input border border-theme-border text-theme-text text-sm outline-none"></textarea>
+                <button onclick="quickParseText()" class="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl text-sm"><i class="fa-solid fa-magnifying-glass mr-2"></i>Đọc & phân loại</button>
+            </div>
+            <div id="qi-pane-img" class="space-y-2 hidden">
+                <p class="text-[11px] opacity-75">Chọn ảnh chụp/ảnh màn hình đơn hàng. App chỉ lấy dòng sản phẩm và số lượng, bỏ phần địa chỉ, SĐT, tổng tiền. Lần đầu cần có mạng để tải bộ đọc chữ tiếng Việt.</p>
+                <input type="file" id="qi-file" accept="image/*" onchange="qiFilePicked(this)" class="w-full text-xs file:mr-3 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:bg-amber-500 file:text-slate-950 file:font-bold">
+                <img id="qi-preview" class="hidden w-full max-h-56 object-contain rounded-xl border border-theme-border">
+                <p id="qi-progress" class="text-[11px] text-center font-semibold text-amber-500"></p>
+                <button id="qi-ocr-btn" onclick="quickOcr()" class="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl text-sm"><i class="fa-solid fa-image mr-2"></i>Đọc ảnh đơn hàng</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- XÁC NHẬN NHẬP KHO NHANH (CHỈNH SỬA ĐƯỢC) -->
+    <div id="quick-confirm-modal" class="fixed inset-0 bg-theme-card text-theme-text z-[62] hidden flex flex-col">
+        <div class="flex items-center justify-between px-4 py-3 border-b border-theme-border">
+            <h3 class="font-bold text-base"><i class="fa-solid fa-clipboard-check text-emerald-400 mr-2"></i>Xác nhận nhập kho</h3>
+            <button onclick="closeQuickConfirm()" class="p-2 opacity-75 hover:opacity-100"><i class="fa-solid fa-xmark text-xl"></i></button>
+        </div>
+        <div class="px-4 pt-3 space-y-2 border-b border-theme-border pb-3">
+            <p class="text-[11px] opacity-80">Kiểm tra kỹ từng dòng, có thể sửa tên, nhóm, màu, biến thể, số lượng. Chỉ khi bấm "Xác nhận nhập kho" hàng mới vào kho.</p>
+            <details class="text-xs"><summary class="cursor-pointer font-semibold opacity-80">Xem / sửa văn bản gốc đã đọc</summary>
+                <textarea id="qc-raw" rows="5" class="w-full mt-2 px-3 py-2 rounded-xl bg-theme-input border border-theme-border text-xs outline-none"></textarea>
+                <button onclick="qcReparse()" class="mt-2 px-3 py-2 bg-blue-600 text-white rounded-lg font-bold text-xs">Đọc lại từ văn bản này</button>
+            </details>
+        </div>
+        <datalist id="qc-names"></datalist>
+        <div id="qc-list" class="flex-1 overflow-y-auto px-4 py-3 space-y-3"></div>
+        <div class="px-4 py-3 border-t border-theme-border space-y-2" style="padding-bottom:max(12px, env(safe-area-inset-bottom))">
+            <div class="flex justify-between items-center text-xs font-bold"><span id="qc-summary" class="opacity-80"></span>
+                <button onclick="qcAddRow()" class="px-3 py-1.5 bg-theme-input border border-theme-border rounded-lg"><i class="fa-solid fa-plus mr-1"></i>Thêm dòng</button></div>
+            <button onclick="confirmQuickImport()" class="w-full py-3.5 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold rounded-2xl text-sm"><i class="fa-solid fa-check mr-2"></i>Xác nhận nhập kho</button>
+        </div>
+    </div>
+
+    <!-- TRẢ HÀNG VỀ KHO -->
+    <div id="return-modal" class="fixed inset-0 bg-theme-card text-theme-text z-[58] hidden flex flex-col">
+        <div class="flex items-center justify-between px-4 py-3 border-b border-theme-border">
+            <h3 class="font-bold text-base"><i class="fa-solid fa-rotate-left text-rose-400 mr-2"></i>Trả hàng về kho</h3>
+            <button onclick="closeReturnModal()" class="p-2 opacity-75 hover:opacity-100"><i class="fa-solid fa-xmark text-xl"></i></button>
+        </div>
+        <div class="px-4 pt-3 pb-2 space-y-2 border-b border-theme-border">
+            <div class="relative">
+                <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-xs opacity-60"></i>
+                <input type="text" id="rt-search" oninput="renderReturnList()" placeholder="Tìm sản phẩm theo tên hoặc mã..." class="w-full pl-9 pr-3 py-3 rounded-xl bg-theme-input border border-theme-border text-sm outline-none">
+            </div>
+            <div class="flex gap-2">
+                <button onclick="returnSelectAll()" class="flex-1 py-2.5 bg-rose-600 text-white rounded-xl text-xs font-bold"><i class="fa-solid fa-check-double mr-1"></i>Chọn tất cả</button>
+                <button onclick="returnClearAll()" class="flex-1 py-2.5 bg-theme-input border border-theme-border rounded-xl text-xs font-bold">Bỏ chọn</button>
+            </div>
+        </div>
+        <div id="rt-list" class="flex-1 overflow-y-auto px-4 py-3 space-y-2"></div>
+        <div class="px-4 py-3 border-t border-theme-border space-y-2" style="padding-bottom:max(12px, env(safe-area-inset-bottom))">
+            <div class="text-[11px] font-bold uppercase opacity-70">Thông tin người nhận ở kho</div>
+            <input type="text" id="rt-name" placeholder="Tên người nhận ở kho *" class="w-full px-3 py-2.5 rounded-xl bg-theme-input border border-theme-border text-sm outline-none">
+            <div class="grid grid-cols-2 gap-2">
+                <input type="tel" id="rt-phone" placeholder="SĐT người nhận" class="px-3 py-2.5 rounded-xl bg-theme-input border border-theme-border text-sm outline-none">
+                <input type="text" id="rt-note" placeholder="Ghi chú / lý do" class="px-3 py-2.5 rounded-xl bg-theme-input border border-theme-border text-sm outline-none">
+            </div>
+            <div class="flex justify-between text-xs font-bold"><span>Đã chọn <span id="rt-count">0</span> sản phẩm</span><span><span id="rt-qty">0</span> cái</span></div>
+            <button onclick="confirmReturn()" class="w-full py-3.5 bg-rose-500 hover:bg-rose-600 text-white font-bold rounded-2xl text-sm"><i class="fa-solid fa-check mr-2"></i>Xác nhận trả hàng về kho</button>
+        </div>
+    </div>
+
     <!-- MODAL BÁN HÀNG & LÊN ĐƠN -->
     <div id="sales-order-modal" class="fixed inset-0 bg-slate-950/85 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
         <div class="bg-theme-card border border-theme-border rounded-3xl max-w-xl w-full p-6 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto text-theme-text">
@@ -410,7 +575,8 @@
                 <button onclick="document.getElementById('sales-order-modal').classList.add('hidden')" class="text-theme-text opacity-75 hover:opacity-100 p-2"><i class="fa-solid fa-xmark text-lg"></i></button>
             </div>
             
-            <div class="space-y-3 max-h-[220px] overflow-y-auto hide-scrollbar" id="order-product-list"></div>
+            <button type="button" onclick="openProductPicker()" class="w-full py-4 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-2xl text-sm shadow"><i class="fa-solid fa-boxes-stacked mr-2"></i><span id="btn-picker-label">Chọn sản phẩm</span></button>
+            <div class="space-y-2 max-h-[200px] overflow-y-auto hide-scrollbar" id="order-product-list"></div>
             
             <div class="bg-black/30 p-3.5 rounded-2xl border border-theme-border space-y-2">
                 <div class="flex justify-between items-center">
@@ -473,7 +639,7 @@
     <!-- MODAL HIỂN THỊ BILL THANH TOÁN (ẢNH JPG) -->
     <div id="bill-modal" class="fixed inset-0 bg-slate-950/85 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
         <div class="bg-theme-card border border-theme-border rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto text-theme-text">
-            <div class="text-center font-bold text-emerald-400 text-sm mb-1"><i class="fa-solid fa-circle-check mr-1"></i> Tạo đơn hàng thành công (Đã xuất file JPG)!</div>
+            <div id="bill-title" class="text-center font-bold text-emerald-400 text-sm mb-1"><i class="fa-solid fa-circle-check mr-1"></i> Tạo đơn hàng thành công (Đã xuất file JPG)!</div>
             <div id="invoice-card" class="bg-black border-2 border-amber-500/40 rounded-2xl p-5 space-y-3 text-slate-100 shadow-inner">
                 <div class="text-center border-b border-amber-500/30 pb-3">
                     <h2 class="font-black text-amber-400 uppercase text-sm tracking-wider">PHỤ KIỆN HOÀNG ĐẾ</h2>
@@ -607,7 +773,7 @@
 
         function normalizeDb() {
             if (!db.users || !db.users.length) db.users = [{ username: 'admin', password: '123', role: 'admin', status: 'approved', fullname: 'Quản trị viên (Hoàng Đế)', permissions: { stores: true, master: true, warehouse: true, history: true } }];
-            ['stores', 'productsMaster', 'warehouse', 'checkinHistory', 'importHistory'].forEach(k => { if (!Array.isArray(db[k])) db[k] = []; });
+            ['stores', 'productsMaster', 'warehouse', 'checkinHistory', 'importHistory', 'routes', 'returnHistory'].forEach(k => { if (!Array.isArray(db[k])) db[k] = []; });
             if (!db.salesHistory) db.salesHistory = db.history || [];
             if (!db.settings) db.settings = { checkinRadius: 50, requiredMinutes: 5, deviceMode: 'mobile' };
             if (!db.categories || !db.categories.length) db.categories = ['Cáp sạc', 'Củ sạc', 'Tai nghe', 'Kính cường lực', 'Ốp lưng'];
@@ -616,11 +782,149 @@
             db.users.forEach(u => { if (!u.permissions) u.permissions = { stores: true, master: true, warehouse: true, history: true }; });
         }
 
+        // ===== Bản 21: ảnh lưu trong IndexedDB, chữ lưu trong localStorage =====
+        const PHOTO_KEYS = new Set(['photo', 'photos', 'storePhoto', 'img']);
+        const IDB = { db: null, known: new Set() };
+        function idbOpen() {
+            return new Promise(res => {
+                try {
+                    const r = indexedDB.open('hoangde_photos', 1);
+                    r.onupgradeneeded = () => { r.result.createObjectStore('p'); };
+                    r.onsuccess = () => { IDB.db = r.result; res(true); };
+                    r.onerror = () => res(false); r.onblocked = () => res(false);
+                } catch (e) { res(false); }
+            });
+        }
+        function idbPutMany(map) {
+            return new Promise(res => {
+                try {
+                    const tx = IDB.db.transaction('p', 'readwrite'), st = tx.objectStore('p');
+                    Object.keys(map).forEach(k => st.put(map[k], k));
+                    tx.oncomplete = () => res(true); tx.onerror = tx.onabort = () => res(false);
+                } catch (e) { res(false); }
+            });
+        }
+        function idbGetMany(keys) {
+            return new Promise(res => {
+                const out = {}; if (!IDB.db || !keys.length) { res(out); return; }
+                try {
+                    const tx = IDB.db.transaction('p', 'readonly'), st = tx.objectStore('p');
+                    keys.forEach(k => { const rq = st.get(k); rq.onsuccess = () => { if (typeof rq.result === 'string') out[k] = rq.result; }; });
+                    tx.oncomplete = () => res(out); tx.onerror = tx.onabort = () => res(out);
+                } catch (e) { res(out); }
+            });
+        }
+        function idbDeleteExcept(keep) {
+            return new Promise(res => {
+                if (!IDB.db) { res(0); return; }
+                try {
+                    const tx = IDB.db.transaction('p', 'readwrite'), st = tx.objectStore('p'); let n = 0;
+                    st.openKeyCursor().onsuccess = ev => { const c = ev.target.result; if (c) { if (!keep.has(c.key)) { st.delete(c.key); IDB.known.delete(c.key); n++; } c.continue(); } };
+                    tx.oncomplete = () => res(n); tx.onerror = tx.onabort = () => res(0);
+                } catch (e) { res(0); }
+            });
+        }
+        function photoKey(d) {
+            let h = 2166136261 >>> 0; const L = d.length, step = Math.max(1, Math.floor(L / 6000));
+            for (let i = 0; i < L; i += step) { h ^= d.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
+            for (let i = Math.max(0, L - 64); i < L; i++) { h ^= d.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
+            return 'img_' + h.toString(36) + '_' + L.toString(36);
+        }
+        function walkPhotos(node, cb) {
+            if (!node || typeof node !== 'object') return;
+            if (Array.isArray(node)) { node.forEach(x => walkPhotos(x, cb)); return; }
+            Object.keys(node).forEach(k => {
+                const v = node[k];
+                if (PHOTO_KEYS.has(k)) {
+                    if (typeof v === 'string') cb(node, k);
+                    else if (Array.isArray(v)) v.forEach((x, i) => { if (typeof x === 'string') cb(v, i); });
+                } else if (v && typeof v === 'object') walkPhotos(v, cb);
+            });
+        }
+        async function hydratePhotos(obj) {
+            const refs = new Set();
+            walkPhotos(obj, (h, k) => { const v = h[k]; if (v.startsWith('idb:')) refs.add(v.slice(4)); });
+            if (!refs.size) return;
+            const got = await idbGetMany([...refs]);
+            walkPhotos(obj, (h, k) => { const v = h[k]; if (v.startsWith('idb:')) { const key = v.slice(4); h[k] = got[key] || ''; if (got[key]) IDB.known.add(key); } });
+        }
+
+        let storageWriteFailed = false, storageAlerted = false;
         function localCacheWrite() {
-            try { localStorage.setItem('hoangde_safe_fallback_db', JSON.stringify(db)); }
+            const pending = {};
+            const mapPhoto = d => {
+                if (typeof d !== 'string' || !d.startsWith('data:')) return d;
+                const key = photoKey(d);
+                if (IDB.db && IDB.known.has(key)) return 'idb:' + key;
+                if (IDB.db) pending[key] = d;
+                return d;
+            };
+            const rep = (k, v) => PHOTO_KEYS.has(k) ? (typeof v === 'string' ? mapPhoto(v) : (Array.isArray(v) ? v.map(mapPhoto) : v)) : v;
+            const stripUnknown = (k, v) => {
+                const f = d => (typeof d === 'string' && d.startsWith('data:')) ? (IDB.db && IDB.known.has(photoKey(d)) ? 'idb:' + photoKey(d) : '') : d;
+                return PHOTO_KEYS.has(k) ? (typeof v === 'string' ? f(v) : (Array.isArray(v) ? v.map(f) : v)) : v;
+            };
+            let ok = true;
+            try { localStorage.setItem('hoangde_safe_fallback_db', JSON.stringify(db, rep)); }
             catch (e) {
-                try { localStorage.setItem('hoangde_safe_fallback_db', JSON.stringify(db, (k, v) => ['photo', 'photos', 'storePhoto', 'img'].includes(k) ? (Array.isArray(v) ? [] : '') : v)); } catch (e2) {}
+                ok = false;
+                try { localStorage.setItem('hoangde_safe_fallback_db', JSON.stringify(db, stripUnknown)); } catch (e2) {}
             }
+            if (IDB.db && Object.keys(pending).length) {
+                idbPutMany(pending).then(done => {
+                    if (done) { Object.keys(pending).forEach(k => IDB.known.add(k)); localCacheWrite(); }
+                    else if (!ok) markStorageFailed();
+                });
+            } else if (ok) { storageWriteFailed = false; }
+            else if (!IDB.db) markStorageFailed();
+        }
+        function markStorageFailed() {
+            storageWriteFailed = true;
+            if (!storageAlerted) { storageAlerted = true; setTimeout(() => alert('⚠️ CẢNH BÁO: Bộ nhớ trình duyệt đã đầy hoặc bị chặn, app không lưu được đầy đủ dữ liệu (ảnh có thể bị mất)!\n\nHãy bấm "Sao lưu Excel" ngay, sau đó xóa lịch sử để giải phóng bộ nhớ.'), 50); }
+        }
+
+        // ----- nén ảnh -----
+        function shrinkDataUrl(d, maxSide, q) {
+            return new Promise(res => {
+                const img = new Image();
+                img.onload = () => {
+                    try {
+                        const sc = Math.min(1, maxSide / Math.max(img.width, img.height));
+                        const w = Math.max(1, Math.round(img.width * sc)), h = Math.max(1, Math.round(img.height * sc));
+                        const c = document.createElement('canvas'); c.width = w; c.height = h;
+                        const cx = c.getContext('2d'); cx.fillStyle = '#fff'; cx.fillRect(0, 0, w, h); cx.drawImage(img, 0, 0, w, h);
+                        const out = c.toDataURL('image/jpeg', q); res(out.length < d.length ? out : d);
+                    } catch (e) { res(d); }
+                };
+                img.onerror = () => res(d); img.src = d;
+            });
+        }
+        let compressing = false;
+        async function photoMaintenance(manual) {
+            if (compressing) return null; compressing = true;
+            const big = []; let before = 0, after = 0;
+            walkPhotos(db, (h, k) => { const v = h[k]; if (v.startsWith('data:image') && v.length > 150000) big.push([h, k, v]); });
+            for (const [h, k, v] of big) {
+                const out = await shrinkDataUrl(v, 800, 0.65);
+                before += v.length; after += out.length; h[k] = out;
+            }
+            const stats = { count: big.length, before, after };
+            if (big.length) { saveData(); }
+            if (IDB.db) {
+                setTimeout(async () => {
+                    const keep = new Set(); walkPhotos(db, (h, k) => { const v = h[k]; if (v.startsWith('data:')) keep.add(photoKey(v)); });
+                    if (IDB.known.size && [...keep].every(x => IDB.known.has(x))) await idbDeleteExcept(keep);
+                    refreshStorageEstimate();
+                }, 1500);
+            }
+            compressing = false;
+            if (manual) { refreshStorageEstimate(); render(); }
+            return stats;
+        }
+        async function manualCompress() {
+            const r = await photoMaintenance(true);
+            if (!r) return;
+            alert(r.count ? `Đã nén ${r.count} ảnh lớn: từ ${fmtBytes(r.before * 2)} xuống ${fmtBytes(r.after * 2)}.` : 'Không có ảnh nào quá lớn, không cần nén thêm.');
         }
 
         function describeSyncError(e) {
@@ -664,6 +968,8 @@
             db.salesHistory = data.salesHistory || data.history || [];
             db.checkinHistory = data.checkinHistory || [];
             db.importHistory = data.importHistory || [];
+            db.routes = data.routes || [];
+            db.returnHistory = data.returnHistory || [];
             if (data.settings) db.settings = data.settings;
             if (data.categories && data.categories.length) db.categories = data.categories;
             normalizeDb();
@@ -757,11 +1063,18 @@
             if (cloudOk && isDirty()) pushCloud(); else { cloudOk = false; pullCloud('init'); }
         }
 
-        function loadCloudData() {
-            try { const l = localStorage.getItem('hoangde_safe_fallback_db'); if (l) db = Object.assign(db, JSON.parse(l)); } catch (e) {}
+        async function loadCloudData() {
+            await idbOpen();
+            try {
+                const l = localStorage.getItem('hoangde_safe_fallback_db');
+                if (l) { const parsed = JSON.parse(l); await hydratePhotos(parsed); db = Object.assign(db, parsed); }
+            } catch (e) {}
             normalizeDb();
             render();
             pullCloud('init');
+            localCacheWrite();
+            setTimeout(() => photoMaintenance(false), 2500);
+            setTimeout(refreshStorageEstimate, 1000);
         }
 
         function saveSession() {
@@ -856,6 +1169,7 @@
 
         function render() {
             if (resetDailyStatus()) saveData();
+            if (leafMap) { try { mapState.view = { c: leafMap.getCenter(), z: leafMap.getZoom() }; leafMap.remove(); } catch (e) {} leafMap = null; mapLayer = null; mapMeMarker = null; }
             applyThemeToBody();
             const app = document.getElementById('app');
             if(!app) return;
@@ -864,6 +1178,7 @@
             if (user.status !== 'approved' && user.role !== 'admin') { app.innerHTML = renderPendingScreen(); return; }
             app.innerHTML = renderMainLayout();
             decorateImages();
+            if (currentTab === 'map') initMapTab();
             updateSyncBadge();
         }
 
@@ -964,7 +1279,7 @@
                         </div>
                         <div>
                             <h1 class="font-black text-xs sm:text-sm uppercase tracking-wider">PHỤ KIỆN HOÀNG ĐẾ</h1>
-                            <p class="text-[11px] sm:text-xs opacity-75">Nhân sự: <span class="font-bold text-amber-500">${user.fullname}</span> (${db.settings?.deviceMode === 'pc' ? 'Chế độ PC' : 'Chế độ Mobile'} • Bản 12)</p>
+                            <p class="text-[11px] sm:text-xs opacity-75">Nhân sự: <span class="font-bold text-amber-500">${user.fullname}</span> (${db.settings?.deviceMode === 'pc' ? 'Chế độ PC' : 'Chế độ Mobile'} • Bản 21)</p>
                         </div>
                     </div>
                     <div class="flex space-x-2 w-full sm:w-auto justify-end">
@@ -976,16 +1291,55 @@
                 <div class="bg-theme-card border-b border-theme-border px-4 sm:px-6 flex space-x-4 sm:space-x-6 overflow-x-auto shadow-sm hide-scrollbar text-theme-text">
                     ${(isAdmin || p.stores) ? `<button onclick="currentTab='stores'; render();" class="py-3 text-xs sm:text-sm font-semibold border-b-2 whitespace-nowrap transition ${currentTab==='stores'?'border-amber-500 text-amber-500':'border-transparent opacity-75 hover:opacity-100'}"><i class="fa-solid fa-store mr-1.5"></i> Điểm bán (${db.stores.length})</button>` : ''}
                     ${(isAdmin || p.stores) ? `<button onclick="currentTab='storeinfo'; render();" class="py-3 text-xs sm:text-sm font-semibold border-b-2 whitespace-nowrap transition ${currentTab==='storeinfo'?'border-amber-500 text-amber-500':'border-transparent opacity-75 hover:opacity-100'}"><i class="fa-solid fa-address-book mr-1.5"></i> Thông tin cửa hàng (${db.stores.length})</button>` : ''}
+                    ${(isAdmin || p.stores) ? `<button onclick="currentTab='map'; render();" class="py-3 text-xs sm:text-sm font-semibold border-b-2 whitespace-nowrap transition ${currentTab==='map'?'border-amber-500 text-amber-500':'border-transparent opacity-75 hover:opacity-100'}"><i class="fa-solid fa-map-location-dot mr-1"></i> Bản đồ</button>` : ''}
                     ${(isAdmin || p.master) ? `<button onclick="currentTab='master'; render();" class="py-3 text-xs sm:text-sm font-semibold border-b-2 whitespace-nowrap transition ${currentTab==='master'?'border-amber-500 text-amber-500':'border-transparent opacity-75 hover:opacity-100'}"><i class="fa-solid fa-box-archive mr-1.5"></i> Sản phẩm (${db.productsMaster.length})</button>` : ''}
                     ${(isAdmin || p.warehouse) ? `<button onclick="currentTab='warehouse'; render();" class="py-3 text-xs sm:text-sm font-semibold border-b-2 whitespace-nowrap transition relative ${currentTab==='warehouse'?'border-amber-500 text-amber-500':'border-transparent opacity-75 hover:opacity-100'}"><i class="fa-solid fa-warehouse mr-1.5"></i> Kho Tồn ${lowStockCount>0?`<span class="absolute top-2 -right-3 px-1.5 py-0.5 bg-rose-500 text-white rounded-full text-[10px]">${lowStockCount}</span>`:''}</button>` : ''}
                     ${(isAdmin || p.history) ? `<button onclick="currentTab='history'; render();" class="py-3 text-xs sm:text-sm font-semibold border-b-2 whitespace-nowrap transition ${currentTab==='history'?'border-amber-500 text-amber-500':'border-transparent opacity-75 hover:opacity-100'}"><i class="fa-solid fa-route mr-1.5"></i> Lịch sử (${totalHistoryCount})</button>` : ''}
                     <button onclick="currentTab='settings'; render();" class="py-3 text-xs sm:text-sm font-semibold border-b-2 whitespace-nowrap transition ${currentTab==='settings'?'border-amber-500 text-amber-500':'border-transparent opacity-75 hover:opacity-100'}"><i class="fa-solid fa-gear mr-1.5"></i> Cài đặt chung</button>
                     ${isAdmin ? `<button onclick="currentTab='admin'; render();" class="py-3 text-xs sm:text-sm font-semibold border-b-2 whitespace-nowrap transition relative ${currentTab==='admin'?'border-amber-500 text-amber-500':'border-transparent opacity-75 hover:opacity-100'}"><i class="fa-solid fa-shield-halved mr-1.5"></i> Quản trị ${pendingCount>0?`<span class="absolute top-2 -right-3 px-1.5 py-0.5 bg-rose-500 text-white rounded-full text-[10px]">${pendingCount}</span>`:''}</button>` : ''}
                 </div>
-                ${backupBannerHtml()}<main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6">${currentTab === 'stores' ? renderStoresView() : currentTab === 'storeinfo' ? renderStoreInfoView() : currentTab === 'master' ? renderMasterProductsView() : currentTab === 'warehouse' ? renderWarehouseView() : currentTab === 'history' ? renderHistoryView() : currentTab === 'settings' ? renderSettingsView() : renderAdminView()}</main>
+                ${storageBannerHtml()}${backupBannerHtml()}<main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6">${currentTab === 'stores' ? renderStoresView() : currentTab === 'map' ? renderMapView() : currentTab === 'storeinfo' ? renderStoreInfoView() : currentTab === 'master' ? renderMasterProductsView() : currentTab === 'warehouse' ? renderWarehouseView() : currentTab === 'history' ? renderHistoryView() : currentTab === 'settings' ? renderSettingsView() : renderAdminView()}</main>
             `;
         }
 
+
+        // ===== Bản 21: tìm cửa hàng, lọc tỉnh/quận có ô tìm =====
+        let storeQ = '', pickKind = '';
+        function storeKey(s) { return normTxt([s.name, s.owner, s.phone, s.address, s.district, s.city].join(' ')); }
+        function storeMatch(s) { const k = normTxt(storeQ).trim(); return !k || storeKey(s).includes(k); }
+        function storeSearchInput(v) {
+            storeQ = v; const k = normTxt(v).trim(); let n = 0;
+            document.querySelectorAll('[data-scard]').forEach(c => { const ok = !k || c.dataset.skey.includes(k); c.classList.toggle('hidden', !ok); if (ok) n++; });
+            const el = document.getElementById('store-count'); if (el) el.innerText = n;
+            const em = document.getElementById('store-empty'); if (em) em.classList.toggle('hidden', n > 0 || !document.querySelector('[data-scard]'));
+        }
+        function resetStoreFilters() { storeQ = ''; selectedCity = 'all'; selectedDistrict = 'all'; render(); }
+        function pickOptions() {
+            const base = pickKind === 'city' ? db.stores : db.stores.filter(s => selectedCity === 'all' || s.city === selectedCity);
+            const key = pickKind === 'city' ? 'city' : 'district'; const cnt = {};
+            base.forEach(s => { const v = s[key]; if (v) cnt[v] = (cnt[v] || 0) + 1; });
+            return Object.keys(cnt).sort((a, b) => a.localeCompare(b, 'vi')).map(v => [v, cnt[v]]);
+        }
+        function openPicker(kind) {
+            pickKind = kind;
+            document.getElementById('pick-title').innerText = kind === 'city' ? 'Chọn Tỉnh / Thành phố' : 'Chọn Quận / Huyện';
+            document.getElementById('pick-search').value = '';
+            renderPicker2();
+            document.getElementById('pick-modal').classList.remove('hidden');
+            setTimeout(() => { try { document.getElementById('pick-search').focus(); } catch (e) {} }, 100);
+        }
+        function renderPicker2() {
+            const k = normTxt(document.getElementById('pick-search').value).trim();
+            const cur = pickKind === 'city' ? selectedCity : selectedDistrict;
+            const rows = pickOptions().filter(([v]) => !k || normTxt(v).includes(k));
+            const row = (v, label, n) => `<button type="button" data-pv="${escHtml(v)}" onclick="choosePick(this.dataset.pv)" class="w-full flex justify-between items-center px-4 py-3 rounded-xl border text-sm font-semibold ${cur === v ? 'bg-amber-500 text-slate-950 border-amber-500' : 'bg-theme-input border-theme-border'}"><span>${escHtml(label)}</span><span class="text-xs opacity-70">${n}</span></button>`;
+            const total = pickOptions().reduce((a, x) => a + x[1], 0);
+            document.getElementById('pick-list').innerHTML = (k ? '' : row('all', 'Tất cả', total)) + (rows.length ? rows.map(([v, n]) => row(v, v, n)).join('') : '<p class="text-xs opacity-60 text-center py-6">Không có kết quả.</p>');
+        }
+        function choosePick(v) {
+            if (pickKind === 'city') { selectedCity = v; selectedDistrict = 'all'; } else { selectedDistrict = v; }
+            document.getElementById('pick-modal').classList.add('hidden'); render();
+        }
         function renderStoresView() {
             const isAdmin = getCurrentUser().role === 'admin';
             const cities = [...new Set(db.stores.map(s => s.city))];
@@ -1028,20 +1382,25 @@
                         </div>
                     </div>
 
-                    <div class="bg-theme-card border border-theme-border p-4 sm:p-5 rounded-2xl shadow-sm grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div>
-                            <label class="block text-xs font-semibold opacity-75 mb-1">Tỉnh / Thành phố</label>
-                            <select id="filter-city" onchange="selectedCity=this.value; selectedDistrict='all'; render();" class="w-full px-3 py-2.5 rounded-xl bg-theme-input border border-theme-border text-theme-text text-sm focus:outline-none">
-                                <option value="all">-- Tất cả Thành phố --</option>
-                                ${cities.map(c => `<option value="${c}" ${selectedCity===c?'selected':''}>${c}</option>`).join('')}
-                            </select>
+                    ${revenuePanelHtml()}
+                    <div class="bg-theme-card border border-theme-border p-4 sm:p-5 rounded-2xl shadow-sm space-y-3">
+                        <div class="relative">
+                            <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-xs opacity-60"></i>
+                            <input type="text" id="store-search" value="${escHtml(storeQ)}" oninput="storeSearchInput(this.value)" placeholder="Tìm cửa hàng theo tên, chủ shop, SĐT, địa chỉ..." class="w-full pl-9 pr-3 py-3 rounded-xl bg-theme-input border border-theme-border text-theme-text text-sm outline-none">
                         </div>
-                        <div>
-                            <label class="block text-xs font-semibold opacity-75 mb-1">Quận / Huyện</label>
-                            <select id="filter-district" onchange="selectedDistrict=this.value; render();" class="w-full px-3 py-2.5 rounded-xl bg-theme-input border border-theme-border text-theme-text text-sm focus:outline-none">
-                                <option value="all">-- Tất cả Quận / Huyện --</option>
-                                ${districts.map(d => `<option value="${d}" ${selectedDistrict===d?'selected':''}>${d}</option>`).join('')}
-                            </select>
+                        <div class="grid grid-cols-2 gap-3">
+                            <button type="button" onclick="openPicker('city')" class="text-left px-3 py-2.5 rounded-xl bg-theme-input border border-theme-border">
+                                <div class="text-[10px] font-semibold opacity-60 uppercase">Tỉnh / Thành phố</div>
+                                <div class="text-sm font-bold truncate">${selectedCity === 'all' ? 'Tất cả' : escHtml(selectedCity)} <i class="fa-solid fa-chevron-down text-[10px] opacity-60 ml-1"></i></div>
+                            </button>
+                            <button type="button" onclick="openPicker('district')" class="text-left px-3 py-2.5 rounded-xl bg-theme-input border border-theme-border">
+                                <div class="text-[10px] font-semibold opacity-60 uppercase">Quận / Huyện</div>
+                                <div class="text-sm font-bold truncate">${selectedDistrict === 'all' ? 'Tất cả' : escHtml(selectedDistrict)} <i class="fa-solid fa-chevron-down text-[10px] opacity-60 ml-1"></i></div>
+                            </button>
+                        </div>
+                        <div class="flex items-center justify-between text-[11px] opacity-70">
+                            <span>Hiển thị <b id="store-count">${filteredStores.filter(storeMatch).length}</b> / ${db.stores.length} điểm bán</span>
+                            ${(selectedCity !== 'all' || selectedDistrict !== 'all' || storeQ) ? `<button type="button" onclick="resetStoreFilters()" class="text-amber-500 font-bold"><i class="fa-solid fa-xmark mr-1"></i>Xóa lọc</button>` : ''}
                         </div>
                     </div>
 
@@ -1064,7 +1423,7 @@
                             const canCheckout = remainingSeconds === 0;
 
                             return `
-                                <div class="bg-theme-card border border-theme-border p-4 sm:p-5 rounded-2xl shadow-sm hover:border-amber-500/50 transition space-y-3 ${isTodayVisited ? 'opacity-75 bg-slate-900/40' : ''}">
+                                <div data-scard data-skey="${escHtml(storeKey(s))}" class="${storeMatch(s) ? '' : 'hidden'} bg-theme-card border border-theme-border p-4 sm:p-5 rounded-2xl shadow-sm hover:border-amber-500/50 transition space-y-3 ${isTodayVisited ? 'opacity-75 bg-slate-900/40' : ''}">
                                     <div class="flex items-start justify-between gap-2">
                                         <div class="flex items-start space-x-3">
                                             <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl ${isTodayVisited ? 'bg-slate-700 text-slate-300' : 'bg-amber-500 text-slate-950'} flex items-center justify-center font-black text-xs sm:text-sm shadow flex-shrink-0 mt-0.5">
@@ -1126,6 +1485,7 @@
                                 </div>
                             `;
                         }).join('')}
+                        <div id="store-empty" class="${filteredStores.length && !filteredStores.some(storeMatch) ? '' : 'hidden'} bg-theme-card border border-theme-border p-10 text-center rounded-2xl opacity-75 text-sm">Không có điểm bán nào khớp từ khóa.</div>
                     </div>
                 </div>
             `;
@@ -1228,49 +1588,89 @@
 
         function renderMasterProductsView() {
             const isAdmin = getCurrentUser().role === 'admin';
+            const kq = normTxt(masterQ).trim();
+            const cats = allCategories().filter(c => db.productsMaster.some(p => prodCat(p) === c));
+            const groups = cats.map((c, gi) => {
+                const items = db.productsMaster.filter(p => prodCat(p) === c);
+                const keyOf = p => normTxt(p.name + ' ' + prodCode(p));
+                const vis = items.filter(p => !kq || keyOf(p).includes(kq)).length;
+                const collapsed = !!masterCollapsed[c] && !kq;
+                return `<div data-mgrp="${gi}" data-cat="${escHtml(c)}" id="mgrp-${gi}" class="bg-theme-card border border-theme-border rounded-2xl shadow-sm overflow-hidden ${vis === 0 ? 'hidden' : ''}">
+                    <button type="button" onclick="toggleMasterGroup(${gi})" class="w-full flex items-center justify-between p-3.5 bg-amber-500/10 border-b border-theme-border">
+                        <span class="font-bold text-sm"><i class="fa-solid fa-layer-group text-amber-500 mr-2"></i>${escHtml(c)} <span class="opacity-60 font-semibold">(<span data-mcount>${vis}</span>)</span></span>
+                        <i class="fa-solid fa-chevron-down text-xs opacity-60 transition ${collapsed ? '-rotate-90' : ''}" data-marrow></i>
+                    </button>
+                    <div data-mbody class="overflow-x-auto hide-scrollbar ${collapsed ? 'hidden' : ''}">
+                        <table class="w-full text-left border-collapse min-w-[480px]">
+                            <thead><tr class="text-xs uppercase font-semibold border-b border-theme-border">
+                                <th class="p-3">Hình ảnh</th><th class="p-3">Tên sản phẩm / Mẫu mã</th><th class="p-3">Giá bán</th><th class="p-3 text-center">Hành động</th>
+                            </tr></thead>
+                            <tbody class="divide-y divide-theme-border text-xs sm:text-sm">
+                            ${items.map(p => `
+                                <tr data-mrow id="mrow-${p.id}" data-key="${escHtml(keyOf(p))}" class="${kq && !keyOf(p).includes(kq) ? 'hidden' : ''}">
+                                    <td class="p-3">${p.img ? `<img src="${p.img}" class="w-12 h-12 object-cover rounded-lg border border-theme-border shadow-sm cursor-pointer hover:opacity-80 transition" onclick="openGlobalPhotoEdit('product_master', '${p.id}')">` : '<div class="w-12 h-12 rounded-lg bg-black/20"></div>'}</td>
+                                    <td class="p-3"><div class="font-bold">${escHtml(p.name)}</div><div class="text-[11px] opacity-60">Mã ${prodCode(p)}</div></td>
+                                    <td class="p-3 font-semibold text-amber-500 whitespace-nowrap">${Number(p.price).toLocaleString()} đ</td>
+                                    <td class="p-3 text-center space-x-1 whitespace-nowrap">
+                                        <button onclick="editMasterProductPrice(${p.id})" class="px-3 py-1 bg-blue-500/10 border border-blue-500/20 text-blue-400 rounded text-xs font-semibold">Sửa giá</button>
+                                        ${isAdmin ? `<button onclick="deleteMasterProduct(${p.id})" class="px-3 py-1 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded text-xs font-semibold">Xóa</button>` : ''}
+                                    </td>
+                                </tr>`).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>`;
+            }).join('');
+            const chips = cats.map((c, gi) => `<button type="button" onclick="jumpMasterGroup(${gi})" class="px-3 py-2 rounded-xl border border-theme-border bg-theme-input whitespace-nowrap text-xs font-bold">${escHtml(c)}</button>`).join('');
             return `
                 <div class="space-y-4 sm:space-y-6 text-theme-text">
-                    <div class="bg-theme-card border border-theme-border p-4 sm:p-6 rounded-2xl shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <div class="bg-theme-card border border-theme-border p-4 sm:p-6 rounded-2xl shadow-sm space-y-3">
                         <div>
                             <h2 class="font-bold text-base sm:text-lg">Bảng Tổng Sản Phẩm (Đồng bộ từ Kho Tồn)</h2>
-                            <p class="text-xs sm:text-sm opacity-75 mt-1">Toàn bộ sản phẩm được thêm tự động khi bạn nhập hàng vào kho.</p>
+                            <p class="text-xs sm:text-sm opacity-75 mt-1">Sản phẩm được chia theo nhóm. Gõ tên hoặc mã để nhảy tới đúng sản phẩm.</p>
                         </div>
-                    </div>
-
-                    <div class="bg-theme-card border border-theme-border rounded-2xl shadow-sm overflow-hidden">
-                        <div class="overflow-x-auto hide-scrollbar">
-                            <table class="w-full text-left border-collapse min-w-[600px]">
-                                <thead>
-                                    <tr class="text-xs uppercase font-semibold border-b border-theme-border">
-                                        <th class="p-3.5">Hình ảnh</th>
-                                        <th class="p-3.5">Phân loại</th>
-                                        <th class="p-3.5">Tên sản phẩm / Mẫu mã</th>
-                                        <th class="p-3.5">Giá bán (VNĐ)</th>
-                                        <th class="p-3.5 text-center">Hành động</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="divide-y divide-theme-border text-xs sm:text-sm">
-                                    ${db.productsMaster.length === 0 ? `<tr><td colspan="5" class="p-8 text-center opacity-50">Chưa có sản phẩm nào. Hãy vào mục "Kho Tồn" để nhập hàng mới.</td></tr>` : ''}
-                                    ${db.productsMaster.map(p => `
-                                        <tr>
-                                            <td class="p-3.5">
-                                                ${p.img ? `<img src="${p.img}" class="w-12 h-12 object-cover rounded-lg border border-theme-border shadow-sm cursor-pointer hover:opacity-80 transition" onclick="openGlobalPhotoEdit('product_master', '${p.id}')" title="Nhấn để đổi ảnh sản phẩm" />` : '<div class="w-12 h-12 bg-theme-input rounded-lg flex items-center justify-center text-[10px] opacity-75 cursor-pointer border border-theme-border" onclick="openGlobalPhotoEdit(\'product_master\', \'' + p.id + '\')">Thêm ảnh</div>'}
-                                            </td>
-                                            <td class="p-3.5 font-semibold opacity-75">${p.category || 'Chung'}</td>
-                                            <td class="p-3.5 font-bold">${p.name}</td>
-                                            <td class="p-3.5 font-semibold text-amber-500">${Number(p.price).toLocaleString()} đ</td>
-                                            <td class="p-3.5 text-center space-x-2">
-                                                <button onclick="editMasterProductPrice(${p.id})" class="px-3 py-1 bg-blue-500/10 border border-blue-500/20 text-blue-400 rounded text-xs font-semibold">Sửa giá</button>
-                                                ${isAdmin ? `<button onclick="deleteMasterProduct(${p.id})" class="px-3 py-1 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded text-xs font-semibold">Xóa</button>` : ''}
-                                            </td>
-                                        </tr>
-                                    `).join('')}
-                                </tbody>
-                            </table>
+                        <div class="relative">
+                            <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-xs opacity-60"></i>
+                            <input type="text" id="master-search" value="${escHtml(masterQ)}" oninput="masterSearchInput(this.value)" placeholder="Tìm sản phẩm theo tên hoặc mã..." class="w-full pl-9 pr-3 py-3 rounded-xl bg-theme-input border border-theme-border text-theme-text text-sm outline-none">
                         </div>
+                        <div class="flex gap-2 overflow-x-auto pb-1 hide-scrollbar">${chips}</div>
                     </div>
+                    ${db.productsMaster.length === 0 ? `<div class="bg-theme-card border border-theme-border rounded-2xl p-8 text-center opacity-60 text-sm">Chưa có sản phẩm nào. Hãy vào mục "Kho Tồn" để nhập hàng mới.</div>` : ''}
+                    <div id="master-groups" class="space-y-4">${groups}</div>
+                    <div id="master-empty" class="hidden bg-theme-card border border-theme-border rounded-2xl p-8 text-center opacity-60 text-sm">Không tìm thấy sản phẩm phù hợp.</div>
                 </div>
             `;
+        }
+        function toggleMasterGroup(gi) {
+            const g = document.getElementById('mgrp-' + gi); if (!g) return;
+            const body = g.querySelector('[data-mbody]'), arrow = g.querySelector('[data-marrow]');
+            const hide = !body.classList.contains('hidden');
+            body.classList.toggle('hidden', hide); arrow.classList.toggle('-rotate-90', hide);
+            masterCollapsed[g.dataset.cat] = hide;
+        }
+        function jumpMasterGroup(gi) {
+            const g = document.getElementById('mgrp-' + gi); if (!g) return;
+            if (g.querySelector('[data-mbody]').classList.contains('hidden')) toggleMasterGroup(gi);
+            g.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+        function masterSearchInput(v) {
+            masterQ = v; const k = normTxt(v).trim(); let first = null;
+            document.querySelectorAll('[data-mrow]').forEach(r => {
+                const ok = !k || r.dataset.key.includes(k);
+                r.classList.toggle('hidden', !ok);
+                r.classList.remove('bg-amber-500/20');
+                if (ok && k && !first) first = r;
+            });
+            let any = false;
+            document.querySelectorAll('[data-mgrp]').forEach(g => {
+                const n = g.querySelectorAll('[data-mrow]:not(.hidden)').length;
+                g.classList.toggle('hidden', n === 0);
+                g.querySelector('[data-mcount]').innerText = n;
+                if (n > 0) any = true;
+                if (k && n > 0) { g.querySelector('[data-mbody]').classList.remove('hidden'); g.querySelector('[data-marrow]').classList.remove('-rotate-90'); }
+            });
+            const em = document.getElementById('master-empty'); if (em) em.classList.toggle('hidden', any || !document.querySelector('[data-mrow]'));
+            if (first) { first.classList.add('bg-amber-500/20'); first.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
         }
 
         function renderWarehouseView() {
@@ -1297,6 +1697,12 @@
                             ${isAdmin ? `
                                 <button onclick="openImportStockModal()" class="px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-xl text-xs transition shadow-lg">
                                     <i class="fa-solid fa-cart-flatbed mr-1"></i> Nhập hàng
+                                </button>
+                                <button onclick="openQuickImport()" class="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs transition shadow-lg">
+                                    <i class="fa-solid fa-wand-magic-sparkles mr-1"></i> Nhập nhanh (văn bản / ảnh)
+                                </button>
+                                <button onclick="openReturnModal()" class="px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs transition shadow-lg">
+                                    <i class="fa-solid fa-rotate-left mr-1"></i> Trả hàng về kho
                                 </button>
                             ` : ''}
                         </div>
@@ -1339,10 +1745,479 @@
                             </table>
                         </div>
                     </div>
+                    ${returnHistoryHtml()}
                 </div>
             `;
         }
 
+
+        // ===== Bản 21: doanh thu, xem bill, dung lượng =====
+        function dayKeyOf(t) { return typeof t === 'string' ? t.trim().split(/\s+/).pop() : ''; }
+        function parseMoneyStr(x) { const m = String(x || '').match(/([\d.,]+)\s*đ/); return m ? (parseInt(m[1].replace(/[.,]/g, '')) || 0) : 0; }
+        function saleNet(h) { return typeof h.net === 'number' ? h.net : moneyOf(h.note); }
+        function saleGross(h) {
+            if (typeof h.gross === 'number') return h.gross;
+            const d = String(h.discountStr || ''); const m = d.match(/\(([\d.,]+)\s*đ\)/);
+            const disc = m ? parseInt(m[1].replace(/[.,]/g, '')) || 0 : (/%/.test(d) ? 0 : parseMoneyStr(d));
+            return saleNet(h) + disc;
+        }
+        function fmtVnd(n) { return Math.round(n).toLocaleString('vi-VN') + ' đ'; }
+        function revenuePanelHtml() {
+            const u = getCurrentUser(); const admin = u.role === 'admin';
+            const mine = (db.salesHistory || []).filter(h => admin || h.username === u.username);
+            const today = todayVN();
+            const days = {};
+            mine.forEach(h => { const k = dayKeyOf(h.time); if (!k) return; (days[k] = days[k] || { g: 0, n: 0, c: 0 }); days[k].g += saleGross(h); days[k].n += saleNet(h); days[k].c++; });
+            const t = days[today] || { g: 0, n: 0, c: 0 };
+            let allG = 0, allN = 0, allC = 0, firstT = Infinity, firstStr = '';
+            mine.forEach(h => {
+                allG += saleGross(h); allN += saleNet(h); allC++;
+                const m = dayKeyOf(h.time).match(/^(\d+)\/(\d+)\/(\d+)$/);
+                if (m) { const tt = new Date(+m[3], +m[2] - 1, +m[1]).getTime(); if (tt < firstT) { firstT = tt; firstStr = dayKeyOf(h.time); } }
+            });
+            const spanDays = isFinite(firstT) ? Math.floor((new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate()).getTime() - firstT) / 86400000) + 1 : 0;
+            const past = [];
+            for (let i = 1; i <= 7; i++) { const d = new Date(); d.setDate(d.getDate() - i); const k = d.toLocaleDateString('vi-VN'); if (days[k]) past.push([k, days[k]]); }
+            return `<div class="bg-theme-card border border-theme-border p-4 sm:p-5 rounded-2xl shadow-sm space-y-3">
+                <div class="flex items-center justify-between">
+                    <h3 class="font-bold text-sm"><i class="fa-solid fa-sack-dollar text-amber-500 mr-2"></i>Doanh thu hôm nay <span class="opacity-60 font-normal">(${today}${admin ? ' · toàn đội' : ''})</span></h3>
+                    <span class="text-[11px] opacity-60">${t.c} đơn · tự reset mỗi ngày</span>
+                </div>
+                <div class="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30">
+                    <div class="flex justify-between items-center gap-2"><div class="text-[11px] uppercase font-bold text-emerald-400"><i class="fa-solid fa-clock-rotate-left mr-1"></i>Doanh thu toàn bộ lịch sử</div><div class="text-[11px] opacity-70">${allC ? 'từ ' + firstStr + ' → nay · ' + spanDays + ' ngày · ' + allC + ' đơn' : 'chưa có đơn'}</div></div>
+                    <div class="grid grid-cols-2 gap-3 mt-1.5"><div><div class="text-[10px] uppercase opacity-70">Gross</div><div class="text-base font-extrabold">${fmtVnd(allG)}</div></div><div><div class="text-[10px] uppercase text-emerald-400">Net</div><div class="text-base font-extrabold text-emerald-400">${fmtVnd(allN)}</div></div></div>
+                    ${spanDays > 1 ? '<div class="text-[10px] opacity-60 mt-1">Lịch sử đang gộp nhiều ngày (chưa xóa) – con số này là tổng cả giai đoạn, khác với doanh thu hôm nay.</div>' : ''}
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="p-3 rounded-xl bg-theme-input border border-theme-border"><div class="text-[11px] uppercase font-bold opacity-70">Gross (trước CK)</div><div class="text-lg font-extrabold">${fmtVnd(t.g)}</div></div>
+                    <div class="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30"><div class="text-[11px] uppercase font-bold text-amber-500">Net (thực thu)</div><div class="text-lg font-extrabold text-amber-500">${fmtVnd(t.n)}</div></div>
+                </div>
+                ${past.length ? `<details class="text-xs"><summary class="cursor-pointer font-semibold opacity-75">Doanh thu 7 ngày gần nhất</summary>
+                    <div class="mt-2 space-y-1">${past.map(([k, v]) => `<div class="flex justify-between gap-2 p-2 rounded-lg bg-theme-input"><span>${k} · ${v.c} đơn</span><span>Gross ${fmtVnd(v.g)} · <b class="text-amber-500">Net ${fmtVnd(v.n)}</b></span></div>`).join('')}</div></details>` : ''}
+            </div>`;
+        }
+
+        function viewSavedBill(i) {
+            const h = (db.salesHistory || [])[i]; if (!h) return;
+            const st = db.stores.find(x => x.name === h.storeName) || {};
+            let items = h.items;
+            if (!items || !items.length) {
+                const body = String(h.note || '').replace(/^[^:]*\):\s*/, '').replace(/\s*\|\s*Tổng:.*$/, '');
+                items = body.split(/,\s*(?=[^,]+ x\d+(?:,|$))/).map(x => { const m = x.match(/^(.*) x(\d+)\s*$/); return m ? { name: m[1], q: parseInt(m[2]), price: null } : null; }).filter(Boolean);
+            }
+            const pay = h.pay || ((h.note || '').match(/\(([^)]*)\)/) || [])[1] || '--';
+            document.getElementById('bill-title').innerHTML = '<i class="fa-solid fa-receipt mr-1"></i> Xem lại bill đã lưu';
+            document.getElementById('bill-store-name').innerText = h.storeName || '--';
+            document.getElementById('bill-owner').innerText = h.owner || st.owner || '--';
+            document.getElementById('bill-phone').innerText = h.phone || st.phone || '--';
+            document.getElementById('bill-time').innerText = h.time || '--';
+            document.getElementById('bill-sale').innerText = h.saleName || h.username || '--';
+            document.getElementById('bill-pay-method').innerText = pay;
+            document.getElementById('bill-discount-str').innerText = h.discountStr || '0 đ';
+            document.getElementById('bill-items-list').innerHTML = items.length ? items.map(it => `<div class="flex justify-between"><span>- ${escHtml(it.name)} (x${it.q})</span> <b>${it.price != null ? (it.q * it.price).toLocaleString() + 'đ' : ''}</b></div>`).join('') : escHtml(h.note || '');
+            document.getElementById('bill-grand-total').innerText = saleNet(h).toLocaleString() + ' đ';
+            lastOrderShareText = `🛒 HÓA ĐƠN BÁN HÀNG\n🏪 Shop: ${h.storeName}\n⏰ Giờ: ${h.time}\n💳 TT: ${pay}\n🎁 Chiết khấu: ${h.discountStr || '0 đ'}\n📦 ${h.note}`;
+            document.getElementById('bill-modal').classList.remove('hidden');
+            setTimeout(() => prepareShare('bill', 'invoice-card', '#000000', 'Hoa-Don-' + Date.now() + '.jpg'), 400);
+        }
+
+        // ----- dung lượng lưu trữ -----
+        let storageEst = null;
+        function lsUsageBytes() {
+            let n = 0;
+            try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); n += (k.length + (localStorage.getItem(k) || '').length) * 2; } } catch (e) {}
+            return n;
+        }
+        const LS_QUOTA = 5 * 1024 * 1024;
+        function storageStatus() {
+            const used = lsUsageBytes(); const lsPct = Math.min(100, used / LS_QUOTA * 100);
+            const estPct = storageEst && storageEst.quota ? Math.min(100, storageEst.usage / storageEst.quota * 100) : 0;
+            const pct = Math.max(lsPct, estPct);
+            return { used, lsPct, estPct, pct, failed: storageWriteFailed, level: storageWriteFailed || pct >= 90 ? 'danger' : (pct >= 70 ? 'warn' : 'ok') };
+        }
+        function fmtBytes(b) { return b > 1048576 ? (b / 1048576).toFixed(2) + ' MB' : Math.round(b / 1024) + ' KB'; }
+        function refreshStorageEstimate() {
+            if (navigator.storage && navigator.storage.estimate) navigator.storage.estimate().then(e => { storageEst = e; if (currentTab === 'admin') render(); }).catch(() => {});
+        }
+        function storageBannerHtml() {
+            const st = storageStatus();
+            if (st.level === 'ok') return '';
+            const danger = st.level === 'danger';
+            return `<div class="${danger ? 'bg-rose-500/20 border-rose-500/40' : 'bg-amber-500/15 border-amber-500/30'} border-b px-4 sm:px-6 py-2.5 flex items-center justify-between gap-3 text-xs text-theme-text"><span><i class="fa-solid fa-triangle-exclamation ${danger ? 'text-rose-500' : 'text-amber-500'} mr-1"></i>${st.failed ? '<b>Bộ nhớ đã đầy – dữ liệu (ảnh) có nguy cơ MẤT!</b> Sao lưu Excel ngay.' : 'Bộ nhớ trình duyệt đã dùng ' + st.pct.toFixed(0) + '%. ' + (danger ? '<b>Sắp đầy – có nguy cơ mất dữ liệu!</b>' : 'Nên sao lưu Excel và dọn lịch sử sớm.')}</span><button onclick="openBackupModal('manual')" class="px-3 py-1.5 bg-emerald-600 text-white font-bold rounded-lg whitespace-nowrap">Sao lưu</button></div>`;
+        }
+        function storageCardHtml() {
+            const st = storageStatus();
+            const colors = { ok: 'bg-emerald-500', warn: 'bg-amber-500', danger: 'bg-rose-500' };
+            const msg = { ok: 'Bộ nhớ còn thoải mái.', warn: 'Bộ nhớ đã dùng khá nhiều. Hãy sao lưu Excel và dọn lịch sử/ảnh cũ sớm.', danger: 'NGUY HIỂM: bộ nhớ gần đầy hoặc đã đầy – app có thể không lưu được và MẤT DỮ LIỆU. Sao lưu Excel ngay rồi xóa lịch sử.' }[st.level];
+            let dbLen = 0, photos = 0;
+            try { dbLen = JSON.stringify(db).length * 2; } catch (e) {}
+            photos = (db.productsMaster || []).filter(p => p.img).length + (db.stores || []).filter(x => x.storePhoto).length + (db.salesHistory || []).reduce((a, h) => a + ((h.photos && h.photos.length) || 0), 0);
+            if (storageEst === null) setTimeout(refreshStorageEstimate, 100);
+            return `<div class="bg-theme-card border ${st.level === 'danger' ? 'border-rose-500/60' : 'border-theme-border'} p-6 rounded-3xl shadow-xl space-y-3">
+                <div class="flex justify-between items-center border-b border-theme-border pb-3">
+                    <h3 class="font-bold text-base flex items-center space-x-2"><i class="fa-solid fa-database text-amber-500"></i><span>Dung lượng lưu trữ & cảnh báo mất dữ liệu</span></h3>
+                    <button onclick="storageEst=null;render()" class="text-xs px-3 py-1.5 bg-theme-input border border-theme-border rounded-lg font-semibold"><i class="fa-solid fa-rotate mr-1"></i>Kiểm tra lại</button>
+                </div>
+                <div class="h-3 rounded-full bg-black/30 overflow-hidden"><div class="${colors[st.level]} h-3" style="width:${Math.max(2, st.pct).toFixed(1)}%"></div></div>
+                <div class="flex justify-between text-xs font-semibold"><span>Chữ & dữ liệu: ${fmtBytes(st.used)} / ~5 MB (${st.lsPct.toFixed(1)}%) · Kho ảnh + tổng: ${storageEst && storageEst.quota ? st.estPct.toFixed(1) + '%' : 'không rõ'}</span><span class="${st.level === 'ok' ? 'text-emerald-400' : st.level === 'warn' ? 'text-amber-500' : 'text-rose-400'}">${st.level === 'ok' ? 'AN TOÀN' : st.level === 'warn' ? 'CẢNH BÁO' : 'NGUY HIỂM'}</span></div>
+                <p class="text-xs ${st.level === 'ok' ? 'opacity-75' : 'font-bold'}">${msg}</p>
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]">
+                    <div class="p-2 rounded-lg bg-theme-input">Dữ liệu app (cả ảnh)<br><b class="text-sm">${fmtBytes(dbLen)}</b></div>
+                    <div class="p-2 rounded-lg bg-theme-input">Số ảnh đã lưu<br><b class="text-sm">${photos}</b></div>
+                    <div class="p-2 rounded-lg bg-theme-input">Đơn bán<br><b class="text-sm">${(db.salesHistory || []).length}</b></div>
+                    <div class="p-2 rounded-lg bg-theme-input">Tổng đã dùng / hạn mức<br><b class="text-sm">${storageEst && storageEst.quota ? fmtBytes(storageEst.usage) + ' / ' + fmtBytes(storageEst.quota) : 'không rõ'}</b></div>
+                </div>
+                <p class="text-[11px] opacity-60">${lastBackupText()}. Cảnh báo tự hiện ở đầu trang khi dùng ≥70% bộ nhớ hoặc khi không lưu được. Dữ liệu đã đồng bộ lên Google Drive vẫn còn, nhưng ảnh chỉ nằm ở máy nếu chưa sao lưu Excel.</p>
+                <div class="flex flex-wrap gap-2">
+                    <button onclick="openBackupModal('manual')" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs"><i class="fa-solid fa-file-excel mr-1"></i>Sao lưu Excel ngay</button>
+                    <button onclick="manualCompress()" class="px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-xl text-xs"><i class="fa-solid fa-compress mr-1"></i>Nén ảnh cũ</button>
+                </div>
+            </div>`;
+        }
+
+
+        // ===== Bản 21: nhập nhanh bằng văn bản/ảnh, trả hàng về kho =====
+        const QI_UNITS = 'cái|chiếc|bộ|sợi|cuộn|hộp|thùng|chai|đôi|cặp|pcs|pc|cây';
+        const COLOR_RE = /(^|[^\p{L}])(?:màu\s+)?(đen|trắng|xanh\s+(?:lá|dương|ngọc|rêu|navy|lam|biển)|xanh|ghi|xám|hồng|đỏ|vàng|tím|cam|nâu|bạc|den|trang|hong|vang|tim|nau|bac|black|white|blue|gr[ae]y|silver|pink|red)(?![\p{L}])/iu;
+        const COLOR_MAP = { den: 'Đen', trang: 'Trắng', hong: 'Hồng', vang: 'Vàng', tim: 'Tím', nau: 'Nâu', bac: 'Bạc', black: 'Đen', white: 'Trắng', blue: 'Xanh', gray: 'Ghi', grey: 'Ghi', 'xám': 'Ghi', silver: 'Bạc', pink: 'Hồng', red: 'Đỏ' };
+        const VARIANT_RULES = [
+            [/(type\s*-?\s*c|typec|tyce\s*c|\bc\b)\s*(?:to|sang|ra|->|→|-)\s*(?:lightning|lightening|ip\b|iphone)/i, 'Type C - Lightning'],
+            [/(type\s*-?\s*c|typec|tyce\s*c|\bc\b)\s*(?:to|sang|ra|->|→|-)\s*(?:type\s*-?\s*c|typec|tyce\s*c|\bc\b)/i, 'C to C'],
+            [/usb\s*(?:to|sang|ra|->|→|-)?\s*(?:lightning|lightening|ip\b|iphone)/i, 'USB sang Lightning'],
+            [/(?:usb\s*(?:to|sang|ra|->|→|-)?\s*)?micro(?:\s*usb)?/i, 'USB - micro'],
+            [/usb\s*(?:to|sang|ra|->|→|-)?\s*(?:type\s*-?\s*c|typec|tyce\s*c|\bc\b)/i, 'USB - Type C'],
+            [/lightning|lightening/i, 'USB sang Lightning'],
+            [/type\s*-?\s*c|typec|tyce\s*c/i, 'USB - Type C']
+        ];
+        const CAT_RULES = [
+            [/sac du phong|pin du phong|power\s?bank/, 'Sạc dự phòng'],
+            [/tai nghe|airpod|headphone|earphone|\btws\b/, 'Tai nghe'],
+            [/\bkinh\b|cuong luc|dan man hinh|\bglass\b/, 'Kính cường lực'],
+            [/\bop\b|op lung|\bcase\b/, 'Ốp lưng'],
+            [/\bcap\b|\bcable\b|day sac/, 'Cáp sạc'],
+            [/\bcu\b|cu sac|adapter|adaptor/, 'Củ sạc']
+        ];
+        function qiGuessCat(w) {
+            const n = normTxt(w);
+            for (const c of (db.categories || [])) { const nc = normTxt(c); if (nc.length > 2 && n.includes(nc)) return c; }
+            for (const [re, c] of CAT_RULES) { if (re.test(n)) { const ex = (db.categories || []).find(x => normTxt(x) === normTxt(c)); return ex || c; } }
+            return '';
+        }
+        function parseOrderLine(raw) {
+            let t = String(raw || '').replace(/\u00a0/g, ' ').trim(); if (!t) return null;
+            t = t.replace(/^[\s\-–•*+·>▪●]+/, '').replace(/^\d{1,2}\s*[.)]\s+/, '').trim();
+            const nt = normTxt(t);
+            if ((t.match(/\p{L}/gu) || []).length < 3) return null;
+            if (/(^|\s)(tong|tong cong|thanh tien|dia chi|sdt|dt|so dien thoai|khach hang|khach|nguoi nhan|nguoi gui|ngay|gio|ship|van chuyen|phi|chiet khau|thanh toan|stk|ghi chu|ma don|don hang|cam on|zalo|hotline|kinh gui|xin chao|chao|dh)(\s|:|$)/.test(nt)) return null;
+            if (/\b0\d{8,10}\b/.test(t)) return null;
+            let w = t;
+            w = w.replace(/(?:giá|gia|đơn giá|@)\s*[:=]?\s*\d[\d.,]*\s*(?:k|nghìn|ngàn|đ|vnđ|vnd)?/giu, ' ');
+            w = w.replace(/\b\d[\d.,]*\s*(?:k|nghìn|ngàn|vnđ|vnd|đ)(?![\p{L}])/giu, ' ');
+            let qty = null, guess = false;
+            const take = (re, g) => { const m = w.match(re); if (m) { qty = parseInt(m[1]); guess = !!g; w = w.replace(m[0], ' '); return true; } return false; };
+            take(/(?:^|[\s(\[])x\s*(\d{1,4})(?![\p{L}\d])/iu) ||
+            take(/(?:^|[\s)\]])(\d{1,4})\s*x(?![\p{L}\d])/iu) ||
+            take(/(?:sl|s\.l|số lượng|so luong)\s*[:=]?\s*(\d{1,4})/iu) ||
+            take(new RegExp('(?:^|[^\\p{L}\\d.,])(\\d{1,4})\\s*(?:' + QI_UNITS + ')(?![\\p{L}])', 'iu')) ||
+            take(/^(\d{1,4})\s+(?=\p{L})/u) ||
+            take(/[:=–-]\s*(\d{1,4})\s*$/u) ||
+            take(/\s(\d{1,4})\s*$/u, true);
+            if (qty === null) { qty = 1; guess = true; }
+            let color = '';
+            const cm = w.match(COLOR_RE);
+            if (cm) { const k = cm[2].toLowerCase().replace(/\s+/g, ' '); color = COLOR_MAP[k] || (k.charAt(0).toUpperCase() + k.slice(1)); w = w.replace(cm[0], cm[1] + ' '); }
+            let cat = qiGuessCat(w), variant = '';
+            if (isCableCat(cat) || /\bcap\b|\bcable\b/i.test(normTxt(w))) {
+                for (const [re, v] of VARIANT_RULES) { const vm = w.match(re); if (vm) { variant = v; w = w.replace(vm[0], ' '); break; } }
+            }
+            w = w.replace(new RegExp('(^|\\s)(?:' + QI_UNITS + ')(?![\\p{L}])', 'giu'), ' ').replace(/(^|\s)màu(?![\p{L}])/giu, ' ');
+            w = w.replace(/[()\[\]{}:=,;|]+/g, ' ').replace(/\s[-–]\s/g, ' ').replace(/\s{2,}/g, ' ').trim().replace(/^[-–.\s]+|[-–.\s]+$/g, '');
+            if ((w.match(/\p{L}/gu) || []).length < 2) return null;
+            w = w.charAt(0).toUpperCase() + w.slice(1);
+            return { name: w, cat: cat || 'Chưa phân loại', color, variant, qty: Math.max(1, qty), price: '', guess, raw: t };
+        }
+        function parseOrderText(text) {
+            const lines = [];
+            String(text || '').split(/\r?\n/).forEach(l => l.split(';').forEach(part => {
+                const toks = part.split(',');
+                if (toks.length > 1 && toks.every(x => /\d/.test(x) && /\p{L}{2}/u.test(x))) toks.forEach(x => lines.push(x)); else lines.push(part);
+            }));
+            return lines.map(parseOrderLine).filter(Boolean);
+        }
+        function qiTok(x) { return new Set(normTxt(x).split(/[^a-z0-9]+/).filter(Boolean)); }
+        function qiJac(a, b) { let i = 0; a.forEach(x => { if (b.has(x)) i++; }); const u = a.size + b.size - i; return u ? i / u : 0; }
+        function resolveRow(r) {
+            const base = baseProductName(String(r.name || '').trim());
+            const A = qiTok(base); let best = null, bs = 0;
+            db.productsMaster.forEach(p => { const sc = qiJac(A, qiTok(parseProductName(p).base)); if (sc > bs) { bs = sc; best = p; } });
+            const matched = best && bs >= 0.75 ? best : null;
+            const cat = matched ? prodCat(matched) : (r.cat || 'Chưa phân loại');
+            const variant = isCableCat(cat) ? (r.variant || '') : '';
+            const baseName = matched ? parseProductName(matched).base : base;
+            const final = composeName(baseName, variant, r.color || '');
+            const exact = db.productsMaster.find(p => p.name === final && prodCat(p) === cat) || null;
+            return { matched, cat, variant, final, exact };
+        }
+
+        // ----- giao diện nhập nhanh -----
+        let qiRows = [], qiTabNow = 'text';
+        function openQuickImport() { document.getElementById('qi-text').value = ''; document.getElementById('qi-file').value = ''; document.getElementById('qi-preview').classList.add('hidden'); document.getElementById('qi-progress').innerText = ''; setQiTab('text'); document.getElementById('quick-import-modal').classList.remove('hidden'); }
+        function closeQuickImport() { document.getElementById('quick-import-modal').classList.add('hidden'); }
+        function setQiTab(t) {
+            qiTabNow = t;
+            const on = 'flex-1 py-2.5 rounded-xl text-xs font-bold border bg-amber-500 text-slate-950 border-amber-500', off = 'flex-1 py-2.5 rounded-xl text-xs font-bold border bg-theme-input border-theme-border';
+            document.getElementById('qi-tab-text').className = t === 'text' ? on : off;
+            document.getElementById('qi-tab-img').className = t === 'img' ? on : off;
+            document.getElementById('qi-pane-text').classList.toggle('hidden', t !== 'text');
+            document.getElementById('qi-pane-img').classList.toggle('hidden', t !== 'img');
+        }
+        function quickParseText() {
+            const txt = document.getElementById('qi-text').value;
+            if (!txt.trim()) { alert('Hãy dán nội dung đơn hàng vào ô trước.'); return; }
+            openQuickConfirm(txt);
+        }
+        function openQuickConfirm(rawText) {
+            document.getElementById('qc-raw').value = rawText;
+            qiRows = parseOrderText(rawText);
+            closeQuickImport();
+            renderQuickConfirm();
+            document.getElementById('quick-confirm-modal').classList.remove('hidden');
+        }
+        function closeQuickConfirm() {
+            if (qiRows.length && !confirm('Đóng và bỏ đơn đang xem? Chưa có hàng nào được nhập vào kho.')) return;
+            document.getElementById('quick-confirm-modal').classList.add('hidden');
+        }
+        function qcReparse() { qiRows = parseOrderText(document.getElementById('qc-raw').value); renderQuickConfirm(); }
+        function qcAddRow() { syncQiFromDom(); qiRows.push({ name: '', cat: 'Chưa phân loại', color: '', variant: '', qty: 1, price: '', guess: false, raw: '' }); renderQuickConfirm(); }
+        function qcDelRow(i) { syncQiFromDom(); qiRows.splice(i, 1); renderQuickConfirm(); }
+        function qiCatOptions(cur) {
+            const cats = allCategories(); if (!cats.includes('Chưa phân loại')) cats.push('Chưa phân loại'); if (cur && !cats.includes(cur)) cats.push(cur);
+            return cats.map(c => `<option value="${escHtml(c)}" ${c === cur ? 'selected' : ''}>${escHtml(c)}</option>`).join('') + '<option value="__new">+ Nhóm mới...</option>';
+        }
+        function renderQuickConfirm() {
+            const bases = [...new Set(db.productsMaster.map(p => parseProductName(p).base))];
+            document.getElementById('qc-names').innerHTML = bases.map(b => `<option value="${escHtml(b)}">`).join('');
+            const list = document.getElementById('qc-list');
+            if (!qiRows.length) list.innerHTML = '<div class="p-6 text-center text-xs opacity-70">Không đọc được sản phẩm nào. Hãy sửa văn bản gốc ở trên rồi bấm "Đọc lại", hoặc bấm "Thêm dòng" để nhập tay.</div>';
+            else list.innerHTML = qiRows.map((r, i) => {
+                const inp = 'w-full px-3 py-2.5 rounded-xl bg-theme-input border border-theme-border text-sm outline-none';
+                const colorSel = !r.color ? '' : (COLORS.includes(r.color) ? r.color : '__other');
+                return `<div class="p-3 rounded-2xl border ${r.guess ? 'border-amber-500/70' : 'border-theme-border'} bg-theme-input/40 space-y-2" data-qi="${i}">
+                    <div class="flex gap-2"><input data-f="name" list="qc-names" value="${escHtml(r.name)}" onchange="qcChange(${i}, this)" placeholder="Tên sản phẩm" class="${inp} font-bold">
+                        <button onclick="qcDelRow(${i})" class="px-3 rounded-xl bg-rose-500/15 text-rose-400 flex-shrink-0"><i class="fa-solid fa-trash-can"></i></button></div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <select data-f="cat" onchange="qcChange(${i}, this)" class="${inp}">${qiCatOptions(r.cat)}</select>
+                        <div><select data-f="color" onchange="qcChange(${i}, this)" class="${inp}"><option value="" ${!colorSel ? 'selected' : ''}>Màu: không</option>${COLORS.map(c => `<option ${colorSel === c ? 'selected' : ''}>${c}</option>`).join('')}<option value="__other" ${colorSel === '__other' ? 'selected' : ''}>Màu khác...</option></select></div>
+                    </div>
+                    <input data-f="colorOther" value="${colorSel === '__other' ? escHtml(r.color) : ''}" onchange="qcChange(${i}, this)" placeholder="Nhập tên màu khác" class="${inp} ${colorSel === '__other' ? '' : 'hidden'}">
+                    <select data-f="variant" onchange="qcChange(${i}, this)" class="${inp}" data-wrap="variant"><option value="">Biến thể cáp: giữ nguyên</option>${CABLE_VARIANTS.map(v => `<option ${r.variant === v ? 'selected' : ''}>${v}</option>`).join('')}</select>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div><label class="text-[10px] uppercase font-bold opacity-60">Số lượng nhập</label><input data-f="qty" type="number" inputmode="numeric" min="1" value="${r.qty}" onchange="qcChange(${i}, this)" class="${inp} text-center font-bold"></div>
+                        <div data-wrap="price"><label class="text-[10px] uppercase font-bold opacity-60">Giá bán (SP mới)</label><input data-f="price" type="number" inputmode="numeric" min="0" value="${r.price}" placeholder="0" onchange="qcChange(${i}, this)" class="${inp} text-center"></div>
+                    </div>
+                    <div data-status class="text-[11px] font-semibold"></div>
+                    ${r.guess ? '<div class="text-[11px] text-amber-500 font-semibold"><i class="fa-solid fa-triangle-exclamation mr-1"></i>Chưa chắc số lượng – hãy kiểm tra lại.</div>' : ''}
+                </div>`;
+            }).join('');
+            qiRows.forEach((r, i) => refreshQiRow(i));
+            updateQcSummary();
+        }
+        function syncQiFromDom() {
+            document.querySelectorAll('#qc-list [data-qi]').forEach(card => {
+                const i = +card.dataset.qi, r = qiRows[i]; if (!r) return;
+                const g = f => { const el = card.querySelector(`[data-f="${f}"]`); return el ? el.value : ''; };
+                r.name = g('name').trim();
+                const pn = parseProductName({ name: r.name });
+                if (pn.base !== r.name) { r.name = pn.base; if (pn.color && !r.color) r.color = pn.color; if (pn.variant && !r.variant) r.variant = pn.variant; }
+                const c = g('cat'); if (c && c !== '__new') r.cat = c;
+                const col = g('color'); if (col === '__other') r.color = g('colorOther').trim(); else r.color = col;
+                r.variant = g('variant'); r.qty = parseInt(g('qty')) || 0; r.price = g('price');
+            });
+        }
+        function qcChange(i, el) {
+            const f = el.dataset.f;
+            if (f === 'cat' && el.value === '__new') { const t = prompt('Tên nhóm sản phẩm mới:'); if (t && t.trim()) { syncQiFromDom(); qiRows[i].cat = t.trim(); renderQuickConfirm(); } else { el.value = qiRows[i].cat; } return; }
+            if (f === 'color') { const card = el.closest('[data-qi]'); const other = card.querySelector('[data-f="colorOther"]'); other.classList.toggle('hidden', el.value !== '__other'); if (el.value === '') qiRows[i].color = ''; }
+            syncQiFromDom(); qiRows[i].guess = false; refreshQiRow(i); updateQcSummary();
+        }
+        function refreshQiRow(i) {
+            const card = document.querySelector(`#qc-list [data-qi="${i}"]`), r = qiRows[i]; if (!card || !r) return;
+            const x = resolveRow(r);
+            const st = card.querySelector('[data-status]');
+            if (!r.name) { st.className = 'text-[11px] font-semibold text-rose-400'; st.innerText = 'Chưa nhập tên sản phẩm'; }
+            else if (x.exact) { const w = db.warehouse.find(z => String(z.productId) === String(x.exact.id)); st.className = 'text-[11px] font-semibold text-emerald-400'; st.innerText = `✔ Có sẵn trong kho: ${x.final} (tồn ${w ? w.qty : 0})`; }
+            else if (x.matched) { st.className = 'text-[11px] font-semibold text-blue-400'; st.innerText = `➕ Tạo mới: ${x.final} • giá ${Number(x.matched.price).toLocaleString()} đ (theo ${x.matched.name})`; }
+            else { st.className = 'text-[11px] font-semibold text-amber-500'; st.innerText = `🆕 Sản phẩm mới: ${x.final}`; }
+            card.querySelector('[data-wrap="price"]').classList.toggle('hidden', !!(x.matched || x.exact));
+            card.querySelector('[data-wrap="variant"]').classList.toggle('hidden', !isCableCat(x.cat));
+            const cs = card.querySelector('[data-f="cat"]'); cs.disabled = !!x.matched; if (x.matched) cs.innerHTML = qiCatOptions(x.cat);
+        }
+        function updateQcSummary() {
+            const n = qiRows.filter(r => r.name && r.qty > 0).length, q = qiRows.reduce((a, r) => a + (r.name && r.qty > 0 ? r.qty : 0), 0);
+            document.getElementById('qc-summary').innerText = `${n} dòng • ${q} cái`;
+        }
+        function confirmQuickImport() {
+            syncQiFromDom();
+            const rows = qiRows.filter(r => r.name && r.qty > 0);
+            if (!rows.length) { alert('Chưa có dòng hợp lệ (cần có tên và số lượng lớn hơn 0).'); return; }
+            const noPrice = rows.filter(r => { const x = resolveRow(r); return !x.matched && !x.exact && !(Number(r.price) > 0); });
+            if (noPrice.length && !confirm(`${noPrice.length} sản phẩm mới chưa có giá bán (sẽ lưu 0 đ, sửa sau ở Bảng Tổng). Vẫn nhập kho?`)) return;
+            const done = [];
+            rows.forEach(r => {
+                const x = resolveRow(r); let target = x.exact;
+                if (!target) {
+                    target = { id: newProductId(), category: x.cat, name: x.final, price: x.matched ? x.matched.price : (Number(r.price) || 0), img: x.matched ? x.matched.img : '', color: r.color || '' };
+                    db.productsMaster.push(target);
+                    if (!db.categories.includes(x.cat)) db.categories.push(x.cat);
+                }
+                const w = db.warehouse.find(z => String(z.productId) === String(target.id));
+                if (w) w.qty += r.qty; else db.warehouse.push({ id: Date.now().toString() + Math.floor(Math.random() * 100000), productId: target.id, qty: r.qty });
+                db.importHistory.unshift({ time: new Date().toLocaleTimeString('vi-VN'), productName: target.name, qty: r.qty });
+                done.push(`${target.name} x${r.qty}`);
+            });
+            saveData();
+            document.getElementById('quick-confirm-modal').classList.add('hidden'); qiRows = [];
+            alert(`Đã nhập kho ${done.length} sản phẩm:\n` + done.join('\n'));
+            render();
+        }
+
+        // ----- đọc ảnh (OCR) -----
+        function qiFilePicked(inp) {
+            const f = inp.files && inp.files[0]; const pv = document.getElementById('qi-preview');
+            if (!f) { pv.classList.add('hidden'); return; }
+            pv.src = URL.createObjectURL(f); pv.classList.remove('hidden');
+        }
+        function loadTesseract() {
+            return new Promise((res, rej) => {
+                if (window.Tesseract) return res();
+                const sc = document.createElement('script');
+                sc.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';
+                sc.onload = () => res(); sc.onerror = () => rej(new Error('Không tải được bộ đọc ảnh. Hãy kiểm tra kết nối mạng rồi thử lại.'));
+                document.head.appendChild(sc);
+            });
+        }
+        function ocrPrep(file) {
+            return new Promise((res, rej) => {
+                const fr = new FileReader();
+                fr.onload = () => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const sc = Math.min(2, 2000 / Math.max(img.width, img.height));
+                        const w = Math.round(img.width * sc), h = Math.round(img.height * sc);
+                        const c = document.createElement('canvas'); c.width = w; c.height = h;
+                        const cx = c.getContext('2d'); cx.drawImage(img, 0, 0, w, h);
+                        const d = cx.getImageData(0, 0, w, h), px = d.data; let sum = 0;
+                        for (let i = 0; i < px.length; i += 4) sum += px[i] * .299 + px[i + 1] * .587 + px[i + 2] * .114;
+                        const invert = (sum / (px.length / 4)) < 110;
+                        for (let i = 0; i < px.length; i += 4) {
+                            let g = px[i] * .299 + px[i + 1] * .587 + px[i + 2] * .114; if (invert) g = 255 - g;
+                            g = Math.max(0, Math.min(255, (g - 128) * 1.4 + 128)); px[i] = px[i + 1] = px[i + 2] = g;
+                        }
+                        cx.putImageData(d, 0, 0); res(c);
+                    };
+                    img.onerror = () => rej(new Error('Không mở được ảnh này.')); img.src = fr.result;
+                };
+                fr.onerror = () => rej(new Error('Không đọc được file ảnh.')); fr.readAsDataURL(file);
+            });
+        }
+        async function quickOcr() {
+            const f = document.getElementById('qi-file').files[0];
+            if (!f) { alert('Hãy chọn ảnh đơn hàng trước.'); return; }
+            const prog = document.getElementById('qi-progress'), btn = document.getElementById('qi-ocr-btn'); btn.disabled = true;
+            try {
+                prog.innerText = 'Đang chuẩn bị ảnh...'; const canvas = await ocrPrep(f);
+                prog.innerText = 'Đang tải bộ đọc chữ (lần đầu hơi lâu)...'; await loadTesseract();
+                const r = await Tesseract.recognize(canvas, 'vie+eng', { logger: m => { if (m && m.status) prog.innerText = (m.status === 'recognizing text' ? 'Đang đọc chữ ' + Math.round((m.progress || 0) * 100) + '%' : 'Đang xử lý: ' + m.status); } });
+                const text = (r && r.data && r.data.text) || '';
+                prog.innerText = '';
+                openQuickConfirm(text);
+            } catch (e) { prog.innerText = ''; alert('Lỗi đọc ảnh: ' + (e && e.message ? e.message : e)); }
+            btn.disabled = false;
+        }
+
+        // ----- trả hàng về kho -----
+        let rtDraft = {};
+        function openReturnModal() {
+            if (!db.warehouse.some(w => w.qty > 0)) { alert('Kho đang trống, không có hàng để trả.'); return; }
+            rtDraft = {};
+            ['rt-search', 'rt-name', 'rt-phone', 'rt-note'].forEach(id => document.getElementById(id).value = '');
+            renderReturnList();
+            document.getElementById('return-modal').classList.remove('hidden');
+        }
+        function closeReturnModal() {
+            if (Object.keys(rtDraft).length && !confirm('Đóng và bỏ phiếu trả hàng đang nhập?')) return;
+            document.getElementById('return-modal').classList.add('hidden');
+        }
+        function returnRows() {
+            const k = normTxt(document.getElementById('rt-search').value).trim();
+            return db.warehouse.filter(w => w.qty > 0).map(w => ({ w, p: db.productsMaster.find(x => String(x.id) === String(w.productId)) }))
+                .filter(r => r.p && (!k || normTxt(r.p.name).includes(k) || prodCode(r.p).includes(k)));
+        }
+        function renderReturnList() {
+            const rows = returnRows(); const list = document.getElementById('rt-list');
+            if (!rows.length) list.innerHTML = '<p class="text-xs opacity-60 text-center py-8">Không tìm thấy sản phẩm.</p>';
+            else list.innerHTML = rows.map(({ w, p }) => `<div class="flex items-center gap-2 p-3 rounded-xl border ${rtDraft[p.id] ? 'border-rose-500/60 bg-rose-500/5' : 'border-theme-border bg-theme-input'}">
+                ${p.img ? `<img src="${p.img}" class="w-12 h-12 object-cover rounded-lg border border-theme-border flex-shrink-0">` : '<div class="w-12 h-12 rounded-lg bg-black/20 flex-shrink-0"></div>'}
+                <div class="min-w-0 flex-1"><div class="font-bold text-sm leading-tight">${escHtml(p.name)}</div><div class="text-[11px] opacity-75">Mã ${prodCode(p)} • Tồn: <b>${w.qty}</b></div></div>
+                <button onclick="returnAllOne('${p.id}')" class="px-2.5 py-2 rounded-lg bg-rose-500/15 text-rose-400 text-[11px] font-bold flex-shrink-0">Tất cả</button>
+                <input type="number" inputmode="numeric" min="0" max="${w.qty}" placeholder="SL" value="${rtDraft[p.id] || ''}" id="rt-q-${p.id}" oninput="returnQty('${p.id}', this)" class="w-16 px-2 py-2.5 rounded-xl bg-theme-card border border-theme-border text-center font-bold outline-none flex-shrink-0">
+            </div>`).join('');
+            updateReturnTotals();
+        }
+        function returnQty(pid, el) {
+            let q = parseInt(el.value); const max = orderStockOf(pid);
+            if (isNaN(q) || q <= 0) delete rtDraft[pid]; else { if (q > max) { q = max; el.value = max; } rtDraft[pid] = q; }
+            updateReturnTotals();
+        }
+        function returnAllOne(pid) { rtDraft[pid] = orderStockOf(pid); const el = document.getElementById('rt-q-' + pid); if (el) el.value = rtDraft[pid]; updateReturnTotals(); }
+        function returnSelectAll() { db.warehouse.forEach(w => { if (w.qty > 0) rtDraft[w.productId] = w.qty; }); renderReturnList(); }
+        function returnClearAll() { rtDraft = {}; renderReturnList(); }
+        function updateReturnTotals() {
+            document.getElementById('rt-count').innerText = Object.keys(rtDraft).length;
+            document.getElementById('rt-qty').innerText = Object.values(rtDraft).reduce((a, b) => a + b, 0);
+        }
+        function confirmReturn() {
+            const ids = Object.keys(rtDraft).filter(id => rtDraft[id] > 0);
+            if (!ids.length) { alert('Hãy chọn ít nhất 1 sản phẩm và số lượng cần trả.'); return; }
+            const name = document.getElementById('rt-name').value.trim();
+            if (!name) { alert('Hãy nhập tên người nhận ở kho.'); document.getElementById('rt-name').focus(); return; }
+            const items = ids.map(id => { const p = db.productsMaster.find(x => String(x.id) === String(id)); return { productId: id, name: p ? p.name : id, q: Math.min(rtDraft[id], orderStockOf(id)) }; }).filter(i => i.q > 0);
+            const total = items.reduce((a, i) => a + i.q, 0);
+            if (!confirm(`Xác nhận trả ${total} cái (${items.length} sản phẩm) về kho?\nNgười nhận: ${name}\n\n` + items.map(i => `- ${i.name} x${i.q}`).join('\n') + '\n\nSố lượng sẽ được trừ khỏi kho tồn.')) return;
+            items.forEach(i => { const w = db.warehouse.find(x => String(x.productId) === String(i.productId)); if (w) w.qty = Math.max(0, w.qty - i.q); });
+            const u = getCurrentUser();
+            if (!db.returnHistory) db.returnHistory = [];
+            db.returnHistory.unshift({ id: Date.now().toString(), time: new Date().toLocaleString('vi-VN'), username: u.username, byName: u.fullname || u.username, receiverName: name, receiverPhone: document.getElementById('rt-phone').value.trim(), note: document.getElementById('rt-note').value.trim(), items });
+            saveData(); rtDraft = {};
+            document.getElementById('return-modal').classList.add('hidden');
+            alert(`Đã trả ${total} cái về kho cho ${name}.`);
+            render();
+        }
+        function returnHistoryHtml() {
+            const list = db.returnHistory || [];
+            if (!list.length) return '';
+            const admin = getCurrentUser().role === 'admin';
+            return `<details class="bg-theme-card border border-theme-border rounded-2xl shadow-sm p-4 text-xs"><summary class="cursor-pointer font-bold text-sm"><i class="fa-solid fa-rotate-left text-rose-400 mr-2"></i>Lịch sử trả hàng về kho (${list.length})</summary>
+                <div class="mt-3 space-y-2">${list.map((h, i) => `<div class="p-3 rounded-xl border border-theme-border bg-theme-input">
+                    <div class="flex justify-between gap-2"><b>${escHtml(h.time)}</b>${admin ? `<button onclick="deleteReturnRecord(${i})" class="text-rose-400 font-bold">Xóa</button>` : ''}</div>
+                    <div class="mt-1">Người nhận: <b>${escHtml(h.receiverName)}</b>${h.receiverPhone ? ' • ' + escHtml(h.receiverPhone) : ''} <span class="opacity-60">• Người trả: ${escHtml(h.byName || h.username || '')}</span></div>
+                    ${h.note ? `<div class="opacity-80">Ghi chú: ${escHtml(h.note)}</div>` : ''}
+                    <div class="mt-1 opacity-90">${(h.items || []).map(it => escHtml(it.name) + ' <b>x' + it.q + '</b>').join(' • ')}</div></div>`).join('')}</div></details>`;
+        }
+        function deleteReturnRecord(i) {
+            const h = (db.returnHistory || [])[i]; if (!h) return;
+            if (!confirm('Xóa bản ghi trả hàng này?')) return;
+            if (confirm('Có cộng lại số lượng đã trả vào kho không?\nOK = cộng lại, Hủy = chỉ xóa bản ghi.')) {
+                (h.items || []).forEach(it => { const w = db.warehouse.find(x => String(x.productId) === String(it.productId)); if (w) w.qty += it.q; });
+            }
+            db.returnHistory.splice(i, 1); saveData(); render();
+        }
+        function deleteSalesRecord(i) {
+            const h = (db.salesHistory || [])[i]; if (!h) return;
+            if (!confirm('Xóa đơn hàng này?\n\n' + h.time + ' - ' + h.storeName + '\n' + h.note + '\n\nLưu ý: xóa đơn KHÔNG hoàn lại số lượng vào kho.')) return;
+            db.salesHistory.splice(i, 1);
+            saveData(); render();
+        }
         function renderHistoryView() {
             return `
                 <div class="space-y-4 sm:space-y-6 text-theme-text">
@@ -1374,10 +2249,12 @@
                                             <th class="p-3.5">Chi tiết đơn hàng</th>
                                             <th class="p-3.5">Chiết khấu</th>
                                             <th class="p-3.5">Ảnh sản phẩm bán (Tối đa 3)</th>
+                                            <th class="p-3.5 text-center">Bill</th>
+                                            <th class="p-3.5 text-center">Xóa</th>
                                         </tr>
                                     </thead>
                                     <tbody class="divide-y divide-theme-border text-xs sm:text-sm">
-                                        ${(!db.salesHistory || db.salesHistory.length === 0) ? `<tr><td colspan="6" class="p-8 text-center opacity-50 italic">Chưa có lịch sử bán hàng nào.</td></tr>` : ''}
+                                        ${(!db.salesHistory || db.salesHistory.length === 0) ? `<tr><td colspan="8" class="p-8 text-center opacity-50 italic">Chưa có lịch sử bán hàng nào.</td></tr>` : ''}
                                         ${(db.salesHistory || []).map((h, hIdx) => `
                                             <tr>
                                                 <td class="p-3.5 text-xs opacity-75 whitespace-nowrap font-semibold">${h.time}</td>
@@ -1390,6 +2267,8 @@
                                                         ${h.photos && h.photos.length > 0 ? h.photos.map((img, pIdx) => `<img src="${img}" class="w-14 h-10 object-cover rounded border border-theme-border shadow-sm cursor-pointer hover:opacity-80 transition" onclick="openGlobalPhotoEdit('sales_history_photo', ${hIdx}, ${pIdx})" title="Nhấn để đổi ảnh" />`).join('') : (h.photo ? `<img src="${h.photo}" class="w-14 h-10 object-cover rounded border border-theme-border shadow-sm cursor-pointer hover:opacity-80 transition" onclick="openGlobalPhotoEdit('sales_history_photo', ${hIdx}, 0)" title="Nhấn để đổi ảnh" />` : 'Không có ảnh')}
                                                     </div>
                                                 </td>
+                                                <td class="p-3.5 text-center"><button onclick="viewSavedBill(${hIdx})" class="px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded text-xs font-semibold whitespace-nowrap"><i class="fa-solid fa-receipt mr-1"></i>Xem bill</button></td>
+                                                <td class="p-3.5 text-center"><button onclick="deleteSalesRecord(${hIdx})" class="px-3 py-1 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded text-xs font-semibold whitespace-nowrap"><i class="fa-solid fa-trash-can mr-1"></i>Xóa</button></td>
                                             </tr>
                                         `).join('')}
                                     </tbody>
@@ -1583,6 +2462,7 @@
             const saleUsers = db.users.filter(x => x.role !== 'admin');
             return `
                 <div class="space-y-6 text-theme-text">
+                    ${storageCardHtml()}
                     <div class="bg-theme-card border border-theme-border p-6 rounded-3xl shadow-xl space-y-4">
                         <div class="flex justify-between items-center border-b border-theme-border pb-3">
                             <h3 class="font-bold text-base flex items-center space-x-2">
@@ -1637,8 +2517,11 @@
                                 <i class="fa-solid fa-file-invoice-dollar text-amber-500"></i><span>Báo cáo & Dọn dẹp lịch sử</span>
                             </h3>
                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                <button onclick="openReportModal()" class="py-3.5 px-4 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-xl text-xs transition shadow-lg flex items-center justify-center space-x-2">
-                                    <i class="fa-solid fa-receipt"></i><span>Xuất báo cáo ngày (JPG)</span>
+                                <button onclick="openReportModal('day')" class="py-3.5 px-4 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-xl text-xs transition shadow-lg flex items-center justify-center space-x-2">
+                                    <i class="fa-solid fa-receipt"></i><span>Báo cáo trong ngày (JPG)</span>
+                                </button>
+                                <button onclick="openReportModal('all')" class="py-3.5 px-4 bg-amber-600/90 hover:bg-amber-700 text-slate-950 font-bold rounded-xl text-xs transition shadow-lg flex items-center justify-center space-x-2">
+                                    <i class="fa-solid fa-clock-rotate-left"></i><span>Báo cáo toàn bộ lịch sử (JPG)</span>
                                 </button>
                                 <button onclick="clearHistoryOnly()" class="py-3.5 px-4 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-bold rounded-xl text-xs transition border border-rose-500/30 flex items-center justify-center space-x-2">
                                     <i class="fa-solid fa-trash-can"></i><span>Xóa bộ nhớ đệm (Lịch sử)</span>
@@ -1766,11 +2649,7 @@
 
         function handleGlobalFileSelected(input) {
             if(input.files && input.files[0]) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    applyNewPhotoToTarget(e.target.result);
-                };
-                reader.readAsDataURL(input.files[0]);
+                fileToCompressedDataUrl(input.files[0], applyNewPhotoToTarget);
             }
         }
 
@@ -1860,6 +2739,88 @@
         const rpLine = h => `<div style="font-size:10.5px;line-height:1.4;color:#e2e8f0;margin-bottom:5px">${h}</div>`;
         const rpCard = h => `<div style="background:rgba(0,0,0,.35);border:1px solid rgba(148,163,184,.25);border-radius:10px;padding:8px 9px;margin-bottom:7px;font-size:10.5px;line-height:1.4;color:#e2e8f0">${h}</div>`;
 
+        function rpInventoryBlocks() {
+            const blocks = [];
+            const inv = (db.warehouse || []).map(w => ({ w, p: (db.productsMaster || []).find(x => String(x.id) === String(w.productId)) })).filter(x => x.p);
+            inv.sort((a, b) => ((a.w.qty < 5) === (b.w.qty < 5)) ? a.p.name.localeCompare(b.p.name, 'vi') : (a.w.qty < 5 ? -1 : 1));
+            let totalQty = 0; inv.forEach(x => totalQty += Number(x.w.qty) || 0);
+            rpSection('🏬 Tổng tồn kho hiện tại', inv.map(x => {
+                const low = x.w.qty < 5;
+                return `<div style="display:flex;justify-content:space-between;gap:8px;font-size:10.5px;padding:4px 6px;margin-bottom:3px;border-radius:6px;background:${low ? 'rgba(225,29,72,.18)' : 'rgba(0,0,0,.3)'};color:${low ? '#fda4af' : '#e2e8f0'}"><span>${escHtml(x.p.name)}${low ? ' ⚠️' : ''}</span><b style="white-space:nowrap">${x.w.qty} cái</b></div>`;
+            }), 'Kho đang trống.').forEach(b => blocks.push(b));
+            blocks.push(`<div style="margin-top:6px;border-top:1px solid rgba(245,158,11,.4);padding-top:6px;font-size:10.5px;color:#fde68a;font-weight:700;text-align:right">Tổng tồn: ${totalQty.toLocaleString('vi-VN')} cái • ${inv.length} mã sản phẩm</div>`);
+            return blocks;
+        }
+
+        // ===== Bản 21: báo cáo toàn bộ lịch sử + bill chi tiết =====
+        let reportMode = 'day', reportToken = 0;
+        const rpFmt = n => Number(n || 0).toLocaleString('vi-VN');
+        function parseDayKey(k) { const m = String(k).match(/^(\d+)\/(\d+)\/(\d+)$/); return m ? new Date(+m[3], +m[2] - 1, +m[1]).getTime() : 0; }
+        const rpTitleHtml = t => `<div style="font-weight:800;font-size:11px;color:#fbbf24;text-transform:uppercase;margin:8px 0 6px;letter-spacing:.3px">${t}</div>`;
+        function billItemsOf(h) {
+            if (h.items && h.items.length) return { items: h.items, approx: false };
+            const body = String(h.note || '').replace(/^[^:]*\):\s*/, '').replace(/\s*\|\s*Tổng:.*$/, '');
+            const items = body.split(/,\s*(?=[^,]+ x\d+(?:,|$))/).map(x => {
+                const m = x.match(/^(.*) x(\d+)\s*$/); if (!m) return null;
+                const name = m[1].trim(), p = (db.productsMaster || []).find(pp => pp.name === name);
+                return { name, q: parseInt(m[2]), price: p ? p.price : null };
+            }).filter(Boolean);
+            return { items, approx: items.some(i => i.price != null) };
+        }
+        function rpBillCard(h) {
+            const { items, approx } = billItemsOf(h);
+            const pay = h.pay || ((h.note || '').match(/\(([^)]*)\)/) || [])[1] || '';
+            const cell = (w, al, v, b) => `<span style="width:${w}px;text-align:${al};${b ? 'font-weight:700;' : ''}flex-shrink:0">${v}</span>`;
+            const rows = items.map(it => `<div style="display:flex;gap:4px;padding:2px 0;border-bottom:1px dashed rgba(148,163,184,.25);font-size:9.5px"><span style="flex:1;min-width:0;word-break:break-word">${escHtml(it.name)}</span>${cell(20, 'center', it.q)}${cell(48, 'right', it.price != null ? rpFmt(it.price) + (approx ? '*' : '') : '-')}${cell(56, 'right', it.price != null ? rpFmt(it.q * it.price) : '-', true)}</div>`).join('');
+            const head = `<div style="display:flex;gap:4px;font-size:9px;font-weight:800;color:#fbbf24;border-bottom:1px solid rgba(245,158,11,.4);padding-bottom:2px"><span style="flex:1">Sản phẩm</span>${cell(20, 'center', 'SL')}${cell(48, 'right', 'Giá')}${cell(56, 'right', 'Thành tiền')}</div>`;
+            const disc = h.discountStr && h.discountStr !== '0 đ';
+            return rpCard(`<div style="display:flex;justify-content:space-between;gap:6px"><b style="color:#6ee7b7">${escHtml(h.storeName)}</b><span style="font-size:9px;opacity:.7;white-space:nowrap">${escHtml(h.time)}</span></div><div style="font-size:9.5px;opacity:.8;margin:2px 0 4px">Sale: ${escHtml(h.saleName || h.username || '-')}${pay ? ' • TT: ' + escHtml(pay) : ''}</div>${head}${rows || '<div style="font-size:9.5px;opacity:.7;padding:3px 0">' + escHtml(h.note || '') + '</div>'}<div style="display:flex;justify-content:space-between;font-size:10px;margin-top:4px"><span>Tạm tính</span><span>${rpFmt(saleGross(h))} đ</span></div>${disc ? `<div style="display:flex;justify-content:space-between;font-size:10px;color:#fbbf24"><span>Chiết khấu</span><span>- ${escHtml(h.discountStr)}</span></div>` : ''}<div style="display:flex;justify-content:space-between;font-size:11.5px;font-weight:900;color:#fbbf24;margin-top:2px;border-top:1px solid rgba(245,158,11,.4);padding-top:3px"><span>TỔNG THANH TOÁN</span><span>${rpFmt(saleNet(h))} đ</span></div>${approx ? '<div style="font-size:8.5px;opacity:.6;margin-top:2px">* Giá theo bảng giá hiện tại (đơn cũ chưa lưu giá lúc bán)</div>' : ''}`);
+        }
+        function rpBillBlocks(list, mainTitle) {
+            if (!list.length) return rpSection(mainTitle, [], 'Chưa có đơn hàng nào.');
+            const groups = {};
+            list.forEach(h => { (groups[h.storeName] = groups[h.storeName] || []).push(h); });
+            const out = []; let first = true;
+            Object.keys(groups).sort((a, b) => a.localeCompare(b, 'vi')).forEach(name => {
+                const g = groups[name]; const net = g.reduce((a, h) => a + saleNet(h), 0);
+                const cards = g.map(rpBillCard);
+                cards[0] = `<div style="font-weight:800;font-size:10.5px;color:#a7f3d0;margin:6px 0 4px">🏪 ${escHtml(name)} — ${g.length} đơn • ${rpFmt(net)} đ</div>` + cards[0];
+                if (first) { cards[0] = rpTitleHtml(mainTitle) + cards[0]; first = false; }
+                cards.forEach(c => out.push(c));
+            });
+            return out;
+        }
+        function buildAllReportBlocks() {
+            const sales = db.salesHistory || [], checks = db.checkinHistory || [], stores = db.stores || [];
+            const blocks = [];
+            let g = 0, n = 0; const days = {}, perStore = {};
+            sales.forEach(h => {
+                const gg = saleGross(h), nn = saleNet(h); g += gg; n += nn;
+                const k = dayKeyOf(h.time); (days[k] = days[k] || { c: 0, g: 0, n: 0 }); days[k].c++; days[k].g += gg; days[k].n += nn;
+                (perStore[h.storeName] = perStore[h.storeName] || { c: 0, n: 0 }); perStore[h.storeName].c++; perStore[h.storeName].n += nn;
+            });
+            const dayKeys = Object.keys(days).filter(Boolean).sort((a, b) => parseDayKey(a) - parseDayKey(b));
+            const range = dayKeys.length ? `${dayKeys[0]} → ${todayVN()}` : 'Chưa có đơn hàng';
+            const box = (l, v, c) => `<div style="flex:1;background:rgba(0,0,0,.4);border:1px solid rgba(245,158,11,.25);border-radius:10px;padding:8px"><div style="font-size:10px;color:#cbd5e1;font-weight:600">${l}</div><div style="font-size:13px;font-weight:900;color:${c};margin-top:3px">${v}</div></div>`;
+            blocks.push(`<div style="text-align:center;border-bottom:1px solid rgba(245,158,11,.4);padding-bottom:8px;margin-bottom:8px"><div style="font-weight:900;color:#fbbf24;font-size:14px;letter-spacing:1px">PHỤ KIỆN HOÀNG ĐẾ</div><div style="font-weight:700;color:#fde68a;font-size:10px;margin-top:2px">BÁO CÁO TOÀN BỘ LỊCH SỬ</div><div style="font-size:10px;color:#cbd5e1;margin-top:3px">Giai đoạn: <b style="color:#fff">${range}</b></div><div style="font-size:9px;color:#94a3b8;margin-top:2px">Xuất lúc ${escHtml(new Date().toLocaleString('vi-VN'))}</div></div>`);
+            blocks.push(`<div style="display:flex;gap:6px;margin-bottom:6px">${box('Doanh thu Gross', rpFmt(g) + ' đ', '#fff')}${box('Doanh thu Net', rpFmt(n) + ' đ', '#fbbf24')}</div>`);
+            blocks.push(`<div style="display:flex;gap:6px;margin-bottom:6px">${box('Số đơn', sales.length, '#fff')}${box('Cửa hàng', stores.length, '#34d399')}${box('Check-in', checks.length, '#60a5fa')}</div>`);
+            rpSection('📅 Doanh thu theo ngày', dayKeys.map(k => rpLine(`🔹 <b>${k}</b>: ${days[k].c} đơn • Gross ${rpFmt(days[k].g)} • <b style="color:#fbbf24">Net ${rpFmt(days[k].n)}</b>`)), 'Chưa có đơn hàng nào.').forEach(b => blocks.push(b));
+            rpSection(`👥 Thông tin khách hàng (${stores.length} điểm bán)`, stores.map((s, i) => {
+                const ps = perStore[s.name] || { c: 0, n: 0 };
+                const nCheck = checks.filter(h => h.storeName === s.name).length;
+                const added = !isNaN(Number(s.id)) && Number(s.id) > 1e12 ? new Date(Number(s.id)).toLocaleDateString('vi-VN') : '-';
+                const gps = s.lat != null && s.lng != null ? `[${Number(s.lat).toFixed(5)}, ${Number(s.lng).toFixed(5)}]` : 'N/A';
+                return rpCard(`<div style="font-weight:800;color:#fcd34d">${i + 1}. ${escHtml(s.name)}</div><div>Chủ: <b>${escHtml(s.owner || 'N/A')}</b> - SĐT: <span style="color:#60a5fa">${escHtml(s.phone || 'N/A')}</span></div><div style="opacity:.85">Địa chỉ: ${escHtml(s.address || '')}, ${escHtml(s.district || '')}, ${escHtml(s.city || '')}</div><div style="opacity:.9;margin-top:2px">Quy mô: <b>${escHtml(s.scale || '-')}</b> • Ngành: <b>${escHtml(s.industry || '-')}</b> • ${escHtml(relLabel(s.relation) || '-')}</div><div style="margin-top:2px">📍 <span style="color:#fbbf24;font-family:monospace">${gps}</span> • Thêm: ${added}</div><div style="margin-top:2px;color:#6ee7b7">${ps.c} đơn • Net <b>${rpFmt(ps.n)} đ</b> • ${nCheck} lần check-in</div>`);
+            }), 'Chưa có khách hàng nào.').forEach(b => blocks.push(b));
+            rpSection(`✅ Lịch sử check-in (${checks.length})`, checks.map((h, i) => rpLine(`${i + 1}. <b style="color:#6ee7b7">${escHtml(h.storeName)}</b> <span style="opacity:.7">• ${escHtml(h.time)}</span>${h.note ? '<br><span style="opacity:.85">📝 ' + escHtml(h.note) + '</span>' : ''}`)), 'Chưa có lịch sử check-in.').forEach(b => blocks.push(b));
+            rpBillBlocks(sales, `🧾 Bill thanh toán từng cửa hàng (${sales.length} đơn)`).forEach(b => blocks.push(b));
+            const imps = db.importHistory || [];
+            rpSection(`📦 Lịch sử nhập kho (${imps.length})`, imps.map(i => rpLine(`🔹 ${escHtml(i.productName)}: <b>+${i.qty} cái</b> (${escHtml(i.time)})`)), 'Chưa có lịch sử nhập kho.').forEach(b => blocks.push(b));
+            rpInventoryBlocks().forEach(b => blocks.push(b));
+            return blocks;
+        }
+
         function buildReportBlocks() {
             const todayStr = new Date().toDateString();
             const sales = (db.salesHistory || []).filter(h => isTodayTime(h.time));
@@ -1893,14 +2854,8 @@
                 return rpCard(`<div style="display:flex;justify-content:space-between;gap:6px"><b style="color:#6ee7b7">${i + 1}. ${escHtml(h.storeName)}</b><span style="font-size:9px;opacity:.7;white-space:nowrap">${escHtml(h.time)}</span></div><div>SĐT: <span style="color:#60a5fa">${escHtml(h.phone || 'N/A')}</span> | ${escHtml(h.address || '')}</div><div>📍 GPS: <span style="color:#fbbf24;font-family:monospace">${gps}</span></div><div>Sale: <span style="color:#fbbf24">@${escHtml(h.username)}</span></div><div style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.25);border-radius:8px;padding:5px 7px;margin-top:4px"><div>• Số đơn: <b>${st.count}</b> • Doanh thu: <b style="color:#fbbf24">${st.revenue.toLocaleString('vi-VN')} đ</b></div><div style="font-size:10px;opacity:.85;margin-top:2px">${escHtml(h.note)}</div></div>`);
             }), 'Chưa có lịch sử check-in trong hôm nay.').forEach(b => blocks.push(b));
 
-            const inv = (db.warehouse || []).map(w => ({ w, p: (db.productsMaster || []).find(x => String(x.id) === String(w.productId)) })).filter(x => x.p);
-            inv.sort((a, b) => ((a.w.qty < 5) === (b.w.qty < 5)) ? a.p.name.localeCompare(b.p.name, 'vi') : (a.w.qty < 5 ? -1 : 1));
-            let totalQty = 0; inv.forEach(x => totalQty += Number(x.w.qty) || 0);
-            rpSection('🏬 Tổng tồn kho hiện tại', inv.map(x => {
-                const low = x.w.qty < 5;
-                return `<div style="display:flex;justify-content:space-between;gap:8px;font-size:10.5px;padding:4px 6px;margin-bottom:3px;border-radius:6px;background:${low ? 'rgba(225,29,72,.18)' : 'rgba(0,0,0,.3)'};color:${low ? '#fda4af' : '#e2e8f0'}"><span>${escHtml(x.p.name)}${low ? ' ⚠️' : ''}</span><b style="white-space:nowrap">${x.w.qty} cái</b></div>`;
-            }), 'Kho đang trống.').forEach(b => blocks.push(b));
-            blocks.push(`<div style="margin-top:6px;border-top:1px solid rgba(245,158,11,.4);padding-top:6px;font-size:10.5px;color:#fde68a;font-weight:700;text-align:right">Tổng tồn: ${totalQty.toLocaleString('vi-VN')} cái • ${inv.length} mã sản phẩm</div>`);
+            rpBillBlocks(sales, '🧾 Bill thanh toán từng cửa hàng (hôm nay)').forEach(b => blocks.push(b));
+            rpInventoryBlocks().forEach(b => blocks.push(b));
             return blocks;
         }
 
@@ -1929,28 +2884,44 @@
             return pages;
         }
 
-        function openReportModal() {
+        function openReportModal(mode) {
+            reportMode = mode === 'all' ? 'all' : 'day';
+            const token = ++reportToken;
             reportImages = [];
             document.getElementById('report-modal').classList.remove('hidden');
-            const pages = paginateReport(buildReportBlocks());
+            document.getElementById('report-title').innerHTML = '<i class="fa-solid fa-file-invoice-dollar text-amber-500 mr-2"></i>' + (reportMode === 'all' ? 'Báo Cáo Toàn Bộ Lịch Sử' : 'Báo Cáo Doanh Thu & Thị Trường Trong Ngày');
+            const act = 'flex-1 py-2.5 rounded-xl text-xs font-bold border bg-amber-500 text-slate-950 border-amber-500', off = 'flex-1 py-2.5 rounded-xl text-xs font-bold border bg-theme-input border-theme-border';
+            document.getElementById('rp-tab-day').className = reportMode === 'day' ? act : off;
+            document.getElementById('rp-tab-all').className = reportMode === 'all' ? act : off;
+            const prog = document.getElementById('rp-progress'); prog.innerText = 'Đang dựng báo cáo...';
+            const host = document.getElementById('report-pages'); host.innerHTML = '';
             setTimeout(async () => {
-                const out = [];
+                if (token !== reportToken) return;
+                const pages = paginateReport(reportMode === 'all' ? buildAllReportBlocks() : buildReportBlocks());
+                const scale = reportMode === 'all' ? 2 : 3;
+                const out = [], d = new Date(), tag = `${d.getDate()}-${d.getMonth() + 1}-${d.getFullYear()}`;
+                const prefix = reportMode === 'all' ? 'Bao-Cao-Toan-Bo-Lich-Su' : 'Bao-Cao';
                 for (let i = 0; i < pages.length; i++) {
+                    if (token !== reportToken) return;
+                    prog.innerText = `Đang tạo ảnh ${i + 1}/${pages.length}...`;
                     try {
-                        const canvas = await html2canvas(pages[i], { scale: 3, backgroundColor: '#0b1120', useCORS: true, logging: false });
+                        const canvas = await html2canvas(pages[i], { scale, backgroundColor: '#0b1120', useCORS: true, logging: false });
                         const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.92));
                         if (!blob) continue;
-                        const d = new Date(), tag = `${d.getDate()}-${d.getMonth() + 1}-${d.getFullYear()}`;
-                        out.push({ blob, dataUrl: canvas.toDataURL('image/jpeg', 0.9), file: new File([blob], `Bao-Cao-${tag}-Trang-${i + 1}.jpg`, { type: 'image/jpeg' }) });
+                        out.push({ blob, dataUrl: canvas.toDataURL('image/jpeg', 0.9), file: new File([blob], `${prefix}-${tag}-Trang-${i + 1}.jpg`, { type: 'image/jpeg' }) });
                     } catch (e) { console.warn('Không tạo được ảnh trang ' + (i + 1), e); }
+                    await new Promise(r => setTimeout(r, 0));
                 }
+                if (token !== reportToken) return;
                 reportImages = out;
-            }, 600);
+                prog.innerText = `✔ Đã tạo xong ${out.length} ảnh – bấm Tải ảnh hoặc Chia sẻ bên dưới.`;
+            }, 400);
         }
 
         
 
         function closeReportModal() {
+            reportToken++;
             document.getElementById('report-modal').classList.add('hidden');
         }
 
@@ -2089,27 +3060,139 @@
                 saveData(); render();
             }
         }
+
+        // ===== Bản 21: tiện ích nhóm / mã / biến thể =====
+        const CABLE_VARIANTS = ['USB - micro', 'USB - Type C', 'USB sang Lightning', 'C to C', 'Type C - Lightning'];
+        let importFilter = { q: '', cat: '' };
+        let manualVariant = '';
+        let orderCart = {};
+        let pickerDraft = {};
+        let pickerCat = '', pickerColor = '';
+        let importPending = null; // { id, variant }
+        let masterQ = '';
+        let masterCollapsed = {};
+
+        function normTxt(t) { return String(t == null ? '' : t).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd'); }
+        function isCableCat(c) { return normTxt(c).indexOf('cap sac') > -1; }
+        function prodCode(p) { return String(p.id).slice(-6); }
+        function prodCat(p) { return p.category || 'Chung'; }
+        function allCategories() {
+            const out = [];
+            (db.categories || []).forEach(c => { if (c && !out.includes(c)) out.push(c); });
+            (db.productsMaster || []).forEach(p => { const c = prodCat(p); if (!out.includes(c)) out.push(c); });
+            return out;
+        }
+        const COLORS = ['Đen', 'Trắng', 'Xanh', 'Ghi'];
+        let manualColor = '';
+        function parseProductName(p) {
+            let n = String(p.name), color = p.color || '', variant = '';
+            const cut = suf => { if (n.endsWith(suf)) { n = n.slice(0, -suf.length); return true; } return false; };
+            if (color) cut(' (' + color + ')');
+            else for (const c of COLORS) { if (cut(' (' + c + ')')) { color = c; break; } }
+            for (const v of CABLE_VARIANTS) { if (cut(' (' + v + ')')) { variant = v; break; } }
+            return { base: n.trim(), variant, color };
+        }
+        function composeName(base, variant, color) { return base + (variant ? ' (' + variant + ')' : '') + (color ? ' (' + color + ')' : ''); }
+        function baseProductName(n) { return parseProductName({ name: n }).base; }
+        function colorChipsHtml(sel, fn, keepLabel, small) {
+            const cls = on => (small ? 'px-2.5 py-1.5 rounded-lg text-[11px]' : 'px-3 py-2 rounded-xl text-xs') + ' border font-bold ' + (on ? 'bg-amber-500 text-slate-950 border-amber-500' : 'bg-theme-input border-theme-border');
+            const other = sel && !COLORS.includes(sel);
+            return `<button type="button" onclick="${fn}(-1)" class="${cls(!sel)}">${keepLabel}</button>` +
+                COLORS.map((c, i) => `<button type="button" onclick="${fn}(${i})" class="${cls(sel === c)}">${c}</button>`).join('') +
+                `<button type="button" onclick="${fn}(4)" class="${cls(other)}">${other ? 'Khác: ' + escHtml(sel) : 'Khác'}</button>`;
+        }
+        function pickColorIdx(i) {
+            if (i < 0) return '';
+            if (i < 4) return COLORS[i];
+            const t = prompt('Nhập màu sắc khác (VD: Hồng, Vàng, Đỏ):');
+            return t && t.trim() ? t.trim() : null;
+        }
+        function newProductId() {
+            let id = Date.now(); const used = new Set(db.productsMaster.map(p => String(p.id)));
+            while (used.has(String(id))) id++;
+            return String(id);
+        }
+        function catChipsHtml(cats, active, fn, allLabel) {
+            const cls = (on) => 'px-3 py-2 rounded-xl border whitespace-nowrap text-xs font-bold transition ' + (on ? 'bg-amber-500 text-slate-950 border-amber-500' : 'bg-theme-input border-theme-border');
+            let h = `<button type="button" onclick="${fn}(-1)" class="${cls(active === '')}">${allLabel}</button>`;
+            cats.forEach((c, i) => { h += `<button type="button" onclick="${fn}(${i})" class="${cls(active === c)}">${escHtml(c)}</button>`; });
+            return h;
+        }
+
         function openImportStockModal() {
-            const list = document.getElementById('import-product-list');
-            list.innerHTML = db.productsMaster.map(p => {
-                const w = db.warehouse.find(x => String(x.productId) === String(p.id));
-                const qty = w ? w.qty : 0;
-                return `<div onclick="selectProductToImport('${p.id}')" class="p-3 rounded-xl border border-theme-border bg-theme-input flex items-center justify-between cursor-pointer hover:border-amber-500/50"><div><div class="font-bold text-sm">${p.name}</div><div class="text-[11px] text-amber-500 font-bold">Tồn: ${qty} | Giá: ${Number(p.price).toLocaleString()}đ</div></div><span class="px-3 py-1.5 bg-amber-500 text-slate-950 font-bold rounded-lg text-xs">+ Nhập</span></div>`;
-            }).join('');
+            importFilter = { q: '', cat: '' };
+            document.getElementById('import-search').value = '';
+            renderImportList();
             document.getElementById('import-stock-modal').classList.remove('hidden');
         }
+        function importSearchInput(v) { importFilter.q = v; renderImportList(); }
+        function setImportCat(i) { const cats = allCategories(); importFilter.cat = i < 0 ? '' : cats[i]; renderImportList(); }
+        function renderImportList() {
+            const cats = allCategories();
+            document.getElementById('import-cat-chips').innerHTML = catChipsHtml(cats, importFilter.cat, 'setImportCat', 'Tất cả');
+            const k = normTxt(importFilter.q).trim();
+            const rows = db.productsMaster.filter(p => (!importFilter.cat || prodCat(p) === importFilter.cat) && (!k || normTxt(p.name).includes(k) || prodCode(p).includes(k)));
+            const list = document.getElementById('import-product-list');
+            if (rows.length === 0) { list.innerHTML = '<p class="text-xs opacity-60 text-center py-6">Không có sản phẩm phù hợp.</p>'; return; }
+            list.innerHTML = rows.map(p => {
+                const w = db.warehouse.find(x => String(x.productId) === String(p.id));
+                const qty = w ? w.qty : 0;
+                return `<div onclick="selectProductToImport('${p.id}')" class="p-3 rounded-xl border border-theme-border bg-theme-input flex items-center justify-between gap-2 cursor-pointer hover:border-amber-500/50">
+                    <div class="flex items-center gap-3 min-w-0">
+                        ${p.img ? `<img src="${p.img}" class="w-10 h-10 object-cover rounded-lg border border-theme-border flex-shrink-0">` : ''}
+                        <div class="min-w-0"><div class="font-bold text-sm truncate">${escHtml(p.name)}</div>
+                        <div class="text-[11px] opacity-75">${escHtml(prodCat(p))} · Mã ${prodCode(p)} · Tồn: ${qty} · ${Number(p.price).toLocaleString()} đ</div></div>
+                    </div>
+                    <span class="text-xs font-bold text-amber-500 flex-shrink-0">+ Nhập</span></div>`;
+            }).join('');
+        }
         function selectProductToImport(id) {
-            const p = db.productsMaster.find(x => String(x.id) === String(id)); if(!p) return;
-            const q = parseInt(prompt(`Nhập số lượng thêm cho ${p.name}:`, '50'));
-            if(!isNaN(q)&&q>0) {
-                let w = db.warehouse.find(x => String(x.productId) === String(id));
-                if(w) w.qty += q; else db.warehouse.push({id: Date.now(), productId: id, qty: q});
-                
-                if(!db.importHistory) db.importHistory = [];
-                db.importHistory.unshift({ time: new Date().toLocaleTimeString('vi-VN'), productName: p.name, qty: q });
-
-                saveData(); alert("Nhập hàng thành công!"); document.getElementById('import-stock-modal').classList.add('hidden'); render();
+            const p = db.productsMaster.find(x => String(x.id) === String(id)); if (!p) return;
+            importPending = { id: String(id), variant: '', color: '' };
+            document.getElementById('iq-name').innerText = p.name;
+            document.getElementById('iq-qty').value = '';
+            const box = document.getElementById('iq-variant-box');
+            if (isCableCat(p.category)) { box.classList.remove('hidden'); renderIqVariants(); } else { box.classList.add('hidden'); }
+            renderIqColors();
+            document.getElementById('import-qty-modal').classList.remove('hidden');
+        }
+        function renderIqVariants() {
+            const on = (v) => importPending.variant === v;
+            const cls = (b) => 'px-3 py-2 rounded-xl border text-xs font-bold ' + (b ? 'bg-amber-500 text-slate-950 border-amber-500' : 'bg-theme-input border-theme-border');
+            let h = `<button type="button" onclick="setIqVariant(-1)" class="${cls(on(''))}">Giữ nguyên</button>`;
+            CABLE_VARIANTS.forEach((v, i) => { h += `<button type="button" onclick="setIqVariant(${i})" class="${cls(on(v))}">${v}</button>`; });
+            document.getElementById('iq-variant-chips').innerHTML = h;
+        }
+        function renderIqColors() { document.getElementById('iq-color-chips').innerHTML = colorChipsHtml(importPending.color, 'setIqColor', 'Giữ nguyên'); }
+        function setIqColor(i) { const c = pickColorIdx(i); if (c === null) return; importPending.color = c; renderIqColors(); }
+        function setIqVariant(i) { importPending.variant = i < 0 ? '' : CABLE_VARIANTS[i]; renderIqVariants(); }
+        function closeImportQty() { document.getElementById('import-qty-modal').classList.add('hidden'); importPending = null; }
+        function confirmImportQty() {
+            if (!importPending) return;
+            const p = db.productsMaster.find(x => String(x.id) === importPending.id); if (!p) return;
+            const q = parseInt(document.getElementById('iq-qty').value);
+            if (isNaN(q) || q <= 0) { alert('Nhập số lượng lớn hơn 0!'); return; }
+            let target = p;
+            const pn = parseProductName(p);
+            const v = (importPending.variant && isCableCat(p.category)) ? importPending.variant : pn.variant;
+            const c = importPending.color || pn.color;
+            if (v !== pn.variant || c !== pn.color) {
+                const newName = composeName(pn.base, v, c);
+                target = db.productsMaster.find(x => x.name === newName && prodCat(x) === prodCat(p));
+                if (!target) {
+                    target = { id: newProductId(), category: p.category, name: newName, price: p.price, img: p.img, color: c };
+                    db.productsMaster.push(target);
+                }
             }
+            let w = db.warehouse.find(x => String(x.productId) === String(target.id));
+            if (w) w.qty += q; else db.warehouse.push({ id: Date.now().toString() + Math.floor(Math.random() * 1000), productId: target.id, qty: q });
+            if (!db.importHistory) db.importHistory = [];
+            db.importHistory.unshift({ time: new Date().toLocaleTimeString('vi-VN'), productName: target.name, qty: q });
+            saveData();
+            closeImportQty();
+            document.getElementById('import-stock-modal').classList.add('hidden');
+            alert('Nhập hàng thành công: ' + target.name + ' x' + q);
+            render();
         }
 
         function openCustomAddProductModal(toWarehouse) {
@@ -2117,6 +3200,7 @@
             document.getElementById('add-product-modal').classList.remove('hidden');
             ['p-name','p-price','p-qty'].forEach(i => document.getElementById(i).value = '');
             uploadedProductImg = '';
+            manualVariant = ''; manualColor = '';
             document.getElementById('product-img-preview-box').classList.add('hidden');
             if(db.categories.length > 0 && !db.categories.includes(selectedCategory)) { selectedCategory = db.categories[0]; }
             renderCategories();
@@ -2125,13 +3209,11 @@
 
         function handleProductImageUpload(input) {
             if(input.files && input.files[0]) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    uploadedProductImg = e.target.result;
+                fileToCompressedDataUrl(input.files[0], data => {
+                    uploadedProductImg = data;
                     document.getElementById('product-img-preview').src = uploadedProductImg;
                     document.getElementById('product-img-preview-box').classList.remove('hidden');
-                };
-                reader.readAsDataURL(input.files[0]);
+                });
             }
         }
 
@@ -2169,7 +3251,18 @@
             let html = db.categories.map(c => `<button type="button" onclick="selectCategory('${c}')" class="px-4 py-2.5 rounded-xl border whitespace-nowrap text-xs font-bold transition ${selectedCategory === c ? 'bg-amber-500 text-slate-950 border-amber-500 shadow-sm' : 'bg-theme-input opacity-75 border-theme-border'}">${c}</button>`).join('');
             html += `<button type="button" onclick="addNewCategory()" class="px-4 py-2.5 rounded-xl border border-dashed border-theme-border whitespace-nowrap text-xs font-bold opacity-75 bg-theme-input"><i class="fa-solid fa-plus mr-1"></i> Thêm</button>`;
             container.innerHTML = html;
+            renderVariantChips(); renderManualColor();
         }
+        function renderManualColor() { const el = document.getElementById('color-chips'); if (el) el.innerHTML = colorChipsHtml(manualColor, 'setManualColor', 'Không chọn', true); }
+        function setManualColor(i) { const c = pickColorIdx(i); if (c === null) return; manualColor = c; renderManualColor(); }
+        function renderVariantChips() {
+            const row = document.getElementById('variant-row'); if (!row) return;
+            if (!isCableCat(selectedCategory)) { manualVariant = ''; row.classList.add('hidden'); return; }
+            row.classList.remove('hidden');
+            document.getElementById('variant-chips').innerHTML = CABLE_VARIANTS.map((v, i) =>
+                `<button type="button" onclick="toggleManualVariant(${i})" class="px-2.5 py-1.5 rounded-lg border text-[11px] font-bold ${manualVariant === v ? 'bg-amber-500 text-slate-950 border-amber-500' : 'bg-theme-input border-theme-border'}">${v}</button>`).join('');
+        }
+        function toggleManualVariant(i) { const v = CABLE_VARIANTS[i]; manualVariant = manualVariant === v ? '' : v; renderVariantChips(); }
         function selectCategory(c) { selectedCategory = c; renderCategories(); }
         function addNewCategory() {
             let newCat = prompt("Nhập tên nhóm sản phẩm mới:");
@@ -2186,15 +3279,16 @@
             }
         }
         function submitCustomAddProduct() {
-            const name = document.getElementById('p-name').value.trim(), price = parseInt(document.getElementById('p-price').value), qty = parseInt(document.getElementById('p-qty').value);
+            let name = document.getElementById('p-name').value.trim(); const price = parseInt(document.getElementById('p-price').value), qty = parseInt(document.getElementById('p-qty').value);
             if (!selectedCategory) { alert("Chọn nhóm sản phẩm!"); return; }
             if (!name) { alert("Nhập tên sản phẩm!"); return; }
             if (isNaN(price) || price < 0) { alert("Giá bán không hợp lệ!"); return; }
             if (isNaN(qty) || qty <= 0) { alert("Số lượng nhập kho phải lớn hơn 0!"); return; }
             if (!uploadedProductImg) { alert("Vui lòng tải lên hoặc chụp ảnh sản phẩm!"); return; }
 
-            const newId = Date.now().toString();
-            db.productsMaster.push({ id: newId, category: selectedCategory, name, price, img: uploadedProductImg });
+            { const v = (manualVariant && isCableCat(selectedCategory)) ? manualVariant : ''; if (v || manualColor) name = composeName(baseProductName(name), v, manualColor); }
+            const newId = newProductId();
+            db.productsMaster.push({ id: newId, category: selectedCategory, name, price, img: uploadedProductImg, color: manualColor || '' });
             db.warehouse.push({ id: Date.now().toString(), productId: newId, qty: qty });
             
             if(!db.importHistory) db.importHistory = [];
@@ -2219,18 +3313,87 @@
             document.getElementById('discount-value').value = '0';
             setDiscountType('percent');
 
-            const list = document.getElementById('order-product-list'); 
-            let avail = db.warehouse.filter(w=>w.qty>0);
-            if(avail.length===0){ list.innerHTML = `<p class="text-xs text-rose-400 py-4">Kho đã hết hàng!</p>`; }
-            else {
-                list.innerHTML = avail.map(w=>{
-                    const p=db.productsMaster.find(x=>String(x.id)===String(w.productId)); if(!p)return'';
-                    return `<div class="flex items-center justify-between p-3 rounded-xl border border-theme-border bg-theme-input gap-2"><div class="flex items-center space-x-3">${p.img?`<img src="${p.img}" class="w-10 h-10 object-cover rounded-lg border border-theme-border cursor-pointer" onclick="openGlobalPhotoEdit('product_master', '${p.id}')" title="Nhấn để đổi ảnh" />`:''}<div><div class="font-bold text-xs sm:text-sm">${p.name}</div><div class="text-[11px] text-amber-500 font-semibold">${Number(p.price).toLocaleString()}đ (Tồn: ${w.qty})</div></div></div><div class="flex items-center space-x-1"><input type="number" min="0" max="${w.qty}" value="0" data-pid="${p.id}" onchange="validateAndCalculateOrderTotal()" class="order-qty-input w-14 px-2 py-1.5 rounded bg-theme-card border border-theme-border text-center text-xs font-bold" /><span class="text-[10px] opacity-75">cái</span></div></div>`;
-                }).join('');
-            }
+            orderCart = {};
+            renderOrderSummary();
             document.querySelectorAll('input[name="pay_method"]').forEach(r=>r.checked=false); 
             validateAndCalculateOrderTotal(); 
             document.getElementById('sales-order-modal').classList.remove('hidden');
+        }
+
+
+        function orderStockOf(pid) { const w = db.warehouse.find(x => String(x.productId) === String(pid)); return w ? w.qty : 0; }
+        function cartSubTotal(cart) {
+            let t = 0;
+            Object.keys(cart).forEach(pid => { const p = db.productsMaster.find(x => String(x.id) === String(pid)); if (p) t += (cart[pid] || 0) * p.price; });
+            return t;
+        }
+        function renderOrderSummary() {
+            const box = document.getElementById('order-product-list');
+            const ids = Object.keys(orderCart).filter(pid => orderCart[pid] > 0);
+            document.getElementById('btn-picker-label').innerText = ids.length ? 'Sửa sản phẩm đã chọn' : 'Chọn sản phẩm';
+            if (orderStockOf && db.warehouse.filter(w => w.qty > 0).length === 0) { box.innerHTML = '<p class="text-xs text-rose-400 py-2">Kho đã hết hàng!</p>'; return; }
+            if (!ids.length) { box.innerHTML = '<p class="text-xs opacity-60 text-center py-2">Chưa chọn sản phẩm nào.</p>'; return; }
+            box.innerHTML = ids.map(pid => {
+                const p = db.productsMaster.find(x => String(x.id) === String(pid)); if (!p) return '';
+                const q = orderCart[pid];
+                return `<div class="flex items-center justify-between gap-2 p-2.5 rounded-xl border border-theme-border bg-theme-input text-xs">
+                    <div class="flex items-center gap-2 min-w-0">${p.img ? `<img src="${p.img}" class="w-9 h-9 object-cover rounded-lg border border-theme-border flex-shrink-0" onclick="openGlobalPhotoEdit('product_master','${p.id}')">` : ''}
+                    <span class="font-bold truncate">${escHtml(p.name)}</span></div>
+                    <div class="text-right flex-shrink-0"><div class="font-bold">x${q}</div><div class="text-amber-500 font-semibold">${(q * p.price).toLocaleString()} đ</div></div></div>`;
+            }).join('');
+        }
+        function openProductPicker() {
+            if (db.warehouse.filter(w => w.qty > 0).length === 0) { alert('Kho đã hết hàng!'); return; }
+            pickerDraft = Object.assign({}, orderCart);
+            pickerCat = ''; pickerColor = '';
+            document.getElementById('picker-search').value = '';
+            renderPicker();
+            document.getElementById('product-picker-modal').classList.remove('hidden');
+        }
+        function closeProductPicker() { document.getElementById('product-picker-modal').classList.add('hidden'); }
+        function setPickerColor(i) { pickerColor = i < 0 ? '' : (i < 4 ? COLORS[i] : '*'); renderPicker(); }
+        function setPickerCat(i) { const cats = allCategories(); pickerCat = i < 0 ? '' : cats[i]; renderPicker(); }
+        function renderPicker() {
+            document.getElementById('picker-cat-chips').innerHTML = catChipsHtml(allCategories(), pickerCat, 'setPickerCat', 'Tất cả');
+            const cc = (on, fn, label) => `<button type="button" onclick="${fn}" class="px-3 py-2 rounded-xl border whitespace-nowrap text-xs font-bold ${on ? 'bg-amber-500 text-slate-950 border-amber-500' : 'bg-theme-input border-theme-border'}">${label}</button>`;
+            document.getElementById('picker-color-chips').innerHTML = '<span class="text-[10px] font-bold uppercase opacity-60 whitespace-nowrap"><i class="fa-solid fa-palette mr-1"></i>Màu</span>' + cc(!pickerColor, 'setPickerColor(-1)', 'Mọi màu') + COLORS.map((c, i) => cc(pickerColor === c, `setPickerColor(${i})`, c)).join('') + cc(pickerColor === '*', 'setPickerColor(4)', 'Khác');
+            const colOk = p => { if (!pickerColor) return true; const c = parseProductName(p).color; return pickerColor === '*' ? (c && !COLORS.includes(c)) : c === pickerColor; };
+            const k = normTxt(document.getElementById('picker-search').value).trim();
+            const rows = db.warehouse.filter(w => w.qty > 0).map(w => ({ w, p: db.productsMaster.find(x => String(x.id) === String(w.productId)) }))
+                .filter(r => r.p && (!pickerCat || prodCat(r.p) === pickerCat) && colOk(r.p) && (!k || normTxt(r.p.name).includes(k) || prodCode(r.p).includes(k)));
+            const list = document.getElementById('picker-list');
+            if (!rows.length) list.innerHTML = '<p class="text-xs opacity-60 text-center py-8">Không tìm thấy sản phẩm trong kho.</p>';
+            else list.innerHTML = rows.map(({ w, p }) => `
+                <div class="flex items-center justify-between gap-3 p-3 rounded-xl border border-theme-border bg-theme-input">
+                    <div class="flex items-center gap-3 min-w-0">
+                        ${p.img ? `<img src="${p.img}" class="w-14 h-14 object-cover rounded-lg border border-theme-border flex-shrink-0">` : '<div class="w-14 h-14 rounded-lg bg-black/20 flex-shrink-0"></div>'}
+                        <div class="min-w-0"><div class="font-bold text-sm leading-tight">${escHtml(p.name)}</div>
+                        <div class="text-[11px] opacity-75 mt-0.5">Mã ${prodCode(p)} · ${escHtml(prodCat(p))}${parseProductName(p).color ? ' · Màu ' + escHtml(parseProductName(p).color) : ''}</div>
+                        <div class="text-xs mt-0.5"><span class="text-amber-500 font-bold">${Number(p.price).toLocaleString()} đ</span> · Tồn: ${w.qty}</div></div>
+                    </div>
+                    <input type="number" inputmode="numeric" min="0" max="${w.qty}" placeholder="SL" value="${pickerDraft[p.id] ? pickerDraft[p.id] : ''}" oninput="pickerQty('${p.id}', this)" class="w-20 px-2 py-3 rounded-xl bg-theme-card border border-theme-border text-center text-base font-bold outline-none flex-shrink-0">
+                </div>`).join('');
+            updatePickerTotal();
+        }
+        function pickerQty(pid, el) {
+            let q = parseInt(el.value);
+            const max = orderStockOf(pid);
+            if (isNaN(q) || q <= 0) { delete pickerDraft[pid]; if (el.value !== '' && q < 0) el.value = ''; }
+            else { if (q > max) { q = max; el.value = max; } pickerDraft[pid] = q; }
+            updatePickerTotal();
+        }
+        function updatePickerTotal() {
+            document.getElementById('picker-total').innerText = cartSubTotal(pickerDraft).toLocaleString() + ' đ';
+            document.getElementById('picker-count').innerText = Object.keys(pickerDraft).length;
+        }
+        function confirmProductPicker() {
+            const c = {};
+            Object.keys(pickerDraft).forEach(pid => { const q = Math.min(parseInt(pickerDraft[pid]) || 0, orderStockOf(pid)); if (q > 0) c[pid] = q; });
+            if (!Object.keys(c).length) { alert('Chọn ít nhất 1 sản phẩm và nhập số lượng!'); return; }
+            orderCart = c;
+            closeProductPicker();
+            renderOrderSummary();
+            validateAndCalculateOrderTotal();
         }
 
         function setDiscountType(type) {
@@ -2268,11 +3431,7 @@
                 if(discVal > 10000000) { discVal = 10000000; discInput.value = "10000000"; }
             }
 
-            let subTotal = 0;
-            document.querySelectorAll('.order-qty-input').forEach(i=>{ 
-                const q=parseInt(i.value)||0, p=db.productsMaster.find(x=>String(x.id)===String(i.getAttribute('data-pid'))); 
-                if(p) subTotal += q * p.price; 
-            });
+            let subTotal = cartSubTotal(orderCart);
 
             let discountAmount = 0;
             if(discountType === 'percent') {
@@ -2336,9 +3495,9 @@
             const pay = document.querySelector('input[name="pay_method"]:checked'); 
             if(!pay){alert('Chọn hình thức thanh toán!');return;}
             let summary=[], billHtml='', subTotal=0;
-            document.querySelectorAll('.order-qty-input').forEach(i=>{
-                const q=parseInt(i.value)||0; if(q>0){
-                    const pid=i.getAttribute('data-pid'), p=db.productsMaster.find(x=>String(x.id)===String(pid)), w=db.warehouse.find(x=>String(x.productId)===String(pid));
+            Object.keys(orderCart).forEach(pid=>{
+                const q=Math.min(parseInt(orderCart[pid])||0, orderStockOf(pid)); if(q>0){
+                    const p=db.productsMaster.find(x=>String(x.id)===String(pid)), w=db.warehouse.find(x=>String(x.productId)===String(pid));
                     if(p&&w){ w.qty-=q; let itemT=q*p.price; subTotal+=itemT; summary.push(`${p.name} x${q}`); billHtml+=`<div class="flex justify-between"><span>- ${p.name} (x${q})</span> <b>${itemT.toLocaleString()}đ</b></div>`; }
                 }
             });
@@ -2371,6 +3530,9 @@
                 address: store.address, 
                 note: `Bán đơn hàng (${pay.value}): ${summary.join(', ')} | Tổng: ${grandTotal.toLocaleString()}đ`, 
                 discountStr: discountStr,
+                gross: subTotal, net: grandTotal, discountAmount: discountAmount, pay: pay.value,
+                owner: store.owner || '', phone: store.phone || '', saleName: user.fullname || user.username,
+                items: Object.keys(orderCart).map(pid => { const p = db.productsMaster.find(x => String(x.id) === String(pid)); return p ? { name: p.name, q: Math.min(parseInt(orderCart[pid]) || 0, 99999), price: p.price } : null; }).filter(Boolean),
                 photos: [...orderPhotos],
                 photo: orderPhotos.length > 0 ? orderPhotos[0] : (store.storePhoto||'')
             });
@@ -2389,6 +3551,7 @@
             document.getElementById('bill-items-list').innerHTML = billHtml; 
             document.getElementById('bill-grand-total').innerText = grandTotal.toLocaleString() + ' đ';
             
+            document.getElementById('bill-title').innerHTML = '<i class="fa-solid fa-circle-check mr-1"></i> Tạo đơn hàng thành công (Đã xuất file JPG)!';
             document.getElementById('bill-modal').classList.remove('hidden');
             setTimeout(() => prepareShare('bill','invoice-card','#000000','Hoa-Don-'+Date.now()+'.jpg'), 400); 
             render();
@@ -2626,6 +3789,7 @@
                 currentLivePos = { lat: p.coords.latitude, lng: p.coords.longitude };
                 currentGpsAccuracy = p.coords.accuracy;
                 hasRealGPS = true; lastGpsTime = Date.now();
+                if (currentTab === 'map') mapUpdateMe();
                 const ae = document.activeElement;
                 const typing = ae && ['INPUT', 'SELECT', 'TEXTAREA'].includes(ae.tagName);
                 if (currentTab === 'stores' && !typing && Date.now() - lastGpsRender > 30000 && !document.querySelector('.fixed.inset-0.z-50:not(.hidden)')) {
@@ -2988,16 +4152,19 @@
                 sales: ['Thời gian', 'Nhân viên', 'Cửa hàng', 'Địa chỉ', 'Chi tiết đơn hàng', 'Chiết khấu', 'Tổng tiền (đ)', 'Số ảnh'],
                 checkin: ['Thời gian', 'Nhân viên', 'Cửa hàng', 'SĐT', 'Địa chỉ', 'Vĩ độ', 'Kinh độ', 'Ghi chú', 'Có ảnh'],
                 imp: ['Thời gian', 'Sản phẩm', 'Số lượng nhập'],
+                ret: ['Thời gian', 'Người trả', 'Người nhận ở kho', 'SĐT người nhận', 'Ghi chú', 'Sản phẩm trả'],
                 store: ['Tên cửa hàng', 'Chủ shop', 'SĐT', 'Tỉnh/TP', 'Quận/Huyện', 'Địa chỉ', 'Quy mô', 'Ngành hàng', 'Tình trạng KH', 'Vĩ độ', 'Kinh độ', 'Đã ghé hôm nay', 'Có ảnh shop'],
                 prod: ['Phân loại', 'Tên sản phẩm', 'Giá bán (đ)', 'Tồn kho']
             };
             let sales = salesAll.map(h => ({ 'Thời gian': h.time, 'Nhân viên': h.username, 'Cửa hàng': h.storeName, 'Địa chỉ': h.address || '', 'Chi tiết đơn hàng': h.note, 'Chiết khấu': h.discountStr || '0 đ', 'Tổng tiền (đ)': moneyOf(h.note), 'Số ảnh': (h.photos && h.photos.length) || (h.photo ? 1 : 0) }));
             let checkins = checkAll.map(h => ({ 'Thời gian': h.time, 'Nhân viên': h.username, 'Cửa hàng': h.storeName, 'SĐT': h.phone || '', 'Địa chỉ': h.address || '', 'Vĩ độ': h.lat == null ? '' : h.lat, 'Kinh độ': h.lng == null ? '' : h.lng, 'Ghi chú': h.note, 'Có ảnh': h.photo ? 'Có' : 'Không' }));
             let imports = (db.importHistory || []).map(h => ({ 'Thời gian': h.time, 'Sản phẩm': h.productName, 'Số lượng nhập': h.qty }));
+            let returns = (db.returnHistory || []).map(h => ({ 'Thời gian': h.time, 'Người trả': h.byName || h.username || '', 'Người nhận ở kho': h.receiverName || '', 'SĐT người nhận': h.receiverPhone || '', 'Ghi chú': h.note || '', 'Sản phẩm trả': (h.items || []).map(i => i.name + ' x' + i.q).join('; ') }));
             if (existingBuf) {
                 sales = bkMerge(wb, 'Lịch sử bán hàng', H.sales, sales);
                 checkins = bkMerge(wb, 'Lịch sử check-in', H.checkin, checkins);
                 imports = bkMerge(wb, 'Lịch sử nhập kho', H.imp, imports);
+                returns = bkMerge(wb, 'Trả hàng về kho', H.ret, returns);
             }
             const stores = (db.stores || []).map(s => ({ 'Tên cửa hàng': s.name, 'Chủ shop': s.owner || '', 'SĐT': s.phone || '', 'Tỉnh/TP': s.city, 'Quận/Huyện': s.district, 'Địa chỉ': s.address, 'Quy mô': s.scale || '', 'Ngành hàng': s.industry || '', 'Tình trạng KH': s.relation || '', 'Vĩ độ': s.lat, 'Kinh độ': s.lng, 'Đã ghé hôm nay': visitedToday(s) ? 'Có' : 'Chưa', 'Có ảnh shop': s.storePhoto ? 'Có' : 'Không' }));
             const products = (db.productsMaster || []).map(p => { const w = (db.warehouse || []).find(x => String(x.productId) === String(p.id)); return { 'Phân loại': p.category || '', 'Tên sản phẩm': p.name, 'Giá bán (đ)': Number(p.price) || 0, 'Tồn kho': w ? w.qty : 0 }; });
@@ -3014,6 +4181,7 @@
             bkWriteSheet(wb, 'Lịch sử bán hàng', -9, H.sales, sales);
             bkWriteSheet(wb, 'Lịch sử check-in', -8, H.checkin, checkins);
             bkWriteSheet(wb, 'Lịch sử nhập kho', -7, H.imp, imports);
+            bkWriteSheet(wb, 'Trả hàng về kho', -6.5, H.ret, returns);
             bkWriteSheet(wb, 'Cửa hàng', -6, H.store, stores);
             bkWriteSheet(wb, 'Sản phẩm & Tồn kho', -5, H.prod, products);
             bkMarketSheet(wb, salesToday, checkinsToday);
@@ -3132,6 +4300,471 @@
         const moneyOf = txt => { const m = (txt || '').match(/Tổng:\s*([\d.,]+)\s*đ/); return m ? (parseInt(m[1].replace(/[.,]/g, '')) || 0) : 0; };
         const addedToday = s => !isNaN(Number(s.id)) && new Date(Number(s.id)).toDateString() === new Date().toDateString();
         const visitedToday = s => s.visited && s.lastVisitDate === new Date().toDateString();
+
+        let leafMap = null, mapLayer = null, mapMeMarker = null;
+        let mapState = { sel: null, order: [], legs: [], total: 0, round: false, start: 'me', road: null, roadLoading: false, name: '', view: null, key: '' };
+
+        const mapFilterKey = () => selectedCity + '|' + selectedDistrict;
+        const mapStores = () => (db.stores || []).filter(s => (selectedCity === 'all' || s.city === selectedCity) && (selectedDistrict === 'all' || s.district === selectedDistrict));
+        const mapHasCoord = s => { const a = Number(s.lat), b = Number(s.lng); return isFinite(a) && isFinite(b) && (a !== 0 || b !== 0); };
+        const mapById = id => (db.stores || []).find(s => String(s.id) === String(id));
+        const mapMeOk = () => hasRealGPS && isFinite(currentLivePos.lat);
+        const kmText = m => (m / 1000).toFixed(1).replace('.', ',') + ' km';
+        const gmapsLink = (lat, lng) => `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=driving`;
+
+        function mapEnsureState() {
+            const key = mapFilterKey();
+            if (mapState.key !== key || !mapState.sel) {
+                mapState.key = key; mapState.order = []; mapState.legs = []; mapState.total = 0; mapState.road = null; mapState.view = null; mapState.start = 'me';
+                mapState.sel = new Set(mapStores().filter(s => mapHasCoord(s) && !visitedToday(s)).map(s => String(s.id)));
+            }
+        }
+
+        function renderMapView() {
+            mapEnsureState();
+            const cities = [...new Set(db.stores.map(s => s.city).filter(Boolean))];
+            const districts = [...new Set((selectedCity === 'all' ? db.stores : db.stores.filter(s => s.city === selectedCity)).map(s => s.district).filter(Boolean))];
+            return `
+                <div class="space-y-4 text-theme-text">
+                    <div class="bg-theme-card border border-theme-border p-4 sm:p-5 rounded-2xl shadow-sm space-y-3">
+                        <h2 class="font-bold text-base sm:text-lg flex items-center space-x-2"><i class="fa-solid fa-map-location-dot text-amber-500"></i><span>Bản đồ điểm bán & Tuyến đường</span></h2>
+                        <p class="text-xs opacity-75">Chọn tỉnh/huyện, chạm vào chấm trên bản đồ để chọn hoặc bỏ điểm, rồi bấm <b>Sắp xếp tuyến đường</b>. Tuyến có thể lưu lại để dùng ở mọi thiết bị.</p>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <select onchange="selectedCity=this.value; selectedDistrict='all'; render();" class="w-full px-3 py-2.5 rounded-xl bg-theme-input border border-theme-border text-theme-text text-sm focus:outline-none">
+                                <option value="all">-- Tất cả Thành phố --</option>
+                                ${cities.map(c => `<option value="${escHtml(c)}" ${selectedCity === c ? 'selected' : ''}>${escHtml(c)}</option>`).join('')}
+                            </select>
+                            <select onchange="selectedDistrict=this.value; render();" class="w-full px-3 py-2.5 rounded-xl bg-theme-input border border-theme-border text-theme-text text-sm focus:outline-none">
+                                <option value="all">-- Tất cả Quận / Huyện --</option>
+                                ${districts.map(d => `<option value="${escHtml(d)}" ${selectedDistrict === d ? 'selected' : ''}>${escHtml(d)}</option>`).join('')}
+                            </select>
+                        </div>
+                    </div>
+                    <div id="map-box" style="height:58vh;min-height:320px;isolation:isolate;position:relative" class="rounded-2xl overflow-hidden border border-theme-border bg-theme-input"></div>
+                    <div class="flex flex-wrap gap-x-4 gap-y-1 text-[11px] opacity-80 px-1">
+                        <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#f59e0b"></span> Đã chọn</span>
+                        <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#94a3b8"></span> Chưa chọn</span>
+                        <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#10b981"></span> Đã ghé hôm nay</span>
+                        <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#3b82f6"></span> Vị trí của tôi</span>
+                    </div>
+                    <div id="map-status" class="text-[11px] opacity-90 px-1 min-h-[16px]">Đang tải ảnh nền bản đồ...</div>
+                    <div id="map-panels" class="space-y-4">${mapPanelsHtml()}</div>
+                </div>`;
+        }
+
+        function mapPanelsHtml() {
+            const all = mapStores(), pts = all.filter(mapHasCoord), missing = all.length - pts.length;
+            const sel = pts.filter(s => mapState.sel.has(String(s.id)));
+            const hasRoute = mapState.order.length > 0;
+            const startOk = mapState.start === 'me' || sel.some(s => String(s.id) === mapState.start);
+            if (!startOk) mapState.start = 'me';
+            const bt = 'w-full py-3 rounded-xl text-xs font-bold transition shadow flex items-center justify-center space-x-2 ';
+            const startOpts = `<option value="me" ${mapState.start === 'me' ? 'selected' : ''}>📍 Vị trí hiện tại của tôi</option>` + sel.map(s => `<option value="${escHtml(s.id)}" ${String(s.id) === mapState.start ? 'selected' : ''}>🏪 ${escHtml(s.name)}</option>`).join('');
+
+            let routeCard = '';
+            if (hasRoute) {
+                const links = mapGmapsLinks();
+                const next = mapState.order.map(mapById).find(s => s && !visitedToday(s));
+                const rk = mapRoadKey();
+                const road = mapState.road && mapState.road.key === rk ? mapState.road : null;
+                routeCard = `
+                <div class="bg-theme-card border border-amber-500/40 p-4 rounded-2xl shadow-sm space-y-3">
+                    <h3 class="font-bold text-sm flex items-center space-x-2"><i class="fa-solid fa-route text-amber-500"></i><span>Tuyến đường tối ưu: ${mapState.order.length} điểm</span></h3>
+                    <div class="text-xs space-y-0.5">
+                        <div>Quãng đường (đường chim bay): <b class="text-amber-500">${kmText(mapState.total)}</b>${mapState.round ? ' (có về điểm xuất phát)' : ''}</div>
+                        <div class="opacity-75">Ước tính đi đường bộ: khoảng <b>${kmText(mapState.total * 1.3)}</b></div>
+                        ${road ? `<div class="text-sky-400">Đường thực tế: <b>${road.km.toFixed(1).replace('.', ',')} km</b>, khoảng ${road.min} phút</div>` : ''}
+                    </div>
+                    <div class="space-y-1.5 max-h-72 overflow-y-auto">
+                        ${mapState.order.map((id, i) => {
+                            const s = mapById(id); if (!s) return '';
+                            const v = visitedToday(s), leg = mapState.legs[i] || 0;
+                            return `<div class="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-theme-input border border-theme-border text-xs">
+                                <div class="min-w-0"><div class="font-bold truncate ${v ? 'line-through opacity-60' : ''}">${i + 1}. ${escHtml(s.name)} ${v ? '<span class="text-emerald-400">✓</span>' : ''}</div>
+                                <div class="opacity-70 truncate">${escHtml(s.address || '')}${leg > 0 ? ' • +' + kmText(leg) : ''}</div></div>
+                                <a href="${gmapsLink(s.lat, s.lng)}" target="_blank" rel="noopener" class="px-2.5 py-2 bg-blue-600 text-white rounded-lg font-semibold whitespace-nowrap"><i class="fa-solid fa-diamond-turn-right"></i></a>
+                            </div>`;
+                        }).join('')}
+                    </div>
+                    ${next ? `<a href="${gmapsLink(next.lat, next.lng)}" target="_blank" rel="noopener" class="${bt}bg-amber-500 hover:bg-amber-600 text-slate-950"><i class="fa-solid fa-location-arrow"></i><span>Chỉ đường tới điểm kế tiếp: ${escHtml(next.name)}</span></a>` : `<div class="text-xs text-emerald-400 font-semibold text-center">Đã ghé hết các điểm trong tuyến hôm nay</div>`}
+                    ${links.map(l => `<a href="${l.url}" target="_blank" rel="noopener" class="${bt}bg-blue-600 hover:bg-blue-700 text-white"><i class="fa-brands fa-google"></i><span>${l.label}</span></a>`).join('')}
+                    <button onclick="mapRoadRoute()" ${mapState.roadLoading ? 'disabled' : ''} class="${bt}bg-theme-input border border-theme-border"><i class="fa-solid ${mapState.roadLoading ? 'fa-spinner fa-spin' : 'fa-road'}"></i><span>${mapState.roadLoading ? 'Đang tính đường thực tế...' : 'Vẽ đường thực tế & tính thời gian'}</span></button>
+                    <div class="flex gap-2">
+                        <input type="text" value="${escHtml(mapState.name)}" oninput="mapState.name=this.value" placeholder="Tên tuyến (VD: Thư Trì sáng thứ 2)" class="flex-1 min-w-0 px-3 py-2.5 rounded-xl bg-theme-input border border-theme-border text-theme-text text-xs focus:outline-none">
+                        <button onclick="mapSaveRoute()" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold whitespace-nowrap"><i class="fa-solid fa-floppy-disk mr-1"></i>Lưu tuyến</button>
+                    </div>
+                </div>`;
+            }
+
+            const meOk = mapMeOk();
+            const list = pts.map(s => ({ s, d: meOk ? calculateDistance(currentLivePos.lat, currentLivePos.lng, s.lat, s.lng) : null }))
+                .sort((a, b) => (a.d != null && b.d != null) ? a.d - b.d : String(a.s.name).localeCompare(String(b.s.name), 'vi'));
+
+            const saved = (db.routes || []).map(r => {
+                const stops = (r.stops || []).map(mapById).filter(Boolean);
+                const done = stops.filter(visitedToday).length;
+                return `<div class="p-3 rounded-xl bg-theme-input border border-theme-border text-xs space-y-2">
+                    <div><div class="font-bold">${escHtml(r.name)}</div>
+                    <div class="opacity-70">${escHtml(r.date || '')} • @${escHtml(r.createdBy || '')} • ${stops.length} điểm • ${(Number(r.km) || 0).toFixed(1).replace('.', ',')} km • hôm nay ghé ${done}/${stops.length}</div></div>
+                    <div class="flex gap-2">
+                        <button onclick="mapLoadRoute('${r.id}')" class="flex-1 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-lg font-bold">Mở tuyến</button>
+                        <button onclick="mapDeleteRoute('${r.id}')" class="px-3 py-2 bg-rose-500/10 text-rose-400 border border-rose-500/30 rounded-lg font-semibold"><i class="fa-solid fa-trash"></i></button>
+                    </div>
+                </div>`;
+            }).join('');
+
+            return `
+                <div class="bg-theme-card border border-theme-border p-4 rounded-2xl shadow-sm space-y-3">
+                    <div class="flex flex-wrap items-center justify-between gap-2 text-xs">
+                        <span><b class="text-amber-500">${sel.length}</b> / ${pts.length} điểm được chọn${missing ? ` • <span class="text-rose-400">${missing} điểm thiếu tọa độ</span>` : ''}</span>
+                        <button onclick="mapLocateMe()" class="px-3 py-2 bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 rounded-xl font-semibold"><i class="fa-solid fa-crosshairs mr-1"></i>Vị trí của tôi</button>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button onclick="mapSelectAll(true)" class="py-2.5 bg-theme-input border border-theme-border rounded-xl text-xs font-semibold">Chọn các điểm chưa ghé</button>
+                        <button onclick="mapSelectAll(false)" class="py-2.5 bg-theme-input border border-theme-border rounded-xl text-xs font-semibold">Chọn tất cả</button>
+                        <button onclick="mapClearSel()" class="col-span-2 py-2.5 bg-theme-input border border-theme-border rounded-xl text-xs font-semibold">Bỏ chọn hết</button>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold opacity-75 mb-1">Điểm xuất phát</label>
+                        <select onchange="mapState.start=this.value; mapState.order=[]; mapState.road=null; refreshMapUI();" class="w-full px-3 py-2.5 rounded-xl bg-theme-input border border-theme-border text-theme-text text-xs focus:outline-none">${startOpts}</select>
+                    </div>
+                    <label class="flex items-center gap-2 text-xs"><input type="checkbox" ${mapState.round ? 'checked' : ''} onchange="mapState.round=this.checked; mapState.order=[]; mapState.road=null; refreshMapUI();" class="w-4 h-4 accent-amber-500"> Quay về điểm xuất phát</label>
+                    <button onclick="mapOptimize()" class="${bt}bg-amber-500 hover:bg-amber-600 text-slate-950"><i class="fa-solid fa-wand-magic-sparkles"></i><span>Sắp xếp tuyến đường hợp lý</span></button>
+                </div>
+                ${routeCard}
+                <div class="bg-theme-card border border-theme-border p-4 rounded-2xl shadow-sm space-y-2">
+                    <h3 class="font-bold text-sm">Danh sách điểm bán (${pts.length})</h3>
+                    <div id="map-sel-list" class="space-y-1 max-h-64 overflow-y-auto">
+                        ${list.length ? list.map(({ s, d }) => `<label class="flex items-center gap-2 p-2 rounded-lg bg-theme-input border border-theme-border text-xs">
+                            <input type="checkbox" ${mapState.sel.has(String(s.id)) ? 'checked' : ''} onchange="mapToggleStore('${s.id}')" class="w-4 h-4 accent-amber-500 flex-shrink-0">
+                            <span class="flex-1 min-w-0 truncate font-semibold">${escHtml(s.name)}</span>
+                            ${visitedToday(s) ? '<span class="text-emerald-400">✓</span>' : ''}
+                            ${d != null ? `<span class="opacity-70 whitespace-nowrap">${kmText(d)}</span>` : ''}
+                        </label>`).join('') : '<div class="text-xs opacity-70 text-center py-4">Chưa có điểm bán nào có tọa độ.</div>'}
+                    </div>
+                </div>
+                <div class="bg-theme-card border border-theme-border p-4 rounded-2xl shadow-sm space-y-2">
+                    <h3 class="font-bold text-sm"><i class="fa-solid fa-bookmark text-amber-500 mr-1"></i>Tuyến đã lưu (${(db.routes || []).length})</h3>
+                    ${saved || '<div class="text-xs opacity-70 text-center py-3">Chưa có tuyến nào được lưu.</div>'}
+                </div>`;
+        }
+
+        function refreshMapUI() {
+            const el = document.getElementById('map-panels'); if (!el) return;
+            const list = document.getElementById('map-sel-list'), top = list ? list.scrollTop : 0;
+            el.innerHTML = mapPanelsHtml();
+            const l2 = document.getElementById('map-sel-list'); if (l2) l2.scrollTop = top;
+            mapDrawAll();
+        }
+
+        function initMapTab() {
+            const box = document.getElementById('map-box'); if (!box) return;
+            const setSt = t => { const el = document.getElementById('map-status'); if (el) el.innerHTML = t; };
+            if (typeof L === 'undefined') {
+                box.innerHTML = '<div class="p-6 text-center text-sm opacity-80">Chưa tải được thư viện bản đồ. Hãy kiểm tra kết nối mạng, tắt tiện ích chặn quảng cáo rồi tải lại trang.</div>';
+                setSt('❌ Không tải được thư viện bản đồ (Leaflet).'); return;
+            }
+            const map = L.map(box, { zoomControl: true, attributionControl: true });
+            leafMap = map;
+            const mk = (url, opt) => L.tileLayer(url, Object.assign({ maxZoom: 19, referrerPolicy: 'origin' }, opt));
+            const bases = [
+                { name: 'Bản đồ (OpenStreetMap)', layer: mk('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }) },
+                { name: 'Bản đồ sáng (CARTO)', layer: mk('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png', { subdomains: 'abcd', attribution: '© OpenStreetMap, © CARTO' }) },
+                { name: 'Đường phố (Esri)', layer: mk('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', { attribution: 'Tiles © Esri' }) },
+                { name: 'Vệ tinh (Esri)', layer: mk('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Tiles © Esri' }) }
+            ];
+            const ctl = {}; bases.forEach(b => { ctl[b.name] = b.layer; });
+            L.control.layers(ctl, null, { position: 'topright', collapsed: false }).addTo(map);
+            let cur = 0, auto = true, internal = false, loaded = 0, errors = 0, timer = null;
+            const alive = () => leafMap === map;
+            const useBase = i => {
+                internal = true;
+                bases.forEach((b, k) => { if (k !== i && map.hasLayer(b.layer)) map.removeLayer(b.layer); });
+                cur = i; loaded = 0; errors = 0;
+                if (!map.hasLayer(bases[i].layer)) bases[i].layer.addTo(map);
+                internal = false;
+            };
+            const schedule = () => { clearTimeout(timer); timer = setTimeout(() => { if (alive() && auto && loaded === 0) next('Ảnh nền chưa hiện sau vài giây.'); }, 6000); };
+            const next = why => {
+                if (!alive() || !auto) return;
+                if (cur < 2) { setSt('⚠️ ' + why + ' Đang thử nguồn khác: ' + bases[cur + 1].name + '...'); useBase(cur + 1); schedule(); }
+                else { auto = false; setSt('❌ Không tải được ảnh nền từ các nguồn bản đồ. Điểm bán và tuyến đường vẫn dùng bình thường. Hãy kiểm tra mạng, tắt tiện ích chặn quảng cáo (AdBlock), hoặc thử trình duyệt khác.'); }
+            };
+            bases.forEach((b, i) => {
+                b.layer.on('tileload', () => { if (i !== cur || !alive()) return; loaded++; if (loaded === 1) setSt('Nền bản đồ: ' + b.name + ' ✓ (chọn nền khác ở khung góc phải bản đồ)'); });
+                b.layer.on('tileerror', () => { if (i !== cur || !alive()) return; errors++; if (auto && loaded === 0 && errors >= 3) next('Không tải được ảnh từ ' + b.name + '.'); });
+            });
+            map.on('baselayerchange', e => {
+                if (internal) return;
+                auto = false; clearTimeout(timer);
+                const i = bases.findIndex(b => b.layer === e.layer);
+                if (i >= 0) { cur = i; loaded = 0; errors = 0; setSt('Nền bản đồ: ' + bases[i].name); }
+            });
+            useBase(0); schedule();
+            mapLayer = L.layerGroup().addTo(map);
+            if (mapState.view) map.setView(mapState.view.c, mapState.view.z); else mapFit();
+            mapDrawAll();
+            setTimeout(() => { if (alive()) map.invalidateSize(); }, 250);
+        }
+
+        function mapFit() {
+            if (!leafMap) return;
+            const stores = mapStores().filter(mapHasCoord);
+            const chosen = stores.filter(s => mapState.sel.has(String(s.id)));
+            const use = chosen.length ? chosen : stores;
+            const pts = use.map(s => [Number(s.lat), Number(s.lng)]);
+            if (mapMeOk()) pts.push([currentLivePos.lat, currentLivePos.lng]);
+            if (!pts.length) leafMap.setView([16.0, 106.0], 5);
+            else if (pts.length === 1) leafMap.setView(pts[0], 16);
+            else leafMap.fitBounds(pts, { padding: [30, 30], maxZoom: 17 });
+        }
+
+        function mapIcon(color, size, text, textColor) {
+            return L.divIcon({ className: '', iconSize: [size, size], iconAnchor: [size / 2, size / 2], popupAnchor: [0, -size / 2],
+                html: `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${color};border:2px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;color:${textColor || '#0f172a'};font-weight:800;font-size:${Math.max(10, size / 2.2)}px;line-height:1">${text || ''}</div>` });
+        }
+
+        function mapPopupHtml(s) {
+            const sel = mapState.sel.has(String(s.id)), v = visitedToday(s);
+            const d = mapMeOk() ? calculateDistance(currentLivePos.lat, currentLivePos.lng, s.lat, s.lng) : null;
+            const tags = [s.scale ? 'Quy mô: ' + s.scale : '', s.industry || '', relLabel(s.relation) || ''].filter(Boolean).map(escHtml).join(' • ');
+            return `<div style="min-width:190px;font-size:12px;line-height:1.45;color:#0f172a">
+                <div style="font-weight:800;font-size:13px">${escHtml(s.name)} ${v ? '✓' : ''}</div>
+                ${s.owner ? `<div>Chủ: ${escHtml(s.owner)}</div>` : ''}
+                ${s.phone ? `<div>SĐT: <a href="tel:${escHtml(s.phone)}">${escHtml(s.phone)}</a></div>` : ''}
+                <div style="opacity:.8">${escHtml([s.address, s.district, s.city].filter(Boolean).join(', '))}</div>
+                ${tags ? `<div style="opacity:.8">${tags}</div>` : ''}
+                ${d != null ? `<div>Cách bạn: <b>${kmText(d)}</b></div>` : ''}
+                <div style="display:flex;gap:6px;margin-top:6px">
+                    <button onclick="mapToggleStore('${s.id}')" style="flex:1;padding:7px;border-radius:8px;border:0;font-weight:700;background:${sel ? '#fecaca' : '#fde68a'}">${sel ? 'Bỏ chọn' : 'Chọn điểm'}</button>
+                    <a href="${gmapsLink(s.lat, s.lng)}" target="_blank" rel="noopener" style="padding:7px 10px;border-radius:8px;background:#2563eb;color:#fff;font-weight:700;text-decoration:none">Chỉ đường</a>
+                </div></div>`;
+        }
+
+        function mapDrawAll() {
+            if (!leafMap || !mapLayer) return;
+            mapLayer.clearLayers();
+            const rk = mapRoadKey(), road = mapState.road && mapState.road.key === rk ? mapState.road : null;
+            const orderIdx = {}; mapState.order.forEach((id, i) => { orderIdx[String(id)] = i + 1; });
+            const line = [];
+            if (mapState.order.length) {
+                if (mapState.start === 'me' && mapMeOk()) line.push([currentLivePos.lat, currentLivePos.lng]);
+                mapState.order.forEach(id => { const s = mapById(id); if (s) line.push([Number(s.lat), Number(s.lng)]); });
+                if (mapState.round && line.length > 1) line.push(line[0]);
+            }
+            if (road) L.polyline(road.coords, { color: '#0ea5e9', weight: 5, opacity: .85 }).addTo(mapLayer);
+            else if (line.length > 1) L.polyline(line, { color: '#f59e0b', weight: 4, opacity: .9, dashArray: '8 8' }).addTo(mapLayer);
+            mapStores().filter(mapHasCoord).forEach(s => {
+                const id = String(s.id), n = orderIdx[id], sel = mapState.sel.has(id), v = visitedToday(s);
+                let icon;
+                if (n) icon = mapIcon(v ? '#10b981' : '#f59e0b', 28, n);
+                else if (v) icon = mapIcon('#10b981', 20, '✓', '#fff');
+                else if (sel) icon = mapIcon('#f59e0b', 20, '');
+                else icon = mapIcon('#94a3b8', 16, '');
+                L.marker([Number(s.lat), Number(s.lng)], { icon, zIndexOffset: n ? 500 : (sel ? 200 : 0) }).bindPopup(() => mapPopupHtml(s)).addTo(mapLayer);
+            });
+            mapMeMarker = null; mapUpdateMe();
+        }
+
+        function mapUpdateMe() {
+            if (!leafMap || !mapLayer || !mapMeOk()) return;
+            const ll = [currentLivePos.lat, currentLivePos.lng];
+            if (mapMeMarker) { mapMeMarker.setLatLng(ll); return; }
+            mapMeMarker = L.marker(ll, { icon: mapIcon('#3b82f6', 18, ''), zIndexOffset: 1000, interactive: false }).addTo(mapLayer);
+        }
+
+        async function mapLocateMe() {
+            if (db.settings?.deviceMode !== 'pc') await getFreshPosition();
+            if (!mapMeOk()) { alert('Chưa lấy được vị trí. Hãy bật định vị (GPS) cho trình duyệt rồi thử lại.'); return; }
+            if (leafMap) { leafMap.setView([currentLivePos.lat, currentLivePos.lng], 16); mapUpdateMe(); }
+        }
+
+        function mapInvalidateRoute() { mapState.order = []; mapState.legs = []; mapState.total = 0; mapState.road = null; }
+        function mapToggleStore(id) {
+            id = String(id);
+            if (mapState.sel.has(id)) mapState.sel.delete(id); else mapState.sel.add(id);
+            mapInvalidateRoute();
+            if (leafMap) leafMap.closePopup();
+            refreshMapUI();
+        }
+        function mapSelectAll(onlyUnvisited) {
+            mapState.sel = new Set(mapStores().filter(s => mapHasCoord(s) && (!onlyUnvisited || !visitedToday(s))).map(s => String(s.id)));
+            mapInvalidateRoute(); refreshMapUI(); mapFit();
+        }
+        function mapClearSel() { mapState.sel = new Set(); mapInvalidateRoute(); refreshMapUI(); }
+
+        // Thuật toán: dưới 12 điểm tính chính xác (quy hoạch động); nhiều điểm hơn dùng điểm gần nhất + 2-opt + Or-opt. Điểm xuất phát cố định.
+        function mapExactSeq(D, round) {
+            const n = D.length, m = n - 1, FULL = 1 << m;
+            const dp = new Array(FULL * m).fill(Infinity), par = new Array(FULL * m).fill(-1);
+            for (let j = 0; j < m; j++) dp[(1 << j) * m + j] = D[0][j + 1];
+            for (let mask = 1; mask < FULL; mask++) for (let j = 0; j < m; j++) {
+                if (!(mask & (1 << j))) continue;
+                const cur = dp[mask * m + j]; if (cur === Infinity) continue;
+                for (let k = 0; k < m; k++) {
+                    if (mask & (1 << k)) continue;
+                    const nm = mask | (1 << k), v = cur + D[j + 1][k + 1];
+                    if (v < dp[nm * m + k]) { dp[nm * m + k] = v; par[nm * m + k] = j; }
+                }
+            }
+            let bj = 0, best = Infinity;
+            for (let j = 0; j < m; j++) { const v = dp[(FULL - 1) * m + j] + (round ? D[j + 1][0] : 0); if (v < best) { best = v; bj = j; } }
+            const seq = []; let mask = FULL - 1, j = bj;
+            while (j !== -1) { seq.push(j + 1); const pj = par[mask * m + j]; mask ^= (1 << j); j = pj; }
+            seq.push(0);
+            return seq.reverse();
+        }
+
+        function mapRouteSeq(nodes, round) {
+            const n = nodes.length;
+            const D = nodes.map(a => nodes.map(b => calculateDistance(a.lat, a.lng, b.lat, b.lng)));
+            if (n <= 2) return n === 2 ? [0, 1] : [0];
+            if (n <= 12) return mapExactSeq(D, round);
+            let seq = [0]; const used = new Set([0]);
+            while (seq.length < n) {
+                const last = seq[seq.length - 1]; let best = -1, bd = Infinity;
+                for (let i = 0; i < n; i++) if (!used.has(i) && D[last][i] < bd) { bd = D[last][i]; best = i; }
+                seq.push(best); used.add(best);
+            }
+            const cost = s => { let c = 0; for (let i = 0; i < s.length - 1; i++) c += D[s[i]][s[i + 1]]; if (round) c += D[s[s.length - 1]][s[0]]; return c; };
+            let best = cost(seq), improved = true, guard = 0;
+            while (improved && guard++ < 30) {
+                improved = false;
+                for (let i = 1; i < n - 1; i++) for (let j = i + 1; j < n; j++) {
+                    const cand = seq.slice(0, i).concat(seq.slice(i, j + 1).reverse(), seq.slice(j + 1));
+                    const c = cost(cand);
+                    if (c < best - 1e-6) { seq = cand; best = c; improved = true; }
+                }
+                for (let len = 1; len <= 3; len++) for (let i = 1; i + len <= n; i++) for (let p = 1; p <= n - len; p++) {
+                    if (p === i) continue;
+                    const seg = seq.slice(i, i + len), rest = seq.slice(0, i).concat(seq.slice(i + len));
+                    const cand = rest.slice(0, p).concat(seg, rest.slice(p));
+                    const c = cost(cand);
+                    if (c < best - 1e-6) { seq = cand; best = c; improved = true; }
+                }
+            }
+            return seq;
+        }
+
+        function mapStartPoint() {
+            if (mapState.start !== 'me') { const s = mapById(mapState.start); if (s) return { lat: Number(s.lat), lng: Number(s.lng) }; }
+            return mapMeOk() ? { lat: currentLivePos.lat, lng: currentLivePos.lng } : null;
+        }
+        function mapComputeLegs() {
+            const stops = mapState.order.map(mapById).filter(Boolean);
+            const legs = []; let total = 0;
+            let prev = (mapState.start === 'me' && mapMeOk()) ? { lat: currentLivePos.lat, lng: currentLivePos.lng } : null;
+            stops.forEach(s => {
+                const cur = { lat: Number(s.lat), lng: Number(s.lng) };
+                const d = prev ? calculateDistance(prev.lat, prev.lng, cur.lat, cur.lng) : 0;
+                legs.push(d); total += d; prev = cur;
+            });
+            if (mapState.round && prev) { const sp = mapStartPoint() || (stops[0] ? { lat: Number(stops[0].lat), lng: Number(stops[0].lng) } : null); if (sp) total += calculateDistance(prev.lat, prev.lng, sp.lat, sp.lng); }
+            mapState.legs = legs; mapState.total = total;
+        }
+
+        async function mapOptimize() {
+            const sel = mapStores().filter(s => mapHasCoord(s) && mapState.sel.has(String(s.id)));
+            if (!sel.length) { alert('Hãy chọn ít nhất 1 điểm bán (chạm vào chấm trên bản đồ hoặc tick trong danh sách).'); return; }
+            const startStore = mapState.start !== 'me' ? sel.find(s => String(s.id) === mapState.start) : null;
+            let nodes, rest;
+            if (startStore) {
+                rest = sel.filter(s => s !== startStore);
+                nodes = [{ lat: Number(startStore.lat), lng: Number(startStore.lng), store: startStore }].concat(rest.map(s => ({ lat: Number(s.lat), lng: Number(s.lng), store: s })));
+            } else {
+                mapState.start = 'me';
+                if (db.settings?.deviceMode !== 'pc') await getFreshPosition();
+                if (!mapMeOk()) { alert('Chưa lấy được vị trí của bạn. Hãy bật định vị (GPS) trên điện thoại, hoặc chọn "Điểm xuất phát" là một cửa hàng.'); return; }
+                nodes = [{ lat: currentLivePos.lat, lng: currentLivePos.lng }].concat(sel.map(s => ({ lat: Number(s.lat), lng: Number(s.lng), store: s })));
+            }
+            if (nodes.length < 2) { mapState.order = nodes.filter(n => n.store).map(n => String(n.store.id)); mapComputeLegs(); mapState.road = null; refreshMapUI(); mapFit(); return; }
+            const seq = mapRouteSeq(nodes, mapState.round);
+            mapState.order = seq.map(i => nodes[i].store).filter(Boolean).map(s => String(s.id));
+            mapState.road = null;
+            mapComputeLegs();
+            refreshMapUI(); mapFit();
+        }
+
+        function mapRoutePoints() {
+            const pts = [];
+            if (mapState.start === 'me' && mapMeOk()) pts.push({ lat: currentLivePos.lat, lng: currentLivePos.lng });
+            mapState.order.map(mapById).filter(Boolean).forEach(s => pts.push({ lat: Number(s.lat), lng: Number(s.lng) }));
+            if (mapState.round && pts.length > 1) pts.push(pts[0]);
+            return pts;
+        }
+        const mapRoadKey = () => mapState.order.join(',') + '|' + mapState.start + '|' + (mapState.round ? 1 : 0);
+
+        function mapGmapsLinks() {
+            const stops = mapState.order.map(mapById).filter(Boolean).map(s => ({ lat: Number(s.lat), lng: Number(s.lng) }));
+            if (!stops.length) return [];
+            let origin = null, rest = stops;
+            if (mapState.start !== 'me') { origin = stops[0]; rest = stops.slice(1); }
+            if (mapState.round) rest = rest.concat([origin || (mapMeOk() ? { lat: currentLivePos.lat, lng: currentLivePos.lng } : stops[0])]);
+            if (!rest.length) return [];
+            const chunks = []; for (let i = 0; i < rest.length; i += 10) chunks.push(rest.slice(i, i + 10));
+            return chunks.map((ch, k) => {
+                const o = k === 0 ? origin : chunks[k - 1][chunks[k - 1].length - 1];
+                const dest = ch[ch.length - 1], way = ch.slice(0, -1);
+                let url = 'https://www.google.com/maps/dir/?api=1&travelmode=driving&destination=' + dest.lat + ',' + dest.lng;
+                if (o) url += '&origin=' + o.lat + ',' + o.lng;
+                if (way.length) url += '&waypoints=' + way.map(p => p.lat + ',' + p.lng).join('%7C');
+                return { url, label: chunks.length > 1 ? `Mở Google Maps - phần ${k + 1}/${chunks.length}` : 'Mở cả tuyến trong Google Maps' };
+            });
+        }
+
+        async function mapRoadRoute() {
+            if (!mapState.order.length) { alert('Hãy sắp xếp tuyến đường trước.'); return; }
+            const pts = mapRoutePoints();
+            if (pts.length < 2) { alert('Tuyến cần ít nhất 2 điểm (hoặc bật GPS để lấy điểm xuất phát).'); return; }
+            if (pts.length > 90) { alert('Tuyến quá dài để vẽ đường thực tế (tối đa 90 điểm). Hãy chia nhỏ tuyến.'); return; }
+            mapState.roadLoading = true; refreshMapUI();
+            try {
+                const coords = pts.map(p => p.lng.toFixed(6) + ',' + p.lat.toFixed(6)).join(';');
+                const ctrl = new AbortController(), t = setTimeout(() => ctrl.abort(), 15000);
+                const res = await fetch('https://router.project-osrm.org/route/v1/driving/' + coords + '?overview=full&geometries=geojson', { signal: ctrl.signal });
+                clearTimeout(t);
+                const j = await res.json();
+                if (j.code !== 'Ok' || !j.routes || !j.routes[0]) throw new Error(j.code || 'no route');
+                const r = j.routes[0];
+                mapState.road = { key: mapRoadKey(), km: r.distance / 1000, min: Math.round(r.duration / 60), coords: r.geometry.coordinates.map(c => [c[1], c[0]]) };
+            } catch (e) {
+                console.warn('OSRM lỗi', e);
+                alert('Không lấy được đường thực tế (máy chủ bản đồ miễn phí đang bận hoặc mất mạng). Thứ tự tuyến và nút Google Maps vẫn dùng bình thường.');
+            }
+            mapState.roadLoading = false; refreshMapUI();
+        }
+
+        function mapSaveRoute() {
+            if (!mapState.order.length) { alert('Chưa có tuyến để lưu. Hãy bấm "Sắp xếp tuyến đường hợp lý" trước.'); return; }
+            if (!db.routes) db.routes = [];
+            const u = getCurrentUser();
+            const name = (mapState.name || '').trim() || `Tuyến ${todayVN()} - ${selectedCity === 'all' ? 'Tất cả' : selectedCity}`;
+            db.routes.unshift({ id: Date.now(), name, date: new Date().toLocaleString('vi-VN'), createdBy: u ? u.username : '', start: mapState.start, round: mapState.round, stops: mapState.order.slice(), km: mapState.total / 1000 });
+            mapState.name = '';
+            saveData();
+            alert('Đã lưu tuyến đường! Tuyến này sẽ có trên mọi thiết bị đăng nhập.');
+            refreshMapUI();
+        }
+
+        function mapLoadRoute(id) {
+            const r = (db.routes || []).find(x => String(x.id) === String(id)); if (!r) return;
+            const stops = (r.stops || []).map(mapById).filter(s => s && mapHasCoord(s));
+            if (!stops.length) { alert('Các cửa hàng trong tuyến này không còn trên hệ thống.'); return; }
+            selectedCity = 'all'; selectedDistrict = 'all';
+            mapState.key = mapFilterKey();
+            mapState.sel = new Set(stops.map(s => String(s.id)));
+            mapState.order = stops.map(s => String(s.id));
+            mapState.start = (r.start && r.start !== 'me' && mapState.sel.has(String(r.start))) ? String(r.start) : 'me';
+            mapState.round = !!r.round; mapState.road = null; mapState.view = null;
+            mapComputeLegs();
+            render();
+        }
+
+        function mapDeleteRoute(id) {
+            if (!confirm('Xóa tuyến đường đã lưu này?')) return;
+            db.routes = (db.routes || []).filter(x => String(x.id) !== String(id));
+            saveData(); refreshMapUI();
+        }
 
         function calculateDistance(lat1,lon1,lat2,lon2){ const R=6371e3,dLat=(lat2-lat1)*Math.PI/180,dLon=(lon2-lon1)*Math.PI/180,a=Math.sin(dLat/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2; return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a)); }
         function requestUserGPS(){ 
