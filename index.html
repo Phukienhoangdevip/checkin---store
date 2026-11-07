@@ -786,7 +786,7 @@
             db.users.forEach(u => { if (!u.permissions) u.permissions = { stores: true, master: true, warehouse: true, history: true }; });
         }
 
-        // ===== Bản 28: ảnh lưu trong IndexedDB, chữ lưu trong localStorage =====
+        // ===== Bản 29: ảnh lưu trong IndexedDB, chữ lưu trong localStorage =====
         const PHOTO_KEYS = new Set(['photo', 'photos', 'storePhoto', 'img']);
         const IDB = { db: null, known: new Set() };
         function idbOpen() {
@@ -1284,7 +1284,7 @@
                         </div>
                         <div>
                             <h1 class="font-black text-xs sm:text-sm uppercase tracking-wider">PHỤ KIỆN HOÀNG ĐẾ</h1>
-                            <p class="text-[11px] sm:text-xs opacity-75">Nhân sự: <span class="font-bold text-amber-500">${user.fullname}</span> (${db.settings?.deviceMode === 'pc' ? 'Chế độ PC' : 'Chế độ Mobile'} • Bản 28)</p>
+                            <p class="text-[11px] sm:text-xs opacity-75">Nhân sự: <span class="font-bold text-amber-500">${user.fullname}</span> (${db.settings?.deviceMode === 'pc' ? 'Chế độ PC' : 'Chế độ Mobile'} • Bản 29)</p>
                         </div>
                     </div>
                     <div class="flex space-x-2 w-full sm:w-auto justify-end">
@@ -1308,7 +1308,7 @@
         }
 
 
-        // ===== Bản 28: tìm cửa hàng, lọc tỉnh/quận có ô tìm =====
+        // ===== Bản 29: tìm cửa hàng, lọc tỉnh/quận có ô tìm =====
         let storeQ = '', pickKind = '';
         function storeKey(s) { return normTxt([s.name, s.owner, s.phone, s.address, s.district, s.city].join(' ')); }
         function storeMatch(s) { const k = normTxt(storeQ).trim(); return !k || storeKey(s).includes(k); }
@@ -1757,7 +1757,7 @@
         }
 
 
-        // ===== Bản 28: doanh thu, xem bill, dung lượng =====
+        // ===== Bản 29: doanh thu, xem bill, dung lượng =====
         function dayKeyOf(t) { return typeof t === 'string' ? t.trim().split(/\s+/).pop() : ''; }
         function parseMoneyStr(x) { const m = String(x || '').match(/([\d.,]+)\s*đ/); return m ? (parseInt(m[1].replace(/[.,]/g, '')) || 0) : 0; }
         function saleNet(h) { return typeof h.net === 'number' ? h.net : moneyOf(h.note); }
@@ -1882,7 +1882,7 @@
         }
 
 
-        // ===== Bản 28: nhập nhanh bằng văn bản/ảnh, trả hàng về kho =====
+        // ===== Bản 29: nhập nhanh bằng văn bản/ảnh, trả hàng về kho =====
         const QI_UNITS = 'cái|chiếc|bộ|sợi|cuộn|hộp|thùng|chai|đôi|cặp|pcs|pc|cây';
         const COLOR_RE = /(^|[^\p{L}])(?:màu\s+)?(đen|trắng|xanh\s+(?:lá|dương|ngọc|rêu|navy|lam|biển)|xanh|ghi|xám|hồng|đỏ|vàng|tím|cam|nâu|bạc|den|trang|hong|vang|tim|nau|bac|black|white|blue|gr[ae]y|silver|pink|red)(?![\p{L}])/iu;
         const COLOR_MAP = { den: 'Đen', trang: 'Trắng', hong: 'Hồng', vang: 'Vàng', tim: 'Tím', nau: 'Nâu', bac: 'Bạc', black: 'Đen', white: 'Trắng', blue: 'Xanh', gray: 'Ghi', grey: 'Ghi', 'xám': 'Ghi', silver: 'Bạc', pink: 'Hồng', red: 'Đỏ' };
@@ -1901,12 +1901,14 @@
             [/\bkinh\b|cuong luc|dan man hinh|\bglass\b/, 'Kính cường lực'],
             [/\bop\b|op lung|\bcase\b/, 'Ốp lưng'],
             [/\bcap\b|\bcable\b|day sac/, 'Cáp sạc'],
-            [/\bcu\b|cu sac|adapter|adaptor/, 'Củ sạc']
+            [/\bcu\b|cu sac|adapter|adaptor/, 'Củ sạc'],
+            [/^bo\b|\bbo (sac|cu|wekome|wk)/, 'Bộ sạc'],
+            [/\bloa\b/, 'Loa'], [/\bquat\b/, 'Quạt'], [/dong ho/, 'Đồng hồ'], [/\bcombo\b/, 'Combo'], [/\bden\b/, 'Đèn'], [/\bmic\b|micro(?!\s*usb)/, 'Micro']
         ];
         function qiGuessCat(w) {
             const n = normTxt(w);
             for (const c of (db.categories || [])) { const nc = normTxt(c); if (nc.length > 2 && n.includes(nc)) return c; }
-            for (const [re, c] of CAT_RULES) { if (re.test(n)) { const ex = (db.categories || []).find(x => normTxt(x) === normTxt(c)); return ex || c; } }
+            for (const [re, c] of CAT_RULES) { if (re.test(n)) { const ex = (db.categories || []).find(x => normTxt(x) === normTxt(c)) || (db.categories || []).find(x => normTxt(x).startsWith(normTxt(c))); return ex || c; } }
             return '';
         }
         function parseOrderLine(raw) {
@@ -1952,7 +1954,84 @@
         }
         function qiTok(x) { return new Set(normTxt(x).split(/[^a-z0-9]+/).filter(Boolean)); }
         function qiJac(a, b) { let i = 0; a.forEach(x => { if (b.has(x)) i++; }); const u = a.size + b.size - i; return u ? i / u : 0; }
-        // ----- Bản 28: bỏ VT, tách biến thể "Chân ...", màu; đối chiếu thông minh theo mã / viết tắt / số -----
+        // ----- Bản 29: bỏ VT, tách biến thể "Chân ...", màu; đối chiếu thông minh theo mã / viết tắt / số -----
+        const QI_SEED = ['cáp', 'sạc', 'tai', 'nghe', 'củ', 'bộ', 'loa', 'quạt', 'kính', 'cường', 'lực', 'ốp', 'lưng', 'dự', 'phòng', 'đồng', 'hồ', 'dây', 'đeo', 'giá', 'đỡ', 'không', 'đầu', 'chân', 'chuyển', 'thẻ', 'nhớ', 'nhanh', 'thông', 'minh', 'trẻ', 'em', 'điện', 'thoại', 'máy', 'đèn', 'gậy', 'chụp', 'ảnh', 'túi', 'bình', 'nước', 'đen', 'trắng', 'xanh', 'ghi', 'xám', 'hồng', 'đỏ', 'vàng', 'tím', 'cam', 'nâu', 'bạc', 'bluetooth', 'iphone', 'samsung', 'type', 'usb', 'lightning', 'micro', 'wekome', 'picom', 'remax', 'hoco', 'combo', 'mini', 'pro', 'max', 'plus', 'ultra', 'chống', 'nước', 'siêu', 'bền', 'cổng'];
+        let QI_VOC = null, QI_VOC_N = -1;
+        function qiLev(a, b) {
+            if (a === b) return 0; const m = a.length, n = b.length; if (Math.abs(m - n) > 2) return 9;
+            let prev = Array.from({ length: n + 1 }, (_, j) => j);
+            for (let i = 1; i <= m; i++) { const cur = [i]; for (let j = 1; j <= n; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); prev = cur; }
+            return prev[n];
+        }
+        function qiVocab() {
+            const n = (db.productsMaster || []).length;
+            if (QI_VOC && QI_VOC_N === n) return QI_VOC;
+            const forms = new Map(), models = new Set();
+            const add = (w, c) => { const k = normTxt(w); if (k.length < 2 || /\d/.test(k)) return; let e = forms.get(k); if (!e) { e = new Map(); forms.set(k, e); } e.set(w, (e.get(w) || 0) + c); };
+            QI_SEED.forEach(w => add(w, 60));
+            ['đen', 'trắng', 'xanh', 'ghi', 'xám', 'hồng', 'đỏ', 'vàng', 'tím', 'cam', 'nâu', 'bạc'].forEach(w => add(w, 600));
+            (db.productsMaster || []).forEach(p => String(p.name || '').split(/\s+/).forEach(t => {
+                const c = t.replace(/^[^\p{L}\d]+|[^\p{L}\d]+$/gu, ''); if (!c) return;
+                if (/\d/.test(c) && /[A-Za-z]/.test(c)) models.add(c.toUpperCase());
+                c.split(/[^\p{L}]+/u).forEach(w => { if (w.length >= 2) add(w.toLowerCase(), 1); });
+            }));
+            const voc = new Map();
+            forms.forEach((e, k) => { let best = '', bc = -1; e.forEach((c, f) => { if (c > bc) { bc = c; best = f; } }); let tot = 0; e.forEach(c => tot += c); voc.set(k, { form: best, n: tot, set: new Set([...e.keys()].map(x => x.toLowerCase())) }); });
+            QI_VOC = { voc, models, keys: [...voc.keys()] }; QI_VOC_N = n;
+            return QI_VOC;
+        }
+        function qiStyleLike(orig, w) {
+            if (orig.length > 1 && orig === orig.toUpperCase() && /\p{L}/u.test(orig)) return w.toUpperCase();
+            if (orig.charAt(0) !== orig.charAt(0).toLowerCase()) return w.charAt(0).toUpperCase() + w.slice(1);
+            return w;
+        }
+        function qiSpellTok(tok, V) {
+            const m = /^([^\p{L}\d]*)(.*?)([^\p{L}\d]*)$/su.exec(tok); const pre = m[1], core = m[2], post = m[3];
+            if (!core) return tok;
+            if (/\d/.test(core)) {
+                if (!/[A-Za-z]/.test(core) || V.models.has(core.toUpperCase())) return tok;
+                const up = core.toUpperCase(); const cl = x => x.split('').map(c => QI_CLS[c] || c).join('');
+                const hit = [...V.models].filter(x => x.length === up.length && x.replace(/[-.]/g, '').length && cl(x) === cl(up));
+                return hit.length === 1 ? pre + hit[0] + post : tok;
+            }
+            const k = normTxt(core); if (k.length < 2) return tok;
+            const ex = V.voc.get(k);
+            if (ex && /[^\u0000-\u007f]/.test(core) && ex.set.has(core.toLowerCase())) return tok;
+            if (ex) return pre + qiStyleLike(core, ex.form) + post;
+            if (k.length >= 4) {
+                const maxd = k.length >= 8 ? 2 : 1; let best = null, bd = 9, tie = false;
+                for (const key of V.keys) {
+                    if (Math.abs(key.length - k.length) > maxd) continue;
+                    const d = qiLev(k, key); if (d > maxd) continue;
+                    if (d < bd || (d === bd && V.voc.get(key).n > V.voc.get(best).n * 3)) { best = key; bd = d; tie = false; } else if (d === bd && best !== key) tie = true;
+                }
+                if (best && !tie && V.voc.get(best).n >= 2) return pre + qiStyleLike(core, V.voc.get(best).form) + post;
+                for (let i = 2; i <= k.length - 2; i++) { const a = V.voc.get(k.slice(0, i)), b = V.voc.get(k.slice(i)); if (a && b && k.slice(0, i).length >= 2 && k.slice(i).length >= 3) return pre + qiStyleLike(core, a.form) + ' ' + qiStyleLike(core, b.form) + post; }
+            }
+            return tok;
+        }
+        function qiDedupe(tokens) {
+            const key = t => normTxt(t).replace(/[^a-z0-9]/g, '');
+            let t = tokens.filter(x => x !== '');
+            for (let guard = 0; guard < 10; guard++) {
+                let changed = false;
+                for (let n = Math.min(5, Math.floor(t.length / 2)); n >= 1 && !changed; n--) {
+                    for (let i = 0; i + n <= t.length && !changed; i++) {
+                        for (let j = i + n; j <= Math.min(t.length - n, i + n + 2) && !changed; j++) {
+                            let same = true; for (let k = 0; k < n; k++) if (key(t[i + k]) === '' || key(t[i + k]) !== key(t[j + k])) { same = false; break; }
+                            if (same && (n >= 2 || j === i + n)) { t.splice(i + n, j + n - (i + n)); changed = true; }
+                        }
+                    }
+                }
+                if (!changed) break;
+            }
+            return t;
+        }
+        function qiSpell(raw) {
+            const V = qiVocab();
+            const toks = String(raw || '').split(/\s+/).filter(Boolean).map(t => qiSpellTok(t, V)).join(' ').split(/\s+/);
+            return qiDedupe(toks).join(' ');
+        }
         function qiStripVT(s) {
             return String(s || '').replace(/\(\s*vtc?\s*\)/gi, ' ').replace(/(^|[\s\-–,])vtc?(?=$|[\s\-–,)])/gi, '$1 ').replace(/\s{2,}/g, ' ').trim();
         }
@@ -1964,9 +2043,10 @@
             if (/samsung|^ss$/.test(n)) return 'Chân Samsung';
             return 'Chân ' + String(x).trim().replace(/[.\s]+$/, '');
         }
-        function qiCleanName(raw) {
+        function qiCleanName(raw, noSpell) {
             let s = String(raw || '').replace(/[|¦]/g, ' ');
             s = qiStripVT(s);
+            if (!noSpell) s = qiSpell(s);
             s = s.replace(/([A-Z]{2})O(\d)/g, '$10$2').replace(/\b\d{1,2}\s*th[aáàảãạ]ng\b.*$/i, ' ');
             s = s.replace(/([A-Za-z0-9])(iphone|lightning|typec|micro|samsung)/gi, '$1 $2');
             s = s.replace(/(^|[^\p{L}])h[eéèêoôồơ]ng(?![\p{L}])/giu, '$1Hồng').replace(/(^|[^\p{L}])tr[ăâ]ng(?![\p{L}])/giu, '$1Trắng');
@@ -1979,7 +2059,7 @@
             if (m) { variant = qiVariantLabel(m[1]); s = s.replace(m[0], ' '); }
             else {
                 const nn = normTxt(s);
-                if (/\bcap\b|day sac/.test(nn) && !/\bop\b|kinh|cuong luc|du phong|tai nghe/.test(nn)) {
+                if (/\bcap\b|day sac|\bbo\b/.test(nn) && !/\bop\b|kinh|cuong luc|du phong|tai nghe/.test(nn)) {
                     let two = null;
                     for (const [re, v] of VARIANT_RULES.slice(0, 3)) { const vm = s.match(re); if (vm) { two = [vm[0], v]; break; } }
                     if (two) { variant = two[1]; s = s.replace(two[0], ' '); }
@@ -1992,8 +2072,10 @@
             let watt = '';
             { const wm = s.match(/\(\s*(\d{1,3})\s*w\s*\)/i) || s.match(/\(\s*(\d{2,3})\s*m\s*\)/i); if (wm) watt = wm[1] + 'W'; }
             s = s.replace(/\(\s*\d{2,3}\s*m\s*\)/gi, ' ').replace(/\(\s*[A-Za-z0-9]{1,3}\s*w\s*\)/gi, ' ').replace(/\(\s*\)/g, ' ');
+            if (!watt) { const bm = s.match(/(^|\s)(\d{1,3})\s*W(?=\s|$)/i); if (bm) { watt = bm[2] + 'W'; s = s.replace(bm[0], ' '); } }
             s = s.replace(/(^|[^\p{L}])([A-Z]{2,4})\s*[-.]+\s*\.?(\d{1,3})(?![\d])/gu, '$1$2-$3');
             s = qiTidyName(s.replace(/\s[-–~]\s*$/, '').replace(/\s[-–~]\s/g, ' ').replace(/^[-–~\s]+/, ''));
+            if (!noSpell) { const tk = s.split(/\s+/).filter(Boolean); if (tk.length > 2 && /^\d{1,3}$/.test(tk[tk.length - 1]) && tk.slice(0, -1).some(x => /[A-Za-z]/.test(x) && /\d/.test(x))) { tk.pop(); s = tk.join(' '); } }
             return { base: s, variant, color, watt };
         }
         function qiWatt(w) { const m = /^\s*(\d{1,3})\s*w?\s*$/i.exec(String(w || '')); return m ? m[1] + 'W' : ''; }
@@ -2054,7 +2136,7 @@
             let e = QI_ENT.get(p.name);
             if (!e) {
                 const pn = parseProductName(p);
-                const cn = qiCleanName(pn.base);
+                const cn = qiCleanName(pn.base, true);
                 const variant = pn.variant || cn.variant, color = pn.color || cn.color;
                 const baseName = cn.variant ? cn.base : qiStripVT(pn.base);
                 e = { base: cn.base, core: cn.base, watt: cn.watt || '', baseName, variant, color, sigBase: qiSig(cn.base), sigFull: qiSig(pn.base), key: [...qiSig(cn.base).set].sort().join(' ') };
@@ -2104,11 +2186,11 @@
             const final = composeName(coreName + (watt ? ' (' + watt + ')' : ''), variant, color);
             let exact = db.productsMaster.find(p => p.name === final && prodCat(p) === cat) || null;
             if (!exact && matched) exact = db.productsMaster.find(p => { const e = qiEntry(p); return e.key === be.key && e.variant === variant && e.color === color && (e.watt || '') === watt && prodCat(p) === cat; }) || null;
-            return { matched, cat, variant, final: exact ? exact.name : final, exact };
+            return { matched, cat, variant, final: exact ? exact.name : final, exact, score: bs, ent: be };
         }
 
 
-        // ===== Bản 28: đọc hóa đơn dạng bảng (Sapo...) =====
+        // ===== Bản 29: đọc hóa đơn dạng bảng (Sapo...) =====
         const INV_SKIP = /(^|\s)(hoa don|giao hang|khach le|dien thoai|email|luu y|vui long|tong so|tong chiet|tong tien|tong cong|tong|ma don|ngay tao|nhan vien|chi tiet don|sapo|stt|ma sp|masp|ten sp|so luong|luong|don gia|chiet khau|thanh tien|bao hanh|dia chi|kieu nai|chung toi|hang hoa|cam on|trang thai)(\s|:|$)/;
         function qiNum(tok) {
             const t = String(tok).replace(/^[^\d]+|[^\d]+$/g, '');
@@ -2234,7 +2316,7 @@
             return { rows: out, totals: { qty: mq ? parseInt(mq[1]) : null, money: mm ? qiNum(mm[1]) : null } };
         }
         let qiTotals = null;
-        // ----- Bản 28: dán bảng hóa đơn (STT | Mã SP | Tên | BH | SL | Đơn giá | CK | Thành tiền) -----
+        // ----- Bản 29: dán bảng hóa đơn (STT | Mã SP | Tên | BH | SL | Đơn giá | CK | Thành tiền) -----
         let qiSrc = 'text';
         const QI_CODE_RE = /^[A-Za-z]{1,6}\d{2,}[A-Za-z0-9\-]*$/;
         function qiRecordToRow(cells) {
@@ -2249,7 +2331,12 @@
             if (!texts.length || (texts.join(' ').match(/\p{L}/gu) || []).length < 3) return null;
             if (nums.length && nums[0].v <= 999 && nums.length >= 5) nums.shift();           // STT
             const tr = qiTripleFrom(nums.slice(-5));
-            if (!tr) return null;
+            if (!tr) {
+                if (nums.length < 3) return null;
+                const L = nums.length, ck = nums[L - 2].v < 1000 && L >= 4;
+                const q = nums[ck ? L - 4 : L - 3].v, p = nums[ck ? L - 3 : L - 2].v, t = nums[L - 1].v;
+                return { code, name: texts.join(' '), q: q > 0 ? q : 1, p, t, fixed: false, bh, mismatch: true };
+            }
             return { code, name: texts.join(' '), q: tr.q.v, p: tr.p.v, t: tr.t.v, fixed: tr.fixed, bh };
         }
         function parseTableText(text) {
@@ -2275,28 +2362,125 @@
             recs.forEach(cells => {
                 const r = qiRecordToRow(cells); if (!r) return;
                 const cn = qiCleanName(r.name), g = qiInvoiceGroup(cn.base);
-                rows.push({ name: g.name, cat: g.cat, color: cn.color, variant: cn.variant, watt: cn.watt || '', code: qiFixCode(r.code), qty: r.q, price: String(r.p), total: r.t, fixed: r.fixed, inv: true, guess: false, strict: true, raw: cells.join(' | ') });
+                rows.push({ name: g.name, cat: g.cat, color: cn.color, variant: cn.variant, watt: cn.watt || '', code: qiFixCode(r.code), qty: r.q, price: String(r.p), total: r.t, fixed: r.fixed, mismatch: !!r.mismatch, inv: true, guess: false, strict: true, raw: cells.join(' | ') });
             });
             if (!rows.length) return null;
             const nt = normTxt(String(text || ''));
             const mq = nt.match(/t[a-z]ng\s*so\s*luong[^0-9]{0,25}(\d+)/), mm = nt.match(/t[a-z]ng\s*tien[^0-9]{0,20}([\d.,]+)/);
             return { rows, totals: { qty: mq ? parseInt(mq[1]) : null, money: mm ? qiNum(mm[1]) : null } };
         }
+        function qiNormalizeRows(rows) {
+            rows.forEach(r => {
+                if (r.fromCatalog || (r.strict && r.code)) return;
+                const x = resolveRow(r);
+                if (x && x.matched && !x.byCode && x.score >= 0.8 && x.ent) {
+                    r.name = x.ent.core; r.cat = prodCat(x.matched);
+                    if (!r.watt && x.ent.watt && Number(r.price) > 0 && Number(x.matched.price) === Number(r.price)) r.watt = x.ent.watt;
+                }
+            });
+            return rows;
+        }
+        // ----- Bản 29: dựng lại bảng theo HÀNG NGANG từ vị trí từng chữ trong ảnh -----
+        function qiRowLines(gray, w, h) {
+            const ys = [];
+            for (let y = 0; y < h; y++) {
+                let run = 0, best = 0, gap = 0; const o = y * w;
+                for (let x = 0; x < w; x++) { if (gray[o + x] < 175) { run++; gap = 0; if (run > best) best = run; } else if (++gap > 4) run = 0; }
+                if (best >= 0.6 * w) ys.push(y);
+            }
+            const out = []; let st = null, pv = null;
+            ys.forEach(y => { if (st === null) { st = y; pv = y; } else if (y - pv <= 5) pv = y; else { out.push((st + pv) / 2); st = y; pv = y; } });
+            if (st !== null) out.push((st + pv) / 2);
+            return out;
+        }
+        function qiMedian(a) { if (!a.length) return 0; const b = a.slice().sort((x, y) => x - y); return b[b.length >> 1]; }
+        function qiNumTok(t) {
+            let x = String(t || '').replace(/[°º]/g, '0').trim();
+            if (/^[\dOolISB.,]+$/.test(x) && (x.match(/\d/g) || []).length >= Math.ceil(x.length / 2)) x = x.replace(/[Oo]/g, '0').replace(/[lI]/g, '1').replace(/S/g, '5').replace(/B/g, '8');
+            return /^\d[\d.,]*$/.test(x) ? x : null;
+        }
+        function qiGroupNoGrid(W, mh) {
+            W = W.slice().sort((a, b) => a.yc - b.yc); const lines = [];
+            W.forEach(w => { const L = lines[lines.length - 1]; if (L && Math.abs(w.yc - L.yc) < 0.6 * mh) { L.ws.push(w); L.yc = L.ws.reduce((a, z) => a + z.yc, 0) / L.ws.length; } else lines.push({ yc: w.yc, ws: [w] }); });
+            const isAnchor = L => L.ws.filter(w => w.n !== null).length >= 3 && L.ws.some(w => w.n !== null && qiNum(w.n) >= 100);
+            const gaps = []; for (let i = 1; i < lines.length; i++) gaps.push(lines[i].yc - lines[i - 1].yc);
+            const med = qiMedian(gaps), groups = []; let cur = [lines[0]];
+            for (let i = 1; i < lines.length; i++) { if (gaps[i - 1] > 1.5 * med) { groups.push(cur); cur = []; } cur.push(lines[i]); }
+            groups.push(cur);
+            const recs = [];
+            groups.forEach(g => {
+                const anchors = g.filter(isAnchor);
+                if (!anchors.length) { if (recs.length) g.forEach(L => recs[recs.length - 1].push(...L.ws)); return; }
+                const bucket = anchors.map(() => []);
+                g.forEach(L => { let bi = 0, bd = 1e9; anchors.forEach((A, i) => { const d = Math.abs(A.yc - L.yc); if (d < bd) { bd = d; bi = i; } }); bucket[bi].push(...L.ws); });
+                bucket.forEach(b => recs.push(b));
+            });
+            return recs;
+        }
+        function qiWordsToText(words, g) {
+            const W = (words || []).filter(x => x && x.text && String(x.text).trim() && x.bbox).map(x => ({ t: String(x.text).trim(), x0: x.bbox.x0, x1: x.bbox.x1, y0: x.bbox.y0, y1: x.bbox.y1, xc: (x.bbox.x0 + x.bbox.x1) / 2, yc: (x.bbox.y0 + x.bbox.y1) / 2, h: x.bbox.y1 - x.bbox.y0, n: qiNumTok(x.text) }));
+            if (W.length < 8) return null;
+            const mh = qiMedian(W.map(w => w.h)) || 10;
+            const lines = g ? qiRowLines(g.gray, g.w, g.h) : [];
+            let recs;
+            if (lines.length >= 3) { recs = []; for (let i = 0; i + 1 < lines.length; i++) recs.push(W.filter(w => w.yc > lines[i] && w.yc < lines[i + 1])); }
+            else recs = qiGroupNoGrid(W, mh);
+            const info = recs.map(rec => {
+                const nums = rec.filter(w => w.n !== null).sort((a, b) => a.xc - b.xc).slice(-6);
+                const L = nums.map((w, i) => ({ v: qiNum(w.n) == null ? -1 : qiNum(w.n), i }));
+                const tr = nums.length >= 3 ? qiTripleFrom(L.filter(x => x.v >= 0)) : null;
+                return { rec, nums, tr };
+            });
+            const qxs = info.filter(i => i.tr && !i.tr.fixed).map(i => i.nums[i.tr.q.i].x0);
+            const pxs = info.filter(i => i.tr).map(i => i.nums[i.tr.p.i].x0);
+            const qtyX = qxs.length ? qiMedian(qxs) : (pxs.length ? qiMedian(pxs) - 6 * mh : null);
+            if (qtyX === null) return null;
+            const out = []; let cands = 0;
+            info.forEach(({ rec, nums, tr }) => {
+                if (rec.some(w => w.n !== null) && (rec.map(w => w.t).join(' ').match(/\p{L}/gu) || []).length >= 6) cands++;
+                if (nums.length < 2) return;
+                let nameW = rec.filter(w => w.xc < qtyX - 2);
+                nameW.sort((a, b) => a.xc - b.xc);
+                let stt = '', code = '';
+                const first = nameW.slice().sort((a, b) => a.x0 - b.x0)[0];
+                if (first && first.n !== null && qiNum(first.n) <= 999 && !/[.,]/.test(first.n)) { stt = first.n; nameW = nameW.filter(w => w !== first); }
+                const lw = nameW.slice().sort((a, b) => a.x0 - b.x0)[0];
+                if (lw && QI_CODE_RE.test(lw.t.replace(/[^A-Za-z0-9\-]/g, ''))) { code = lw.t.replace(/[^A-Za-z0-9\-]/g, ''); nameW = nameW.filter(w => w !== lw); }
+                nameW.sort((a, b) => a.yc - b.yc);
+                const rows = []; nameW.forEach(w => { const R = rows[rows.length - 1]; if (R && Math.abs(w.yc - R.yc) < 0.6 * mh) { R.ws.push(w); R.yc = R.ws.reduce((a, z) => a + z.yc, 0) / R.ws.length; } else rows.push({ yc: w.yc, ws: [w] }); });
+                const name = rows.map(R => R.ws.sort((a, b) => a.x0 - b.x0).map(w => w.t).join(' ')).join(' ').replace(/\s+/g, ' ').trim();
+                if ((name.match(/\p{L}/gu) || []).length < 3) return;
+                let numCells;
+                if (tr) { const idx = [tr.fixed ? null : tr.q.i, tr.p.i, tr.t.i].filter(i => i !== null); const lo = Math.min(...idx), hi = tr.t.i; numCells = []; if (!tr.fixed) numCells.push(nums[tr.q.i].n); for (let i = tr.p.i; i <= hi; i++) numCells.push(nums[i].n); }
+                else numCells = rec.filter(w => w.n !== null && w.xc >= qtyX - 2).sort((a, b) => a.xc - b.xc).map(w => w.n);
+                out.push([stt, code, name].concat(numCells).join('\t'));
+            });
+            return out.length && out.length >= 0.8 * cands ? out.join('\n') : null;
+        }
         function qiParse(text) {
+            const ocr = qiSrc === 'ocr' || qiSrc === 'ocrtab';
             if (qiSrc !== 'ocr') {
                 const tb = parseTableText(text);
-                if (tb && tb.rows.length) { qiTotals = tb.totals; return tb.rows; }
+                if (tb && tb.rows.length) {
+                    qiTotals = tb.totals;
+                    if (ocr) tb.rows.forEach(r => {
+                        r.strict = false;
+                        const fc = r.code ? qiFindCodeIn([r.code]) : null;
+                        if (fc && fc.known) { if (fc.fuzzy) r.codeFuzzy = r.code; r.code = fc.code; const e = qiEntry(fc.known); r.name = e.base; r.watt = e.watt || ''; r.variant = e.variant; r.color = e.color || fc.known.color || ''; r.cat = prodCat(fc.known); r.fromCatalog = true; }
+                    });
+                    return qiNormalizeRows(tb.rows);
+                }
             }
             const inv = parseInvoiceText(text);
             if (inv && inv.rows.length) {
                 qiTotals = inv.totals;
-                if (qiSrc !== 'ocr') inv.rows.forEach(r => { if (r.code) r.strict = true; });
+                if (!ocr) inv.rows.forEach(r => { if (r.code) r.strict = true; });
                 else inv.rows.forEach(r => {
                     const p = r.code ? qiFindByCode(r.code) : null; if (!p) return;
                     const e = qiEntry(p);
                     r.name = e.base; r.watt = e.watt || ''; r.variant = e.variant; r.color = e.color || p.color || ''; r.cat = prodCat(p); r.fromCatalog = true;
                 });
-                return inv.rows;
+                return qiNormalizeRows(inv.rows);
             }
             qiTotals = null; return parseOrderText(text);
         }
@@ -2406,7 +2590,7 @@
               const wp = (r.price !== '' && Number(r.price) > 0 && base && base.price > 0 && Number(r.price) !== Number(base.price)) ? `<br><span class="text-rose-400 font-bold">⚠ SAI GIÁ: hóa đơn ${Number(r.price).toLocaleString()} đ ≠ giá trong kho ${Number(base.price).toLocaleString()} đ</span>` : '';
               const wf = r.codeFuzzy ? `<br><span class="text-amber-500 font-bold">⚠ Mã đọc được "${escHtml(r.codeFuzzy)}" → tự sửa thành ${escHtml(r.code)}, hãy kiểm tra.</span>` : '';
               card.dataset.pw = wp ? '1' : '';
-              inf.innerHTML = (unit > 0 ? `Thành tiền: ${q} × ${unit.toLocaleString()} = <b>${calc.toLocaleString()} đ</b>` + (r.inv && r.total && calc !== r.total ? ` <span class="text-amber-500">(hóa đơn ghi ${r.total.toLocaleString()} đ)</span>` : '') + (r.fixed ? ' <span class="text-amber-500">• số lượng suy ra từ thành tiền</span>' : '') : '') + wp + wf; }
+              inf.innerHTML = (unit > 0 ? `Thành tiền: ${q} × ${unit.toLocaleString()} = <b>${calc.toLocaleString()} đ</b>` + (r.inv && r.total && calc !== r.total ? ` <span class="text-amber-500">(hóa đơn ghi ${r.total.toLocaleString()} đ)</span>` : '') + (r.fixed ? ' <span class="text-amber-500">• số lượng suy ra từ thành tiền</span>' : '') + (r.mismatch ? ' <span class="text-rose-400 font-bold">• SL × giá không khớp thành tiền, kiểm tra lại</span>' : '') : '') + wp + wf; }
             card.querySelector('[data-wrap="variant"]').classList.toggle('hidden', !isCableCat(x.cat));
             const cs = card.querySelector('[data-f="cat"]'); cs.disabled = !!x.matched; if (x.matched) cs.innerHTML = qiCatOptions(x.cat);
         }
@@ -2495,6 +2679,7 @@
                         acc = 0; for (let v = 255; v >= 0; v--) { acc += h2[v]; if (acc >= n * 0.01) { hi = v; break; } }
                         const span = Math.max(40, hi - lo);
                         for (let k = 0; k < n; k++) gray[k] = Math.max(0, Math.min(255, (gray[k] - lo) * 255 / span));
+                        c._qi = { gray: gray.slice(), w, h };
                         // làm nét (unsharp mask 3x3)
                         const out = new Uint8ClampedArray(n);
                         for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
@@ -2514,7 +2699,7 @@
             const files = Array.from(document.getElementById('qi-file').files || []).slice(0, 15);
             if (!files.length) { alert('Hãy chọn ảnh đơn hàng trước.'); return; }
             const prog = document.getElementById('qi-progress'), btn = document.getElementById('qi-ocr-btn'); btn.disabled = true;
-            let worker = null, tag = '';
+            let worker = null, tag = '', anyTab = false;
             const logger = m => { if (m && m.status) prog.innerText = tag + (m.status === 'recognizing text' ? 'đang đọc chữ ' + Math.round((m.progress || 0) * 100) + '%' : 'đang xử lý: ' + m.status); };
             try {
                 prog.innerText = 'Đang tải bộ đọc chữ (lần đầu hơi lâu)...'; await loadTesseract();
@@ -2524,10 +2709,12 @@
                     tag = n > 1 ? 'Ảnh ' + (i + 1) + '/' + n + ': ' : '';
                     prog.innerText = tag + 'đang chuẩn bị ảnh...'; const canvas = await ocrPrep(files[i]);
                     const r = worker ? await worker.recognize(canvas) : await Tesseract.recognize(canvas, 'vie+eng', { logger });
-                    texts.push((r && r.data && r.data.text) || '');
+                    let tt = null; try { tt = r && r.data && r.data.words && r.data.words.length ? qiWordsToText(r.data.words, canvas._qi) : null; } catch (e) { tt = null; }
+                    if (tt) anyTab = true;
+                    texts.push(tt || (r && r.data && r.data.text) || '');
                 }
                 prog.innerText = '';
-                openQuickConfirm(texts.join('\n'), 'ocr');
+                openQuickConfirm(texts.join('\n'), anyTab ? 'ocrtab' : 'ocr');
             } catch (e) { prog.innerText = ''; alert('Lỗi đọc ảnh: ' + (e && e.message ? e.message : e)); }
             try { if (worker) await worker.terminate(); } catch (e) {}
             btn.disabled = false;
@@ -3150,7 +3337,7 @@
             return blocks;
         }
 
-        // ===== Bản 28: báo cáo toàn bộ lịch sử + bill chi tiết =====
+        // ===== Bản 29: báo cáo toàn bộ lịch sử + bill chi tiết =====
         let reportMode = 'day', reportToken = 0;
         const rpFmt = n => Number(n || 0).toLocaleString('vi-VN');
         function parseDayKey(k) { const m = String(k).match(/^(\d+)\/(\d+)\/(\d+)$/); return m ? new Date(+m[3], +m[2] - 1, +m[1]).getTime() : 0; }
@@ -3459,7 +3646,7 @@
             }
         }
 
-        // ===== Bản 28: tiện ích nhóm / mã / biến thể =====
+        // ===== Bản 29: tiện ích nhóm / mã / biến thể =====
         const CABLE_VARIANTS = ['USB - micro', 'USB - Type C', 'USB sang Lightning', 'C to C', 'Type C - Lightning'];
         let importFilter = { q: '', cat: '' };
         let manualVariant = '';
@@ -3471,7 +3658,7 @@
         let masterCollapsed = {};
 
         function normTxt(t) { return String(t == null ? '' : t).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd'); }
-        function isCableCat(c) { return true; /* Bản 28: biến thể dùng cho mọi nhóm */ }
+        function isCableCat(c) { return true; /* Bản 29: biến thể dùng cho mọi nhóm */ }
         function prodCode(p) { return p.code || String(p.id).slice(-6); }
         function newProductCode() {
             let mx = 0; (db.productsMaster || []).forEach(p => { const m = /^SP(\d+)$/.exec(p.code || ''); if (m) mx = Math.max(mx, parseInt(m[1])); });
@@ -3506,7 +3693,7 @@
             saveData(); render();
             alert('Đã thêm ' + list.length + ' sản phẩm vào ' + db.categories.length + ' nhóm.');
         }
-        // ===== Bản 28: biến thể / màu tự thêm, lưu vĩnh viễn =====
+        // ===== Bản 29: biến thể / màu tự thêm, lưu vĩnh viễn =====
         function loadCustomLists() {
             const st = db.settings || (db.settings = {});
             if (!Array.isArray(st.customVariants)) st.customVariants = [];
