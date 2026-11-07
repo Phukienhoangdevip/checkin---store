@@ -527,7 +527,7 @@
             </details>
         </div>
         <div id="qc-banner" class="hidden mx-4 mt-3 p-3 rounded-xl text-xs font-semibold"></div>
-        <datalist id="qc-names"></datalist>
+        <datalist id="qc-names"></datalist><datalist id="qc-watts"></datalist>
         <div id="qc-list" class="flex-1 overflow-y-auto px-4 py-3 space-y-3"></div>
         <div class="px-4 py-3 border-t border-theme-border space-y-2" style="padding-bottom:max(12px, env(safe-area-inset-bottom))">
             <div class="flex justify-between items-center text-xs font-bold"><span id="qc-summary" class="opacity-80"></span>
@@ -786,7 +786,7 @@
             db.users.forEach(u => { if (!u.permissions) u.permissions = { stores: true, master: true, warehouse: true, history: true }; });
         }
 
-        // ===== Bản 27: ảnh lưu trong IndexedDB, chữ lưu trong localStorage =====
+        // ===== Bản 28: ảnh lưu trong IndexedDB, chữ lưu trong localStorage =====
         const PHOTO_KEYS = new Set(['photo', 'photos', 'storePhoto', 'img']);
         const IDB = { db: null, known: new Set() };
         function idbOpen() {
@@ -1284,7 +1284,7 @@
                         </div>
                         <div>
                             <h1 class="font-black text-xs sm:text-sm uppercase tracking-wider">PHỤ KIỆN HOÀNG ĐẾ</h1>
-                            <p class="text-[11px] sm:text-xs opacity-75">Nhân sự: <span class="font-bold text-amber-500">${user.fullname}</span> (${db.settings?.deviceMode === 'pc' ? 'Chế độ PC' : 'Chế độ Mobile'} • Bản 27)</p>
+                            <p class="text-[11px] sm:text-xs opacity-75">Nhân sự: <span class="font-bold text-amber-500">${user.fullname}</span> (${db.settings?.deviceMode === 'pc' ? 'Chế độ PC' : 'Chế độ Mobile'} • Bản 28)</p>
                         </div>
                     </div>
                     <div class="flex space-x-2 w-full sm:w-auto justify-end">
@@ -1308,7 +1308,7 @@
         }
 
 
-        // ===== Bản 27: tìm cửa hàng, lọc tỉnh/quận có ô tìm =====
+        // ===== Bản 28: tìm cửa hàng, lọc tỉnh/quận có ô tìm =====
         let storeQ = '', pickKind = '';
         function storeKey(s) { return normTxt([s.name, s.owner, s.phone, s.address, s.district, s.city].join(' ')); }
         function storeMatch(s) { const k = normTxt(storeQ).trim(); return !k || storeKey(s).includes(k); }
@@ -1757,7 +1757,7 @@
         }
 
 
-        // ===== Bản 27: doanh thu, xem bill, dung lượng =====
+        // ===== Bản 28: doanh thu, xem bill, dung lượng =====
         function dayKeyOf(t) { return typeof t === 'string' ? t.trim().split(/\s+/).pop() : ''; }
         function parseMoneyStr(x) { const m = String(x || '').match(/([\d.,]+)\s*đ/); return m ? (parseInt(m[1].replace(/[.,]/g, '')) || 0) : 0; }
         function saleNet(h) { return typeof h.net === 'number' ? h.net : moneyOf(h.note); }
@@ -1882,7 +1882,7 @@
         }
 
 
-        // ===== Bản 27: nhập nhanh bằng văn bản/ảnh, trả hàng về kho =====
+        // ===== Bản 28: nhập nhanh bằng văn bản/ảnh, trả hàng về kho =====
         const QI_UNITS = 'cái|chiếc|bộ|sợi|cuộn|hộp|thùng|chai|đôi|cặp|pcs|pc|cây';
         const COLOR_RE = /(^|[^\p{L}])(?:màu\s+)?(đen|trắng|xanh\s+(?:lá|dương|ngọc|rêu|navy|lam|biển)|xanh|ghi|xám|hồng|đỏ|vàng|tím|cam|nâu|bạc|den|trang|hong|vang|tim|nau|bac|black|white|blue|gr[ae]y|silver|pink|red)(?![\p{L}])/iu;
         const COLOR_MAP = { den: 'Đen', trang: 'Trắng', hong: 'Hồng', vang: 'Vàng', tim: 'Tím', nau: 'Nâu', bac: 'Bạc', black: 'Đen', white: 'Trắng', blue: 'Xanh', gray: 'Ghi', grey: 'Ghi', 'xám': 'Ghi', silver: 'Bạc', pink: 'Hồng', red: 'Đỏ' };
@@ -1952,7 +1952,7 @@
         }
         function qiTok(x) { return new Set(normTxt(x).split(/[^a-z0-9]+/).filter(Boolean)); }
         function qiJac(a, b) { let i = 0; a.forEach(x => { if (b.has(x)) i++; }); const u = a.size + b.size - i; return u ? i / u : 0; }
-        // ----- Bản 27: bỏ VT, tách biến thể "Chân ...", màu; đối chiếu thông minh theo mã / viết tắt / số -----
+        // ----- Bản 28: bỏ VT, tách biến thể "Chân ...", màu; đối chiếu thông minh theo mã / viết tắt / số -----
         function qiStripVT(s) {
             return String(s || '').replace(/\(\s*vtc?\s*\)/gi, ' ').replace(/(^|[\s\-–,])vtc?(?=$|[\s\-–,)])/gi, '$1 ').replace(/\s{2,}/g, ' ').trim();
         }
@@ -1969,7 +1969,8 @@
             s = qiStripVT(s);
             s = s.replace(/([A-Z]{2})O(\d)/g, '$10$2').replace(/\b\d{1,2}\s*th[aáàảãạ]ng\b.*$/i, ' ');
             s = s.replace(/([A-Za-z0-9])(iphone|lightning|typec|micro|samsung)/gi, '$1 $2');
-            s = s.replace(/(^|[^\p{L}])h[eéèê]ng(?![\p{L}])/giu, '$1Hồng');
+            s = s.replace(/(^|[^\p{L}])h[eéèêoôồơ]ng(?![\p{L}])/giu, '$1Hồng').replace(/(^|[^\p{L}])tr[ăâ]ng(?![\p{L}])/giu, '$1Trắng');
+            s = s.replace(/^TAINGHE/i, 'Tai nghe ').replace(/(WK|WEKOME|PICOM|REMAX|HOCO)(?=[A-Z]{1,3}\d)/g, '$1 ');
             let color = '';
             const cm = s.match(COLOR_RE);
             if (cm) { const k = cm[2].toLowerCase().replace(/\s+/g, ' '); color = COLOR_MAP[k] || (k.charAt(0).toUpperCase() + k.slice(1)); s = s.replace(cm[0], cm[1] + ' '); }
@@ -1988,11 +1989,14 @@
                     }
                 }
             }
-            s = s.replace(/\(\s*[A-Za-z0-9]{1,3}\s*w\s*\)/gi, ' ').replace(/\(\s*\)/g, ' ');
+            let watt = '';
+            { const wm = s.match(/\(\s*(\d{1,3})\s*w\s*\)/i) || s.match(/\(\s*(\d{2,3})\s*m\s*\)/i); if (wm) watt = wm[1] + 'W'; }
+            s = s.replace(/\(\s*\d{2,3}\s*m\s*\)/gi, ' ').replace(/\(\s*[A-Za-z0-9]{1,3}\s*w\s*\)/gi, ' ').replace(/\(\s*\)/g, ' ');
             s = s.replace(/(^|[^\p{L}])([A-Z]{2,4})\s*[-.]+\s*\.?(\d{1,3})(?![\d])/gu, '$1$2-$3');
             s = qiTidyName(s.replace(/\s[-–~]\s*$/, '').replace(/\s[-–~]\s/g, ' ').replace(/^[-–~\s]+/, ''));
-            return { base: s, variant, color };
+            return { base: s, variant, color, watt };
         }
+        function qiWatt(w) { const m = /^\s*(\d{1,3})\s*w?\s*$/i.exec(String(w || '')); return m ? m[1] + 'W' : ''; }
         function qiFixCode(c) {
             c = String(c || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
             const m = /^([A-Z]{1,6})([0-9OIL]{2,}[A-Z0-9]*)$/.exec(c);
@@ -2053,7 +2057,7 @@
                 const cn = qiCleanName(pn.base);
                 const variant = pn.variant || cn.variant, color = pn.color || cn.color;
                 const baseName = cn.variant ? cn.base : qiStripVT(pn.base);
-                e = { base: cn.base, baseName, variant, color, sigBase: qiSig(cn.base), sigFull: qiSig(pn.base), key: [...qiSig(cn.base).set].sort().join(' ') };
+                e = { base: cn.base, core: cn.base, watt: cn.watt || '', baseName, variant, color, sigBase: qiSig(cn.base), sigFull: qiSig(pn.base), key: [...qiSig(cn.base).set].sort().join(' ') };
                 if (QI_ENT.size > 6000) QI_ENT.clear();
                 QI_ENT.set(p.name, e);
             }
@@ -2075,13 +2079,13 @@
             }
             if (r.strict && r.code) {
                 const cn0 = qiCleanName(baseProductName(String(r.name || '').trim()));
-                const v0 = r.variant || cn0.variant || '', c0 = r.color || cn0.color || '';
-                return { matched: null, cat: r.cat || 'Chưa phân loại', variant: v0, final: composeName(cn0.base || String(r.name || '').trim(), v0, c0), exact: null, strictNew: true };
+                const v0 = r.variant || cn0.variant || '', c0 = r.color || cn0.color || '', w0 = qiWatt(r.watt) || cn0.watt || '';
+                return { matched: null, cat: r.cat || 'Chưa phân loại', variant: v0, final: composeName((cn0.base || String(r.name || '').trim()) + (w0 ? ' (' + w0 + ')' : ''), v0, c0), exact: null, strictNew: true };
             }
             const rawBase = baseProductName(String(r.name || '').trim());
             const cn = qiCleanName(rawBase);
             const rb = qiSig(cn.base), rf = qiSig(rawBase);
-            let variant = r.variant || cn.variant || ''; const color = r.color || cn.color || '';
+            let variant = r.variant || cn.variant || ''; const color = r.color || cn.color || '', watt = qiWatt(r.watt) || cn.watt || '';
             let best = null, be = null, bs = 0;
             db.productsMaster.forEach(p => {
                 const e = qiEntry(p);
@@ -2089,21 +2093,22 @@
                 if (sc <= 0) return;
                 if (e.variant && e.variant === variant) sc += 0.02;
                 if (e.color && e.color === color) sc += 0.01;
+                if (watt && e.watt) sc += e.watt === watt ? 0.02 : -0.05;
                 if (Number(r.price) > 0 && Number(p.price) === Number(r.price)) sc += 0.03;
                 if (sc > bs) { bs = sc; best = p; be = e; }
             });
             const matched = best && bs >= 0.7 ? best : null;
             if (matched && !variant && be.variant && Number(r.price) > 0 && Number(matched.price) === Number(r.price)) variant = be.variant;
             const cat = matched ? prodCat(matched) : (r.cat || 'Chưa phân loại');
-            const baseName = matched ? be.baseName : (cn.base || rawBase);
-            const final = composeName(baseName, variant, color);
+            const coreName = matched ? be.core : (cn.base || rawBase);
+            const final = composeName(coreName + (watt ? ' (' + watt + ')' : ''), variant, color);
             let exact = db.productsMaster.find(p => p.name === final && prodCat(p) === cat) || null;
-            if (!exact && matched) exact = db.productsMaster.find(p => { const e = qiEntry(p); return e.key === be.key && e.variant === variant && e.color === color && prodCat(p) === cat; }) || null;
+            if (!exact && matched) exact = db.productsMaster.find(p => { const e = qiEntry(p); return e.key === be.key && e.variant === variant && e.color === color && (e.watt || '') === watt && prodCat(p) === cat; }) || null;
             return { matched, cat, variant, final: exact ? exact.name : final, exact };
         }
 
 
-        // ===== Bản 27: đọc hóa đơn dạng bảng (Sapo...) =====
+        // ===== Bản 28: đọc hóa đơn dạng bảng (Sapo...) =====
         const INV_SKIP = /(^|\s)(hoa don|giao hang|khach le|dien thoai|email|luu y|vui long|tong so|tong chiet|tong tien|tong cong|tong|ma don|ngay tao|nhan vien|chi tiet don|sapo|stt|ma sp|masp|ten sp|so luong|luong|don gia|chiet khau|thanh tien|bao hanh|dia chi|kieu nai|chung toi|hang hoa|cam on|trang thai)(\s|:|$)/;
         function qiNum(tok) {
             const t = String(tok).replace(/^[^\d]+|[^\d]+$/g, '');
@@ -2160,6 +2165,7 @@
                 const cw = c.split(/\s+/).map(normTxt);
                 if (cw.join('').length > 2 && cw.every((w, i) => nn[i] === w)) return { cat: c, name: c + (words.length > cw.length ? ' ' + words.slice(cw.length).join(' ') : '') };
             }
+            const gc = qiGuessCat(name); if (gc) return { cat: gc, name };
             const w = words.filter(x => /\p{L}/u.test(x));
             let g = (w[0] && w[0].length <= 9 && !/\d/.test(w[0])) ? w[0] : 'Chưa phân loại';
             if (g !== 'Chưa phân loại' && w[1] && !/\d/.test(w[1]) && w[1].length >= 2 && w.length > 2) g += ' ' + w[1];
@@ -2195,8 +2201,18 @@
             });
             const rows = idx.map(i => ({ i, pre: [], suf: [] }));
             const sufRe = /^[-–~(),]|^[a-zà-ỹ0-9]/u;
+            const suffixOnly = !hasCodeCol && idx.filter(i => lines[i].main.name.split(/\s+/).filter(Boolean).length >= 3).length * 10 >= idx.length * 6;
             rows.forEach((r, k) => {
                 const nextI = k + 1 < rows.length ? rows[k + 1].i : lines.length;
+                if (suffixOnly) {
+                    let cnt = 0;
+                    for (let j = r.i + 1; j < nextI; j++) {
+                        const L = lines[j]; if (L.main || L.skip || !/[\p{L}\d]/u.test(L.clean)) continue;
+                        if (L.clean.split(/\s+/).length > 8 || /https?:|\.com|\.vn/i.test(L.clean)) break;
+                        r.suf.push(L.clean); if (++cnt >= 3) break;
+                    }
+                    return;
+                }
                 const gap = []; for (let j = r.i + 1; j < nextI; j++) { if (lines[j].nameLike || (/^\d{1,2}[.,]?\d?$/.test(lines[j].clean) && /ch[âa]n\W*$/i.test(lines[r.i].main.name))) gap.push(lines[j].clean); else if (k === rows.length - 1) break; }
                 if (k === rows.length - 1) { const g = gap[0]; if (g && g.split(/\s+/).filter(t => /[\p{L}\d]{2}/u.test(t)).length <= 6) r.suf.push(g); }
                 else if (gap.length >= 2) { gap.slice(0, -1).forEach(g => r.suf.push(g)); rows[k + 1].pre.push(gap[gap.length - 1]); }
@@ -2211,14 +2227,14 @@
                 if (fc) { const rr = String(fc.raw).toLowerCase(); nm = qiTidyName(nm.split(/\s+/).filter(w => w.toLowerCase() !== rr).join(' ')); }
                 const cn = qiCleanName(nm);
                 const g = qiInvoiceGroup(cn.base);
-                return { name: g.name, cat: g.cat, color: cn.color, variant: cn.variant, code: fc ? fc.code : qiFixCode(m.code || ''), codeFuzzy: fc && fc.fuzzy ? String(fc.raw) : '', qty: m.q, price: String(m.p), total: m.t, fixed: m.fixed, inv: true, guess: false, raw: lines[r.i].clean };
+                return { name: g.name, cat: g.cat, color: cn.color, variant: cn.variant, watt: cn.watt || '', code: fc ? fc.code : qiFixCode(m.code || ''), codeFuzzy: fc && fc.fuzzy ? String(fc.raw) : '', qty: m.q, price: String(m.p), total: m.t, fixed: m.fixed, inv: true, guess: false, raw: lines[r.i].clean };
             }).filter(r => (r.name.match(/\p{L}/gu) || []).length >= 2);
             const nt = normTxt(String(text || ''));
             const mq = nt.match(/t[a-z]ng\s*so\s*luong[^0-9]{0,25}(\d+)/), mm = nt.match(/t[a-z]ng\s*tien[^0-9]{0,20}([\d.,]+)/);
             return { rows: out, totals: { qty: mq ? parseInt(mq[1]) : null, money: mm ? qiNum(mm[1]) : null } };
         }
         let qiTotals = null;
-        // ----- Bản 27: dán bảng hóa đơn (STT | Mã SP | Tên | BH | SL | Đơn giá | CK | Thành tiền) -----
+        // ----- Bản 28: dán bảng hóa đơn (STT | Mã SP | Tên | BH | SL | Đơn giá | CK | Thành tiền) -----
         let qiSrc = 'text';
         const QI_CODE_RE = /^[A-Za-z]{1,6}\d{2,}[A-Za-z0-9\-]*$/;
         function qiRecordToRow(cells) {
@@ -2228,9 +2244,9 @@
                 if (!code && QI_CODE_RE.test(c) && idx <= 3) { code = c; return; }
                 if (/^\d{1,3}\s*(th[aáàảãạ]ng|n[aăâ]m|ng[aàáảãạ]y)$/i.test(c) || /^(kh[oô]ng\s*)?(bh|b[aả]o\s*h[aàạ]nh)$/i.test(c)) { bh = true; return; }
                 const v = qiNum(c); if (v !== null && /^[\d.,\s]+$/.test(c)) { nums.push({ v, i: nums.length }); return; }
-                if ((c.match(/\p{L}/gu) || []).length >= 3) texts.push(c);
+                if ((c.match(/\p{L}/gu) || []).length >= 1) texts.push(c);
             });
-            if (!texts.length) return null;
+            if (!texts.length || (texts.join(' ').match(/\p{L}/gu) || []).length < 3) return null;
             if (nums.length && nums[0].v <= 999 && nums.length >= 5) nums.shift();           // STT
             const tr = qiTripleFrom(nums.slice(-5));
             if (!tr) return null;
@@ -2243,10 +2259,15 @@
             if (tabbed.length) tabbed.forEach(l => recs.push(l.split('\t')));
             else {
                 const starts = []; lines.forEach((l, i) => { if (QI_CODE_RE.test(l.trim())) starts.push(i); });
+                if (!starts.length) {
+                    const isInt = l => /^\s*\d{1,3}\s*$/.test(l);
+                    const nextText = i => { for (let j = i + 1; j < lines.length; j++) { if (!lines[j].trim()) continue; return (lines[j].match(/\p{L}/gu) || []).length >= 3; } return false; };
+                    let expect = null; lines.forEach((l, i) => { if (!isInt(l) || !nextText(i)) return; const v = parseInt(l); if (expect === null || v >= expect) { starts.push(i); expect = v + 1; } });
+                }
                 if (!starts.length) return null;
                 starts.forEach((st, k) => {
-                    let from = st; if (from > 0 && /^\s*\d{1,3}\s*$/.test(lines[from - 1])) from--;
-                    const to = k + 1 < starts.length ? (/^\s*\d{1,3}\s*$/.test(lines[starts[k + 1] - 1]) ? starts[k + 1] - 1 : starts[k + 1]) : lines.length;
+                    let from = st; if (from > 0 && !/^\s*\d{1,3}\s*$/.test(lines[st]) && /^\s*\d{1,3}\s*$/.test(lines[from - 1])) from--;
+                    const nx = k + 1 < starts.length ? starts[k + 1] : -1, to = nx >= 0 ? (!/^\s*\d{1,3}\s*$/.test(lines[nx]) && /^\s*\d{1,3}\s*$/.test(lines[nx - 1]) ? nx - 1 : nx) : lines.length;
                     recs.push(lines.slice(from, to).map(x => x.trim()).filter(Boolean));
                 });
             }
@@ -2254,7 +2275,7 @@
             recs.forEach(cells => {
                 const r = qiRecordToRow(cells); if (!r) return;
                 const cn = qiCleanName(r.name), g = qiInvoiceGroup(cn.base);
-                rows.push({ name: g.name, cat: g.cat, color: cn.color, variant: cn.variant, code: qiFixCode(r.code), qty: r.q, price: String(r.p), total: r.t, fixed: r.fixed, inv: true, guess: false, strict: true, raw: cells.join(' | ') });
+                rows.push({ name: g.name, cat: g.cat, color: cn.color, variant: cn.variant, watt: cn.watt || '', code: qiFixCode(r.code), qty: r.q, price: String(r.p), total: r.t, fixed: r.fixed, inv: true, guess: false, strict: true, raw: cells.join(' | ') });
             });
             if (!rows.length) return null;
             const nt = normTxt(String(text || ''));
@@ -2273,7 +2294,7 @@
                 else inv.rows.forEach(r => {
                     const p = r.code ? qiFindByCode(r.code) : null; if (!p) return;
                     const e = qiEntry(p);
-                    r.name = e.base; r.variant = e.variant; r.color = e.color || p.color || ''; r.cat = prodCat(p); r.fromCatalog = true;
+                    r.name = e.base; r.watt = e.watt || ''; r.variant = e.variant; r.color = e.color || p.color || ''; r.cat = prodCat(p); r.fromCatalog = true;
                 });
                 return inv.rows;
             }
@@ -2319,6 +2340,7 @@
         function renderQuickConfirm() {
             const bases = [...new Set(db.productsMaster.map(p => parseProductName(p).base))];
             document.getElementById('qc-names').innerHTML = bases.map(b => `<option value="${escHtml(b)}">`).join('');
+            { const ws = new Set(['5W', '12W', '18W', '20W', '25W', '30W', '35W', '45W', '60W', '65W', '100W']); db.productsMaster.forEach(p => { const w = qiEntry(p).watt; if (w) ws.add(w); }); document.getElementById('qc-watts').innerHTML = [...ws].map(w => `<option value="${w}">`).join(''); }
             const list = document.getElementById('qc-list');
             if (!qiRows.length) list.innerHTML = '<div class="p-6 text-center text-xs opacity-70">Không đọc được sản phẩm nào. Hãy sửa văn bản gốc ở trên rồi bấm "Đọc lại", hoặc bấm "Thêm dòng" để nhập tay.</div>';
             else list.innerHTML = qiRows.map((r, i) => {
@@ -2333,6 +2355,7 @@
                         <div><select data-f="color" onchange="qcChange(${i}, this)" class="${inp}"><option value="" ${!colorSel ? 'selected' : ''}>Màu: không</option>${COLORS.map(c => `<option ${colorSel === c ? 'selected' : ''}>${escHtml(c)}</option>`).join('')}<option value="__other" ${colorSel === '__other' ? 'selected' : ''}>+ Thêm màu mới...</option></select></div>
                     </div>
                     <input data-f="colorOther" value="${colorSel === '__other' ? escHtml(r.color) : ''}" onchange="qcChange(${i}, this)" placeholder="Nhập tên màu khác" class="${inp} ${colorSel === '__other' ? '' : 'hidden'}">
+                    <input data-f="watt" list="qc-watts" value="${escHtml(r.watt || '')}" onchange="qcChange(${i}, this)" placeholder="Hiệu suất (VD: 60W)" class="${inp}">
                     <select data-f="variant" onchange="qcChange(${i}, this)" class="${inp}" data-wrap="variant"><option value="">Biến thể: giữ nguyên</option>${(r.variant && !CABLE_VARIANTS.includes(r.variant) ? CABLE_VARIANTS.concat([r.variant]) : CABLE_VARIANTS).map(v => `<option ${r.variant === v ? 'selected' : ''}>${escHtml(v)}</option>`).join('')}<option value="__newv">+ Thêm biến thể mới...</option></select>
                     <div class="grid grid-cols-2 gap-2">
                         <div><label class="text-[10px] uppercase font-bold opacity-60">Số lượng nhập</label><input data-f="qty" type="number" inputmode="numeric" min="1" value="${r.qty}" onchange="qcChange(${i}, this)" class="${inp} text-center font-bold"></div>
@@ -2350,7 +2373,7 @@
             document.querySelectorAll('#qc-list [data-qi]').forEach(card => {
                 const i = +card.dataset.qi, r = qiRows[i]; if (!r) return;
                 const g = f => { const el = card.querySelector(`[data-f="${f}"]`); return el ? el.value : ''; };
-                r.name = g('name').trim(); r.code = g('code').trim().toUpperCase();
+                r.name = g('name').trim(); r.code = g('code').trim().toUpperCase(); r.watt = qiWatt(g('watt'));
                 const pn = parseProductName({ name: r.name });
                 if (pn.base !== r.name) { r.name = pn.base; if (pn.color && !r.color) r.color = pn.color; if (pn.variant && !r.variant) r.variant = pn.variant; }
                 const c = g('cat'); if (c && c !== '__new') r.cat = c;
@@ -3127,7 +3150,7 @@
             return blocks;
         }
 
-        // ===== Bản 27: báo cáo toàn bộ lịch sử + bill chi tiết =====
+        // ===== Bản 28: báo cáo toàn bộ lịch sử + bill chi tiết =====
         let reportMode = 'day', reportToken = 0;
         const rpFmt = n => Number(n || 0).toLocaleString('vi-VN');
         function parseDayKey(k) { const m = String(k).match(/^(\d+)\/(\d+)\/(\d+)$/); return m ? new Date(+m[3], +m[2] - 1, +m[1]).getTime() : 0; }
@@ -3436,7 +3459,7 @@
             }
         }
 
-        // ===== Bản 27: tiện ích nhóm / mã / biến thể =====
+        // ===== Bản 28: tiện ích nhóm / mã / biến thể =====
         const CABLE_VARIANTS = ['USB - micro', 'USB - Type C', 'USB sang Lightning', 'C to C', 'Type C - Lightning'];
         let importFilter = { q: '', cat: '' };
         let manualVariant = '';
@@ -3448,7 +3471,7 @@
         let masterCollapsed = {};
 
         function normTxt(t) { return String(t == null ? '' : t).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd'); }
-        function isCableCat(c) { return true; /* Bản 27: biến thể dùng cho mọi nhóm */ }
+        function isCableCat(c) { return true; /* Bản 28: biến thể dùng cho mọi nhóm */ }
         function prodCode(p) { return p.code || String(p.id).slice(-6); }
         function newProductCode() {
             let mx = 0; (db.productsMaster || []).forEach(p => { const m = /^SP(\d+)$/.exec(p.code || ''); if (m) mx = Math.max(mx, parseInt(m[1])); });
@@ -3483,7 +3506,7 @@
             saveData(); render();
             alert('Đã thêm ' + list.length + ' sản phẩm vào ' + db.categories.length + ' nhóm.');
         }
-        // ===== Bản 27: biến thể / màu tự thêm, lưu vĩnh viễn =====
+        // ===== Bản 28: biến thể / màu tự thêm, lưu vĩnh viễn =====
         function loadCustomLists() {
             const st = db.settings || (db.settings = {});
             if (!Array.isArray(st.customVariants)) st.customVariants = [];
