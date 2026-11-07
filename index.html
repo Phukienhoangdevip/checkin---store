@@ -528,6 +528,7 @@
         </div>
         <div id="qc-report" class="hidden mx-4 mt-3 p-3 rounded-xl text-xs border border-rose-500/50 bg-rose-500/10 space-y-1"></div>
         <div id="qc-banner" class="hidden mx-4 mt-3 p-3 rounded-xl text-xs font-semibold"></div>
+        <div id="qc-recon" class="hidden mx-4 mt-3 p-3 rounded-xl text-xs border max-h-[38vh] overflow-y-auto"></div>
         <datalist id="qc-names"></datalist><datalist id="qc-watts"></datalist>
         <div id="qc-list" class="flex-1 overflow-y-auto px-4 py-3 space-y-3"></div>
         <div class="px-4 py-3 border-t border-theme-border space-y-2" style="padding-bottom:max(12px, env(safe-area-inset-bottom))">
@@ -787,7 +788,7 @@
             db.users.forEach(u => { if (!u.permissions) u.permissions = { stores: true, master: true, warehouse: true, history: true }; });
         }
 
-        // ===== Bản 32: ảnh lưu trong IndexedDB, chữ lưu trong localStorage =====
+        // ===== Bản 33: ảnh lưu trong IndexedDB, chữ lưu trong localStorage =====
         const PHOTO_KEYS = new Set(['photo', 'photos', 'storePhoto', 'img']);
         const IDB = { db: null, known: new Set() };
         function idbOpen() {
@@ -1285,7 +1286,7 @@
                         </div>
                         <div>
                             <h1 class="font-black text-xs sm:text-sm uppercase tracking-wider">PHỤ KIỆN HOÀNG ĐẾ</h1>
-                            <p class="text-[11px] sm:text-xs opacity-75">Nhân sự: <span class="font-bold text-amber-500">${user.fullname}</span> (${db.settings?.deviceMode === 'pc' ? 'Chế độ PC' : 'Chế độ Mobile'} • Bản 32)</p>
+                            <p class="text-[11px] sm:text-xs opacity-75">Nhân sự: <span class="font-bold text-amber-500">${user.fullname}</span> (${db.settings?.deviceMode === 'pc' ? 'Chế độ PC' : 'Chế độ Mobile'} • Bản 33)</p>
                         </div>
                     </div>
                     <div class="flex space-x-2 w-full sm:w-auto justify-end">
@@ -1309,7 +1310,7 @@
         }
 
 
-        // ===== Bản 32: tìm cửa hàng, lọc tỉnh/quận có ô tìm =====
+        // ===== Bản 33: tìm cửa hàng, lọc tỉnh/quận có ô tìm =====
         let storeQ = '', pickKind = '';
         function storeKey(s) { return normTxt([s.name, s.owner, s.phone, s.address, s.district, s.city].join(' ')); }
         function storeMatch(s) { const k = normTxt(storeQ).trim(); return !k || storeKey(s).includes(k); }
@@ -1758,7 +1759,7 @@
         }
 
 
-        // ===== Bản 32: doanh thu, xem bill, dung lượng =====
+        // ===== Bản 33: doanh thu, xem bill, dung lượng =====
         function dayKeyOf(t) { return typeof t === 'string' ? t.trim().split(/\s+/).pop() : ''; }
         function parseMoneyStr(x) { const m = String(x || '').match(/([\d.,]+)\s*đ/); return m ? (parseInt(m[1].replace(/[.,]/g, '')) || 0) : 0; }
         function saleNet(h) { return typeof h.net === 'number' ? h.net : moneyOf(h.note); }
@@ -1883,7 +1884,7 @@
         }
 
 
-        // ===== Bản 32: nhập nhanh bằng văn bản/ảnh, trả hàng về kho =====
+        // ===== Bản 33: nhập nhanh bằng văn bản/ảnh, trả hàng về kho =====
         const QI_UNITS = 'cái|chiếc|bộ|sợi|cuộn|hộp|thùng|chai|đôi|cặp|pcs|pc|cây';
         const COLOR_RE = /(^|[^\p{L}])(?:màu\s+)?(đen|trắng|xanh\s+(?:lá|dương|ngọc|rêu|navy|lam|biển)|xanh|ghi|xám|hồng|đỏ|vàng|tím|cam|nâu|bạc|den|trang|hong|vang|tim|nau|bac|black|white|blue|gr[ae]y|silver|pink|red)(?![\p{L}])/iu;
         const COLOR_MAP = { den: 'Đen', trang: 'Trắng', hong: 'Hồng', vang: 'Vàng', tim: 'Tím', nau: 'Nâu', bac: 'Bạc', black: 'Đen', white: 'Trắng', blue: 'Xanh', gray: 'Ghi', grey: 'Ghi', 'xám': 'Ghi', silver: 'Bạc', pink: 'Hồng', red: 'Đỏ' };
@@ -1955,7 +1956,7 @@
         }
         function qiTok(x) { return new Set(normTxt(x).split(/[^a-z0-9]+/).filter(Boolean)); }
         function qiJac(a, b) { let i = 0; a.forEach(x => { if (b.has(x)) i++; }); const u = a.size + b.size - i; return u ? i / u : 0; }
-        // ----- Bản 32: bỏ VT, tách biến thể "Chân ...", màu; đối chiếu thông minh theo mã / viết tắt / số -----
+        // ----- Bản 33: bỏ VT, tách biến thể "Chân ...", màu; đối chiếu thông minh theo mã / viết tắt / số -----
         const QI_SEED = ['cáp', 'sạc', 'tai', 'nghe', 'củ', 'bộ', 'loa', 'quạt', 'kính', 'cường', 'lực', 'ốp', 'lưng', 'dự', 'phòng', 'đồng', 'hồ', 'dây', 'đeo', 'giá', 'đỡ', 'không', 'đầu', 'chân', 'chuyển', 'thẻ', 'nhớ', 'nhanh', 'thông', 'minh', 'trẻ', 'em', 'điện', 'thoại', 'máy', 'đèn', 'gậy', 'chụp', 'ảnh', 'túi', 'bình', 'nước', 'đen', 'trắng', 'xanh', 'ghi', 'xám', 'hồng', 'đỏ', 'vàng', 'tím', 'cam', 'nâu', 'bạc', 'bluetooth', 'iphone', 'samsung', 'type', 'usb', 'lightning', 'micro', 'wekome', 'picom', 'remax', 'hoco', 'combo', 'mini', 'pro', 'max', 'plus', 'ultra', 'chống', 'nước', 'siêu', 'bền', 'cổng'];
         let QI_VOC = null, QI_VOC_N = -1;
         function qiLev(a, b) {
@@ -2254,7 +2255,7 @@
         }
 
 
-        // ===== Bản 32: đọc hóa đơn dạng bảng (Sapo...) =====
+        // ===== Bản 33: đọc hóa đơn dạng bảng (Sapo...) =====
         const INV_SKIP = /(^|\s)(hoa don|giao hang|khach le|dien thoai|email|luu y|vui long|tong so|tong chiet|tong tien|tong cong|tong|ma don|ngay tao|nhan vien|chi tiet don|sapo|stt|ma sp|masp|ten sp|so luong|luong|don gia|chiet khau|thanh tien|bao hanh|dia chi|kieu nai|chung toi|hang hoa|cam on|trang thai)(\s|:|$)/;
         function qiNum(tok) {
             const t = String(tok).replace(/^[^\d]+|[^\d]+$/g, '');
@@ -2380,7 +2381,7 @@
             return { rows: out, totals: { qty: mq ? parseInt(mq[1]) : null, money: mm ? qiNum(mm[1]) : null } };
         }
         let qiTotals = null;
-        // ----- Bản 32: dán bảng hóa đơn (STT | Mã SP | Tên | BH | SL | Đơn giá | CK | Thành tiền) -----
+        // ----- Bản 33: dán bảng hóa đơn (STT | Mã SP | Tên | BH | SL | Đơn giá | CK | Thành tiền) -----
         let qiSrc = 'text';
         const QI_CODE_RE = /^[A-Za-z]{1,6}\d{2,}[A-Za-z0-9\-]*$/;
         function qiRecordToRow(cells) {
@@ -2444,7 +2445,7 @@
             });
             return rows;
         }
-        // ----- Bản 32: dựng lại bảng theo HÀNG NGANG từ vị trí từng chữ trong ảnh -----
+        // ----- Bản 33: dựng lại bảng theo HÀNG NGANG từ vị trí từng chữ trong ảnh -----
         function qiRowLines(gray, w, h) {
             const ys = [];
             for (let y = 0; y < h; y++) {
@@ -2567,7 +2568,7 @@
             openQuickConfirm(txt);
         }
         function openQuickConfirm(rawText, src) {
-            qiSrc = src || 'text';
+            qiSrc = src || 'text'; qiManualTotal = null;
             document.getElementById('qc-raw').value = rawText;
             qiRows = qiParse(rawText);
             closeQuickImport();
@@ -2691,6 +2692,82 @@
                 bn.className = 'mx-4 mt-3 p-3 rounded-xl text-xs font-semibold border ' + (okQ && okM ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-amber-500/10 border-amber-500/40 text-amber-500');
                 bn.innerHTML = `Hóa đơn ghi: ${qiTotals.qty != null ? qiTotals.qty + ' sản phẩm' : ''}${qiTotals.money != null ? ' • ' + qiTotals.money.toLocaleString() + ' đ' : ''}<br>Đọc được: ${q} sản phẩm • ${money.toLocaleString()} đ — ${okQ && okM ? '✔ KHỚP' : '⚠ CHƯA KHỚP, hãy kiểm tra lại từng dòng'}`;
             } else bn.className = 'hidden';
+            bn.className = 'hidden';
+            try { qcRenderRecon(); } catch (e) { console.error(e); }
+        }
+        // ----- ĐỐI CHIẾU TỔNG TIỀN HÓA ĐƠN + TỰ ĐỘNG SỬA -----
+        let qiManualTotal = null;
+        function qiRecon() {
+            const rows = [];
+            qiRows.forEach((r, i) => { if (!(r.name && r.qty > 0)) return; const x = resolveRow(r), b = x.exact || x.matched, pr = Number(r.price) > 0 ? Number(r.price) : 0; rows.push({ r, i, b, q: r.qty, p: pr, unit: pr || ((b && b.price) || 0), t: Number(r.total) || 0 }); });
+            const cur = rows.reduce((a, o) => a + o.q * o.unit, 0), qty = rows.reduce((a, o) => a + o.q, 0);
+            const target = qiManualTotal > 0 ? qiManualTotal : (qiTotals && qiTotals.money > 0 ? qiTotals.money : null);
+            const fixes = [], notes = [];
+            let sim = cur;
+            rows.forEach(o => {
+                const { q, p, t, b } = o, stockP = (b && b.price) || 0;
+                if (!(t > 0)) return;
+                if (q * o.unit === t) return;
+                const cQ = (p > 0 && t % p === 0 && t / p >= 1 && t / p <= 9999) ? t / p : null;
+                const cP = (q > 0 && t % q === 0 && t / q >= 100) ? t / q : null;
+                let pick = null;
+                if (cQ && cP) {
+                    if (cP === stockP) pick = 'price'; else if (cQ === q) pick = 'price'; else if (cP === p) pick = 'qty';
+                    else pick = (cP % 500 !== 0 && cQ) ? 'qty' : (Math.abs(cQ - q) / q <= Math.abs(cP - p) / (p || 1) ? 'qty' : 'price');
+                } else if (cP && (p === 0 || !cQ)) pick = 'price'; else if (cQ) pick = 'qty';
+                const why = p === 0 ? `chưa có giá hóa đơn (đang lấy giá kho ${o.unit.toLocaleString()} đ)` : `${q} × ${p.toLocaleString()} = ${(q * p).toLocaleString()} đ ≠ thành tiền ${t.toLocaleString()} đ`;
+                if (pick === 'price') { fixes.push({ i: o.i, kind: 'price', val: cP, why, msg: `đơn giá → ${cP.toLocaleString()} đ` }); sim += q * cP - q * o.unit; }
+                else if (pick === 'qty') { fixes.push({ i: o.i, kind: 'qty', val: cQ, why, msg: `số lượng → ${cQ}` }); sim += cQ * o.unit - q * o.unit; }
+                else notes.push({ i: o.i, msg: `${why} — không chia hết, hãy kiểm tra tay` });
+            });
+            // đồng bộ giá: dòng chưa có giá hóa đơn nhưng có thành tiền đã xử lý ở trên; dòng khác sai giá kho
+            const gap = target != null ? target - sim : null;
+            let cands = [];
+            if (gap) {
+                const fixedIdx = new Set(fixes.map(f => f.i));
+                rows.forEach(o => {
+                    if (fixedIdx.has(o.i) || !(o.unit > 0)) return;
+                    const stockP = (o.b && o.b.price) || 0;
+                    if (gap % o.unit === 0) { const nq = o.q + gap / o.unit; if (nq >= 1 && nq <= 9999) cands.push({ i: o.i, kind: 'qty', val: nq, msg: `số lượng ${o.q} → ${nq}`, score: 10 - Math.min(9, Math.abs(nq - o.q)) + (o.r.fixed ? 6 : 0) }); }
+                    if (gap % o.q === 0) { const np = o.unit + gap / o.q; if (np >= 100 && np % 100 === 0) cands.push({ i: o.i, kind: 'price', val: np, msg: `đơn giá ${o.unit.toLocaleString()} → ${np.toLocaleString()} đ`, score: 8 + (np % 1000 === 0 ? 4 : np % 500 === 0 ? 2 : 0) + (np === stockP ? 6 : 0) - (Math.abs(np - o.unit) > o.unit * 0.5 ? 6 : 0) + (o.p === 0 ? 3 : 0) }); }
+                });
+                cands.sort((a, b) => b.score - a.score); cands = cands.slice(0, 6);
+            }
+            const lineSum = rows.some(o => o.t > 0) ? rows.reduce((a, o) => a + (o.t > 0 ? o.t : o.q * o.unit), 0) : null;
+            return { rows, cur, qty, target, gap, fixes, notes, cands, lineSum, sim };
+        }
+        function qcSetTotal(v) { const n = parseInt(String(v).replace(/[^\d]/g, '')) || 0; qiManualTotal = n > 0 ? n : null; updateQcSummary(); }
+        function qcApply(i, kind, val) { syncQiFromDom(); const r = qiRows[i]; if (!r) return; if (kind === 'qty') r.qty = val; else r.price = String(val); renderQuickConfirm(); }
+        function qcAutoFix() {
+            syncQiFromDom(); let R = qiRecon(), n = 0;
+            R.fixes.forEach(f => { const r = qiRows[f.i]; if (!r) return; if (f.kind === 'qty') r.qty = f.val; else r.price = String(f.val); n++; });
+            R = qiRecon(); let extra = '';
+            if (R.gap && R.cands.length && (R.cands.length === 1 || R.cands[0].score > R.cands[1].score)) { const c = R.cands[0], r = qiRows[c.i]; if (c.kind === 'qty') r.qty = c.val; else r.price = String(c.val); n++; extra = `\n• Dòng ${c.i + 1}: ${c.msg}`; }
+            renderQuickConfirm();
+            const R2 = qiRecon();
+            alert(n ? `Đã tự động sửa ${n} chỗ theo hóa đơn.${extra}\n` + (R2.target != null ? (R2.gap ? `Còn lệch ${Math.abs(R2.gap).toLocaleString()} đ — xem gợi ý trong khung đối chiếu.` : '✔ Tổng tiền đã khớp hóa đơn.') : '') : 'Không có chỗ nào app tự sửa được chắc chắn. Xem danh sách gợi ý trong khung đối chiếu.');
+        }
+        function qcRenderRecon() {
+            const el = document.getElementById('qc-recon'); if (!el) return;
+            if (!qiRows.some(r => r.name && r.qty > 0)) { el.className = 'hidden'; return; }
+            const R = qiRecon(), ok = R.target != null && !R.gap && !R.fixes.length && !R.notes.length;
+            const L = n => Number(n).toLocaleString();
+            let h = `<div class="font-bold ${ok ? 'text-emerald-400' : (R.target == null && !R.fixes.length && !R.notes.length ? 'opacity-90' : 'text-amber-500')}">${ok ? '✔ Khớp tổng tiền hóa đơn' : (R.target == null && !R.fixes.length && !R.notes.length ? 'Đối chiếu tổng tiền hóa đơn' : '⚠ Có sai lệch so với hóa đơn')}</div>`;
+            h += `<div class="flex items-center gap-2 mt-1.5 flex-wrap"><span>Tổng hóa đơn:</span><input type="text" inputmode="numeric" value="${R.target != null ? L(R.target) : ''}" placeholder="nhập tổng tiền trên hóa đơn" onchange="qcSetTotal(this.value)" class="flex-1 min-w-[8rem] px-2 py-1.5 rounded-lg bg-theme-input border border-theme-border outline-none text-xs font-bold"><span>đ</span></div>`;
+            h += `<div class="mt-1">Đọc được: <b>${R.qty} cái • ${L(R.cur)} đ</b>` + (R.target != null && R.cur !== R.target ? ` • lệch <b class="text-rose-400">${R.cur > R.target ? '+' : '−'}${L(Math.abs(R.cur - R.target))} đ</b>` : '') + `</div>`;
+            if (R.lineSum != null && R.target != null && R.lineSum !== R.target) h += `<div class="mt-1 text-amber-500">Cộng các "thành tiền" từng dòng trên hóa đơn = ${L(R.lineSum)} đ ≠ tổng hóa đơn ${L(R.target)} đ → có thể thiếu/thừa dòng, hoặc hóa đơn có chiết khấu/phí.</div>`;
+            if (R.fixes.length) {
+                h += `<div class="mt-2 font-semibold text-amber-500">Sai lệch tìm thấy (${R.fixes.length}):</div>` + R.fixes.map(f => `<div class="mt-1 cursor-pointer" onclick="qcGoRow(${f.i})">• Dòng ${f.i + 1}: <b>${escHtml(qiRows[f.i].name)}</b> — ${escHtml(f.why)}<br><span class="text-emerald-400 font-bold">Sửa: ${f.msg}</span></div>`).join('');
+            }
+            R.notes.forEach(n => { h += `<div class="mt-1 text-rose-400 cursor-pointer" onclick="qcGoRow(${n.i})">• Dòng ${n.i + 1}: ${escHtml(n.msg)}</div>`; });
+            if (R.gap) {
+                h += `<div class="mt-2 font-semibold text-amber-500">${R.fixes.length ? 'Sau khi sửa vẫn' : 'Còn'} ${R.gap > 0 ? 'thiếu' : 'thừa'} ${L(Math.abs(R.gap))} đ so với hóa đơn.</div>`;
+                if (R.cands.length) h += `<div class="opacity-80">Có thể do dòng nào đó đọc sai, bấm để áp dụng:</div>` + R.cands.map(c => `<div class="mt-1 flex items-center justify-between gap-2"><span class="cursor-pointer" onclick="qcGoRow(${c.i})">Dòng ${c.i + 1} <b>${escHtml(qiRows[c.i].name)}</b>: ${c.msg}</span><button type="button" onclick="qcApply(${c.i},'${c.kind}',${c.val})" class="shrink-0 px-2 py-1 rounded-lg bg-amber-500 text-slate-950 font-bold">Áp dụng</button></div>`).join('');
+                else h += `<div class="opacity-80">Không có dòng nào sửa 1 chỗ là khớp — có thể thiếu 1 dòng sản phẩm, hóa đơn có chiết khấu/phí vận chuyển, hoặc sai nhiều dòng. Bấm "Thêm dòng" hoặc sửa tay.</div>`;
+            }
+            if (R.fixes.length || (R.gap && R.cands.length)) h += `<button type="button" onclick="qcAutoFix()" class="mt-2 w-full py-2.5 rounded-xl bg-emerald-500 text-slate-950 font-bold"><i class="fa-solid fa-wand-magic-sparkles mr-1"></i>Tự động sửa theo hóa đơn</button>`;
+            el.className = 'mx-4 mt-3 p-3 rounded-xl text-xs border max-h-[38vh] overflow-y-auto ' + (ok ? 'border-emerald-500/40 bg-emerald-500/10' : 'border-amber-500/40 bg-amber-500/10');
+            el.innerHTML = h;
         }
         function confirmQuickImport() {
             syncQiFromDom();
@@ -2700,6 +2777,7 @@
             if (noPrice.length && !confirm(`${noPrice.length} sản phẩm mới chưa có giá bán (sẽ lưu 0 đ, sửa sau ở Bảng Tổng). Vẫn nhập kho?`)) return;
             const conf = rows.map(r => ({ r, x: resolveRow(r) })).filter(o => o.x.conflict);
             if (conf.length && !confirm(`⚠ ${conf.length} dòng trùng mã SP trong kho nhưng sai tên/biến thể/màu:\n\n` + conf.map(o => `- ${o.r.code}: hóa đơn "${o.r.name}" ↔ kho "${o.x.exact.name}" (${o.x.conflict})`).join('\n') + '\n\nBấm OK để vẫn cộng vào sản phẩm theo mã. Bấm Hủy để quay lại sửa.')) return;
+            { const RC = qiRecon(); if (RC.target != null && RC.cur !== RC.target && !confirm(`⚠ Tổng tiền đọc được ${RC.cur.toLocaleString()} đ lệch ${Math.abs(RC.cur - RC.target).toLocaleString()} đ so với hóa đơn ${RC.target.toLocaleString()} đ.\n\nBấm Hủy để quay lại bấm "Tự động sửa theo hóa đơn", hoặc OK để vẫn nhập kho.`)) return; }
             const dups = rows.map((r, i) => ({ r, x: resolveRow(r) })).filter(o => o.x.dupName);
             if (dups.length) { alert('⚠ Có ' + dups.length + ' dòng trùng tên và khác giá nhưng chưa chọn biến thể khác:\n\n' + dups.map(o => '- ' + o.x.final + ' (hóa đơn ' + (Number(o.r.price) || 0).toLocaleString() + ' đ)').join('\n') + '\n\nHãy chọn biến thể khác ở dòng đó, hoặc đổi cách xử lý thành "cập nhật giá kho" / "giữ giá kho".'); const k = qiRows.findIndex(r => r === dups[0].r); if (k >= 0) qcGoRow(k); return; }
             const done = []; let grand = 0;
@@ -3423,7 +3501,7 @@
             return blocks;
         }
 
-        // ===== Bản 32: báo cáo toàn bộ lịch sử + bill chi tiết =====
+        // ===== Bản 33: báo cáo toàn bộ lịch sử + bill chi tiết =====
         let reportMode = 'day', reportToken = 0;
         const rpFmt = n => Number(n || 0).toLocaleString('vi-VN');
         function parseDayKey(k) { const m = String(k).match(/^(\d+)\/(\d+)\/(\d+)$/); return m ? new Date(+m[3], +m[2] - 1, +m[1]).getTime() : 0; }
@@ -3732,7 +3810,7 @@
             }
         }
 
-        // ===== Bản 32: tiện ích nhóm / mã / biến thể =====
+        // ===== Bản 33: tiện ích nhóm / mã / biến thể =====
         const CABLE_VARIANTS = ['USB - micro', 'USB - Type C', 'USB sang Lightning', 'C to C', 'Type C - Lightning'];
         let importFilter = { q: '', cat: '' };
         let manualVariant = '';
@@ -3744,7 +3822,7 @@
         let masterCollapsed = {};
 
         function normTxt(t) { return String(t == null ? '' : t).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd'); }
-        function isCableCat(c) { return true; /* Bản 32: biến thể dùng cho mọi nhóm */ }
+        function isCableCat(c) { return true; /* Bản 33: biến thể dùng cho mọi nhóm */ }
         function prodCode(p) { return p.code || String(p.id).slice(-6); }
         function newProductCode() {
             let mx = 0; (db.productsMaster || []).forEach(p => { const m = /^SP(\d+)$/.exec(p.code || ''); if (m) mx = Math.max(mx, parseInt(m[1])); });
@@ -3781,7 +3859,7 @@
             saveData(); render();
             alert('Đã thêm ' + list.length + ' sản phẩm vào ' + db.categories.length + ' nhóm.');
         }
-        // ===== Bản 32: biến thể / màu tự thêm, lưu vĩnh viễn =====
+        // ===== Bản 33: biến thể / màu tự thêm, lưu vĩnh viễn =====
         function loadCustomLists() {
             const st = db.settings || (db.settings = {});
             if (!Array.isArray(st.customVariants)) st.customVariants = [];
