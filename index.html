@@ -787,7 +787,7 @@
             db.users.forEach(u => { if (!u.permissions) u.permissions = { stores: true, master: true, warehouse: true, history: true }; });
         }
 
-        // ===== Bản 37: ảnh lưu trong IndexedDB, chữ lưu trong localStorage =====
+        // ===== Bản 38: ảnh lưu trong IndexedDB, chữ lưu trong localStorage =====
         const PHOTO_KEYS = new Set(['photo', 'photos', 'storePhoto', 'img']);
         const IDB = { db: null, known: new Set() };
         function idbOpen() {
@@ -1285,7 +1285,7 @@
                         </div>
                         <div>
                             <h1 class="font-black text-xs sm:text-sm uppercase tracking-wider">PHỤ KIỆN HOÀNG ĐẾ</h1>
-                            <p class="text-[11px] sm:text-xs opacity-75">Nhân sự: <span class="font-bold text-amber-500">${user.fullname}</span> (${db.settings?.deviceMode === 'pc' ? 'Chế độ PC' : 'Chế độ Mobile'} • Bản 37)</p>
+                            <p class="text-[11px] sm:text-xs opacity-75">Nhân sự: <span class="font-bold text-amber-500">${user.fullname}</span> (${db.settings?.deviceMode === 'pc' ? 'Chế độ PC' : 'Chế độ Mobile'} • Bản 38)</p>
                         </div>
                     </div>
                     <div class="flex space-x-2 w-full sm:w-auto justify-end">
@@ -1309,7 +1309,7 @@
         }
 
 
-        // ===== Bản 37: tìm cửa hàng, lọc tỉnh/quận có ô tìm =====
+        // ===== Bản 38: tìm cửa hàng, lọc tỉnh/quận có ô tìm =====
         let storeQ = '', pickKind = '';
         function storeKey(s) { return normTxt([s.name, s.owner, s.phone, s.address, s.district, s.city].join(' ')); }
         function storeMatch(s) { const k = normTxt(storeQ).trim(); return !k || storeKey(s).includes(k); }
@@ -1758,7 +1758,7 @@
         }
 
 
-        // ===== Bản 37: doanh thu, xem bill, dung lượng =====
+        // ===== Bản 38: doanh thu, xem bill, dung lượng =====
         function dayKeyOf(t) { return typeof t === 'string' ? t.trim().split(/\s+/).pop() : ''; }
         function parseMoneyStr(x) { const m = String(x || '').match(/([\d.,]+)\s*đ/); return m ? (parseInt(m[1].replace(/[.,]/g, '')) || 0) : 0; }
         function saleNet(h) { return typeof h.net === 'number' ? h.net : moneyOf(h.note); }
@@ -1883,9 +1883,9 @@
         }
 
 
-        // ===== Bản 37: nhập nhanh bằng văn bản/ảnh, trả hàng về kho =====
+        // ===== Bản 38: nhập nhanh bằng văn bản/ảnh, trả hàng về kho =====
         const QI_UNITS = 'cái|chiếc|bộ|sợi|cuộn|hộp|thùng|chai|đôi|cặp|pcs|pc|cây';
-        const COLOR_RE = /(^|[^\p{L}])(?:màu\s+)?(đen|trắng|xanh\s+(?:lá|dương|ngọc|rêu|navy|lam|biển)|xanh|ghi|xám|hồng|đỏ|vàng|tím|cam|nâu|bạc|den|trang|hong|vang|tim|nau|bac|black|white|blue|gr[ae]y|silver|pink|red)(?![\p{L}])/iu;
+        const COLOR_RE = /(^|[^\p{L}])(?:màu\s+)?(đen|trắng|xanh\s+(?:lá|dương|ngọc|rêu|navy|lam|biển|đậm|nhạt|da trời)|hồng\s+(?:đậm|nhạt|phấn|pastel)|xanh|ghi|xám|hồng|đỏ|vàng|tím|cam|nâu|bạc|den|trang|hong|vang|tim|nau|bac|black|white|blue|gr[ae]y|silver|pink|red)(?![\p{L}])/iu;
         const COLOR_MAP = { den: 'Đen', trang: 'Trắng', hong: 'Hồng', vang: 'Vàng', tim: 'Tím', nau: 'Nâu', bac: 'Bạc', black: 'Đen', white: 'Trắng', blue: 'Xanh', gray: 'Ghi', grey: 'Ghi', 'xám': 'Ghi', silver: 'Bạc', pink: 'Hồng', red: 'Đỏ' };
         const VARIANT_RULES = [
             [/(type\s*-?\s*c|typec|tyce\s*c|\bc\b)\s*(?:to|sang|ra|->|→|-)\s*(?:lightning|lightening|ip\b|iphone)/i, 'Type C - Lightning'],
@@ -1955,7 +1955,7 @@
         }
         function qiTok(x) { return new Set(normTxt(x).split(/[^a-z0-9]+/).filter(Boolean)); }
         function qiJac(a, b) { let i = 0; a.forEach(x => { if (b.has(x)) i++; }); const u = a.size + b.size - i; return u ? i / u : 0; }
-        // ----- Bản 37: bỏ VT, tách biến thể "Chân ...", màu; đối chiếu thông minh theo mã / viết tắt / số -----
+        // ----- Bản 38: bỏ VT, tách biến thể "Chân ...", màu; đối chiếu thông minh theo mã / viết tắt / số -----
         const QI_SEED = ['cáp', 'sạc', 'tai', 'nghe', 'củ', 'bộ', 'loa', 'quạt', 'kính', 'cường', 'lực', 'ốp', 'lưng', 'dự', 'phòng', 'đồng', 'hồ', 'dây', 'đeo', 'giá', 'đỡ', 'không', 'đầu', 'chân', 'chuyển', 'thẻ', 'nhớ', 'nhanh', 'thông', 'minh', 'trẻ', 'em', 'điện', 'thoại', 'máy', 'đèn', 'gậy', 'chụp', 'ảnh', 'túi', 'bình', 'nước', 'đen', 'trắng', 'xanh', 'ghi', 'xám', 'hồng', 'đỏ', 'vàng', 'tím', 'cam', 'nâu', 'bạc', 'bluetooth', 'iphone', 'samsung', 'type', 'usb', 'lightning', 'micro', 'wekome', 'picom', 'remax', 'hoco', 'combo', 'mini', 'pro', 'max', 'plus', 'ultra', 'chống', 'nước', 'siêu', 'bền', 'cổng'];
         let QI_VOC = null, QI_VOC_N = -1;
         function qiLev(a, b) {
@@ -2256,7 +2256,7 @@
         }
 
 
-        // ===== Bản 37: đọc hóa đơn dạng bảng (Sapo...) =====
+        // ===== Bản 38: đọc hóa đơn dạng bảng (Sapo...) =====
         const INV_SKIP = /(^|\s)(hoa don|giao hang|khach le|dien thoai|email|luu y|vui long|tong so|tong chiet|tong tien|tong cong|tong|ma don|ngay tao|nhan vien|chi tiet don|sapo|stt|ma sp|masp|ten sp|so luong|luong|don gia|chiet khau|thanh tien|bao hanh|dia chi|kieu nai|chung toi|hang hoa|cam on|trang thai)(\s|:|$)/;
         function qiNum(tok) {
             const t = String(tok).replace(/^[^\d]+|[^\d]+$/g, '');
@@ -2392,7 +2392,7 @@
             if (vals.length) return (qiSrc === 'ocrtab' || qiSrc === 'ocr') ? vals.reduce((a, b) => a + b, 0) : vals[vals.length - 1];
             return mm ? qiNum(mm[1]) : null;
         }
-        // ----- Bản 37: dán bảng hóa đơn (STT | Mã SP | Tên | BH | SL | Đơn giá | CK | Thành tiền) -----
+        // ----- Bản 38: dán bảng hóa đơn (STT | Mã SP | Tên | BH | SL | Đơn giá | CK | Thành tiền) -----
         let qiSrc = 'text';
         const QI_CODE_RE = /^[A-Za-z]{1,6}\d{2,}[A-Za-z0-9\-]*$/;
         function qiRecordToRow(cells) {
@@ -2456,7 +2456,7 @@
             });
             return rows;
         }
-        // ----- Bản 37: dựng lại bảng theo HÀNG NGANG từ vị trí từng chữ trong ảnh -----
+        // ----- Bản 38: dựng lại bảng theo HÀNG NGANG từ vị trí từng chữ trong ảnh -----
         function qiRowLines(gray, w, h) {
             const ys = [];
             for (let y = 0; y < h; y++) {
@@ -2921,9 +2921,16 @@
             row.push(cur); rows.push(row);
             return rows.filter(r => r.some(x => x.trim())).map(r => r.map(x => x.replace(/\t/g, ' ').trim()));
         }
-        function loadPdfJs() {
+        async function loadPdfJs() {
+            if (window.pdfjsLib) return window.pdfjsLib;
+            const base = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@6.2.108/legacy/build/';
+            try {
+                const m = await import(base + 'pdf.min.mjs');
+                const code = await (await fetch(base + 'pdf.worker.min.mjs')).text();
+                m.GlobalWorkerOptions.workerSrc = URL.createObjectURL(new Blob([code], { type: 'text/javascript' }));
+                window.pdfjsLib = m; return m;
+            } catch (e) { console.warn('pdf.js mới không tải được, dùng bản dự phòng', e); }
             return new Promise((res, rej) => {
-                if (window.pdfjsLib) return res(window.pdfjsLib);
                 const sc = document.createElement('script');
                 sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
                 sc.onload = () => { try { window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'; res(window.pdfjsLib); } catch (e) { rej(e); } };
@@ -2931,7 +2938,47 @@
                 document.head.appendChild(sc);
             });
         }
-        // PDF có chữ: lấy từng từ + vị trí -> dựng lại bảng đúng như ảnh (xử lý tên SP xuống dòng)
+        // Vẽ trang PDF ra ảnh để tìm đường kẻ ngang/dọc của bảng -> mỗi ô đọc riêng, không bao giờ lẫn cột
+        async function qiPdfPageLines(page, S) {
+            const vp = page.getViewport({ scale: S }), W = Math.round(vp.width), H = Math.round(vp.height);
+            const c = document.createElement('canvas'); c.width = W; c.height = H;
+            const cx = c.getContext('2d', { willReadFrequently: true }); cx.fillStyle = '#fff'; cx.fillRect(0, 0, W, H);
+            await page.render({ canvasContext: cx, viewport: vp }).promise;
+            const d = cx.getImageData(0, 0, W, H).data, dark = new Uint8Array(W * H);
+            for (let i = 0, k = 0; i < d.length; i += 4, k++) dark[k] = (d[i] * .299 + d[i + 1] * .587 + d[i + 2] * .114) < 175 ? 1 : 0;
+            const group = (flags, thick) => { const o = []; let st = -1; for (let i = 0; i <= flags.length; i++) { const f = i < flags.length && flags[i]; if (f && st < 0) st = i; if (!f && st >= 0) { if (i - st > thick) { o.push(st); o.push(i - 1); } else o.push((st + i - 1) / 2); st = -1; } } return o; };
+            const hr = new Int32Array(H); let hmax = 0;
+            for (let y = 0; y < H; y++) { let run = 0, best = 0; const o = y * W; for (let x = 0; x < W; x++) { if (dark[o + x]) { run++; if (run > best) best = run; } else run = 0; } hr[y] = best; if (best > hmax) hmax = best; }
+            const hthr = Math.max(0.45 * hmax, 0.3 * W), hy = group(Array.from(hr, v => v >= hthr), 6);
+            if (hy.length < 3) return null;
+            const yTop = Math.floor(hy[0]), yBot = Math.ceil(hy[hy.length - 1]), vr = new Int32Array(W);
+            for (let x = 0; x < W; x++) { let run = 0, best = 0; for (let y = yTop; y <= yBot; y++) { if (dark[y * W + x]) { run++; if (run > best) best = run; } else run = 0; } vr[x] = best; }
+            const vthr = 0.5 * (yBot - yTop), vx = group(Array.from(vr, v => v >= vthr), 6);
+            if (vx.length < 4) return null;
+            return { hy, vx };
+        }
+        function qiPdfGridLines(pages) {
+            const out = []; let hdr = null, ncol = 0;
+            const idxOf = (arr, v) => { for (let i = 0; i + 1 < arr.length; i++) if (v >= arr[i] && v < arr[i + 1]) return i; return -1; };
+            for (const pg of pages) {
+                if (!pg.hy || !pg.vx) continue;
+                const R = pg.hy.length - 1, C = pg.vx.length - 1, cells = Array.from({ length: R }, () => Array.from({ length: C }, () => []));
+                pg.words.forEach(w => { const r = idxOf(pg.hy, (w.bbox.y0 + w.bbox.y1) / 2), c = idxOf(pg.vx, (w.bbox.x0 + w.bbox.x1) / 2); if (r >= 0 && c >= 0) cells[r][c].push(w); });
+                const tx = cells.map(row => row.map(list => {
+                    if (!list.length) return '';
+                    const mh = qiMedian(list.map(w => w.bbox.y1 - w.bbox.y0)) || 10, ls = [];
+                    list.slice().sort((a, b) => (a.bbox.y0 + a.bbox.y1) - (b.bbox.y0 + b.bbox.y1)).forEach(w => { const yc = (w.bbox.y0 + w.bbox.y1) / 2, l = ls[ls.length - 1]; if (l && Math.abs(yc - l.yc) < 0.55 * mh) l.ws.push(w); else ls.push({ yc, ws: [w] }); });
+                    return ls.map(l => l.ws.sort((a, b) => a.bbox.x0 - b.bbox.x0).map(w => w.text).join(' ')).join(' ');
+                }));
+                tx.forEach(row => {
+                    if (!row.some(x => x)) return;
+                    const t = row.map(qiHdrType);
+                    if (t.filter(Boolean).length >= 3 && t.includes('qty')) { if (!hdr) { hdr = row; ncol = C; out.unshift(row); } return; }
+                    if (hdr && C === ncol) out.push(row);
+                });
+            }
+            return hdr && out.length > 2 ? out : null;
+        }
         const QI_HDR = [
             ['stt', /^(stt|tt|#|so tt)$/], ['code', /^(ma|ma (sp|hang|sku|san pham|hang hoa|vach)|sku|barcode)$/],
             ['warr', /(bao hanh|^bh$)/], ['unit', /^(don vi|dvt|dv|don vi tinh)$/],
@@ -2989,6 +3036,16 @@
             if (!lines.length) return qiGridNoHeader(rows);
             return lines.join('\n') + (total ? '\nTổng tiền\t' + fmt(total) : '');
         }
+        function qiTableLines(words, ranges, mh) {   // chỉ giữ các dòng thuộc thân bảng (bỏ ngày giờ in, chân trang, đường dẫn)
+            const L = []; words.slice().sort((a, b) => a.yc - b.yc).forEach(w => { const l = L[L.length - 1]; if (l && Math.abs(w.yc - l.yc) <= 0.45 * mh) { l.ws.push(w); l.yc = l.ws.reduce((a, z) => a + z.yc, 0) / l.ws.length; } else L.push({ yc: w.yc, ws: [w] }); });
+            const idx = []; L.forEach((l, i) => { if (l.ws.some(w => w.n !== null && ranges.some(r => w.xc >= r[0] && w.xc <= r[1]))) idx.push(i); });
+            if (!idx.length) return words;
+            let a = idx[0], b = idx[idx.length - 1]; const gp = []; for (let i = a; i < b; i++) gp.push(L[i + 1].yc - L[i].yc);
+            const mg = qiMedian(gp) || 2 * mh;
+            while (a > 0 && L[a].yc - L[a - 1].yc <= 1.9 * mg) a--;
+            while (b + 1 < L.length && L[b + 1].yc - L[b].yc <= 1.9 * mg) b++;
+            return L.slice(a, b + 1).flatMap(l => l.ws);
+        }
         // PDF có chữ: dựng lại bảng theo cột (tự tìm dòng tiêu đề + khoảng trống giữa các cột), xử lý ô xuống dòng
         function qiPdfGrid(pages) {
             const HK = /^(stt|ma|sku|ten|san|pham|hang|hoa|so|luong|sl|don|gia|chiet|khau|ck|thanh|tien|bh|bao|hanh|phien|ban|dvt|vi)$/;
@@ -3019,6 +3076,7 @@
                     hs.forEach(w => { const c = cl[cl.length - 1]; if (c && w.x0 <= c.x1 + 1.0 * mh) { c.ws.push(w); c.x1 = Math.max(c.x1, w.x1); } else cl.push({ ws: [w], x0: w.x0, x1: w.x1 }); });
                     cl.forEach(c => { c.label = c.ws.slice().sort((a, b) => a.yc - b.yc || a.x0 - b.x0).map(w => w.t).join(' '); c.type = qiHdrType(c.label); c.xc = (c.x0 + c.x1) / 2; });
                     data = W.filter(w => w.yc > hdrBottom + 0.1 * mh);
+                    { const rg = cl.filter(c => ['qty', 'price', 'disc', 'total'].includes(c.type)).map(c => [c.x0 - 2.5 * mh, c.x1 + 2.5 * mh]); data = qiTableLines(data, rg, mh); }
                     // phân cột theo khoảng trống dọc
                     const mn = Math.floor(Math.min(...data.map(w => w.x0))), mx = Math.ceil(Math.max(...data.map(w => w.x1))), cov = new Uint8Array(mx - mn + 2);
                     data.forEach(w => { for (let x = Math.floor(w.x0) - mn; x <= Math.ceil(w.x1) - mn; x++) cov[x] = 1; });
@@ -3035,7 +3093,7 @@
                     // đoạn chữ rời nhau cùng thuộc cột Tên SP (vd. ô có từ ngắn) -> gộp với cột tên liền kề
                     for (let k = 0; k < segs.length; k++) if (!segs[k].type && segs[k - 1] && segs[k - 1].type === 'name' && segs[k].x0 - segs[k - 1].x1 < 2.5 * mh) segs[k].type = 'name';
                     if (!out.length) out.push(Array.from(new Set(segs.map(sg2 => sg2.type))).length ? segs.map(sg2 => LAB[sg2.type] || '') : []);
-                } else if (segs && out.length) { data = W.filter(w => w.yc > 0); hdrBottom = -1; } else continue;
+                } else if (segs && out.length) { data = qiTableLines(W, segs.filter(g2 => ['qty', 'price', 'disc', 'total'].includes(g2.type)).map(g2 => [g2.x0 - mh, g2.x1 + mh]), mh); hdrBottom = -1; } else continue;
                 if (!segs.some(sg2 => sg2.type === 'qty') || !segs.some(sg2 => sg2.type === 'name')) continue;
                 const segOf = w => { let b = -1, bd = 1e9; segs.forEach((sg2, k) => { const d = w.xc < sg2.x0 ? sg2.x0 - w.xc : w.xc > sg2.x1 ? w.xc - sg2.x1 : 0; if (d < bd) { bd = d; b = k; } }); return b; };
                 const DL = clusterLines(data, 0.45 * mh);
@@ -3065,7 +3123,7 @@
         }
         async function qiPdfExtract(buf, prog) {
             const lib = await loadPdfJs(), pdf = await lib.getDocument({ data: new Uint8Array(buf) }).promise, S = 2;
-            const parts = [], pagesW = []; let totalWords = 0;
+            const parts = [], pagesW = [], pagesG = []; let totalWords = 0;
             for (let pn = 1; pn <= pdf.numPages; pn++) {
                 if (prog) prog.innerText = 'Đang đọc PDF trang ' + pn + '/' + pdf.numPages + '...';
                 const page = await pdf.getPage(pn), vh = page.getViewport({ scale: 1 }).height, tc = await page.getTextContent(), words = [];
@@ -3079,6 +3137,7 @@
                     }
                 });
                 totalWords += words.length; pagesW.push(words);
+                { let pl = null; try { pl = words.length >= 8 ? await qiPdfPageLines(page, S) : null; } catch (e) { console.warn(e); } pagesG.push({ words, hy: pl && pl.hy, vx: pl && pl.vx }); }
                 let t = null; try { t = words.length >= 8 ? qiWordsToText(words, null) : null; } catch (e) { t = null; }
                 if (!t && words.length) {
                     const rows = []; words.slice().sort((a, b) => a.bbox.y0 - b.bbox.y0 || a.bbox.x0 - b.bbox.x0).forEach(w => { const R = rows[rows.length - 1]; if (R && Math.abs(R.y - w.bbox.y0) < 6) R.ws.push(w); else rows.push({ y: w.bbox.y0, ws: [w] }); });
@@ -3086,7 +3145,9 @@
                 }
                 if (t) parts.push(t);
             }
-            let gt = null; try { gt = qiGridToText(qiPdfGrid(pagesW)); } catch (e) { console.error(e); }
+            let gt = null;
+            try { const g1 = qiPdfGridLines(pagesG); if (g1) gt = qiGridToText(g1); } catch (e) { console.error(e); }
+            if (!gt) { try { gt = qiGridToText(qiPdfGrid(pagesW)); } catch (e) { console.error(e); } }
             return { text: gt || parts.join('\n'), words: totalWords, pdf };
         }
         async function quickFileImport() {
@@ -3726,7 +3787,7 @@
             return blocks;
         }
 
-        // ===== Bản 37: báo cáo toàn bộ lịch sử + bill chi tiết =====
+        // ===== Bản 38: báo cáo toàn bộ lịch sử + bill chi tiết =====
         let reportMode = 'day', reportToken = 0;
         const rpFmt = n => Number(n || 0).toLocaleString('vi-VN');
         function parseDayKey(k) { const m = String(k).match(/^(\d+)\/(\d+)\/(\d+)$/); return m ? new Date(+m[3], +m[2] - 1, +m[1]).getTime() : 0; }
@@ -4035,7 +4096,7 @@
             }
         }
 
-        // ===== Bản 37: tiện ích nhóm / mã / biến thể =====
+        // ===== Bản 38: tiện ích nhóm / mã / biến thể =====
         const CABLE_VARIANTS = ['USB - micro', 'USB - Type C', 'USB sang Lightning', 'C to C', 'Type C - Lightning'];
         let importFilter = { q: '', cat: '' };
         let manualVariant = '';
@@ -4047,7 +4108,7 @@
         let masterCollapsed = {};
 
         function normTxt(t) { return String(t == null ? '' : t).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd'); }
-        function isCableCat(c) { return true; /* Bản 37: biến thể dùng cho mọi nhóm */ }
+        function isCableCat(c) { return true; /* Bản 38: biến thể dùng cho mọi nhóm */ }
         function prodCode(p) { return p.code || String(p.id).slice(-6); }
         function newProductCode() {
             let mx = 0; (db.productsMaster || []).forEach(p => { const m = /^SP(\d+)$/.exec(p.code || ''); if (m) mx = Math.max(mx, parseInt(m[1])); });
@@ -4084,7 +4145,7 @@
             saveData(); render();
             alert('Đã thêm ' + list.length + ' sản phẩm vào ' + db.categories.length + ' nhóm.');
         }
-        // ===== Bản 37: biến thể / màu tự thêm, lưu vĩnh viễn =====
+        // ===== Bản 38: biến thể / màu tự thêm, lưu vĩnh viễn =====
         function loadCustomLists() {
             const st = db.settings || (db.settings = {});
             if (!Array.isArray(st.customVariants)) st.customVariants = [];
