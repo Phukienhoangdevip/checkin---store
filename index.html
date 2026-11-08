@@ -496,7 +496,6 @@
             </div>
             <div class="flex gap-2">
                 <button id="qi-tab-text" onclick="setQiTab('text')" class="flex-1 py-2.5 rounded-xl text-xs font-bold border">Dán văn bản</button>
-                <button id="qi-tab-img" onclick="setQiTab('img')" class="flex-1 py-2.5 rounded-xl text-xs font-bold border">Từ hình ảnh</button>
                 <button id="qi-tab-file" onclick="setQiTab('file')" class="flex-1 py-2.5 rounded-xl text-xs font-bold border">Excel / PDF</button>
             </div>
             <div id="qi-pane-text" class="space-y-2">
@@ -509,13 +508,6 @@
                 <input type="file" id="qi-docfile" accept=".xlsx,.xlsm,.csv,.tsv,.txt,.pdf,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" class="w-full text-xs file:mr-3 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:bg-emerald-500 file:text-slate-950 file:font-bold">
                 <p id="qi-fprogress" class="text-[11px] text-center font-semibold text-amber-500"></p>
                 <button id="qi-file-btn" onclick="quickFileImport()" class="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-2xl text-sm"><i class="fa-solid fa-file-excel mr-2"></i>Đọc file hóa đơn</button>
-            </div>
-            <div id="qi-pane-img" class="space-y-2 hidden">
-                <p class="text-[11px] opacity-75">Chọn tối đa 15 ảnh chụp/ảnh màn hình đơn hàng (chọn nhiều ảnh cùng lúc). Với hóa đơn dạng bảng (Sapo…), app chỉ lấy tên sản phẩm, số lượng, đơn giá, thành tiền và tự đối chiếu với tổng hóa đơn; bỏ hết phần còn lại. Lần đầu cần có mạng để tải bộ đọc chữ tiếng Việt.</p>
-                <input type="file" id="qi-file" accept="image/*" multiple onchange="qiFilePicked(this)" class="w-full text-xs file:mr-3 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:bg-amber-500 file:text-slate-950 file:font-bold">
-                <img id="qi-preview" class="hidden w-full max-h-56 object-contain rounded-xl border border-theme-border">
-                <p id="qi-progress" class="text-[11px] text-center font-semibold text-amber-500"></p>
-                <button id="qi-ocr-btn" onclick="quickOcr()" class="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl text-sm"><i class="fa-solid fa-image mr-2"></i>Đọc ảnh đơn hàng</button>
             </div>
         </div>
     </div>
@@ -795,7 +787,7 @@
             db.users.forEach(u => { if (!u.permissions) u.permissions = { stores: true, master: true, warehouse: true, history: true }; });
         }
 
-        // ===== Bản 35: ảnh lưu trong IndexedDB, chữ lưu trong localStorage =====
+        // ===== Bản 36: ảnh lưu trong IndexedDB, chữ lưu trong localStorage =====
         const PHOTO_KEYS = new Set(['photo', 'photos', 'storePhoto', 'img']);
         const IDB = { db: null, known: new Set() };
         function idbOpen() {
@@ -1293,7 +1285,7 @@
                         </div>
                         <div>
                             <h1 class="font-black text-xs sm:text-sm uppercase tracking-wider">PHỤ KIỆN HOÀNG ĐẾ</h1>
-                            <p class="text-[11px] sm:text-xs opacity-75">Nhân sự: <span class="font-bold text-amber-500">${user.fullname}</span> (${db.settings?.deviceMode === 'pc' ? 'Chế độ PC' : 'Chế độ Mobile'} • Bản 35)</p>
+                            <p class="text-[11px] sm:text-xs opacity-75">Nhân sự: <span class="font-bold text-amber-500">${user.fullname}</span> (${db.settings?.deviceMode === 'pc' ? 'Chế độ PC' : 'Chế độ Mobile'} • Bản 36)</p>
                         </div>
                     </div>
                     <div class="flex space-x-2 w-full sm:w-auto justify-end">
@@ -1317,7 +1309,7 @@
         }
 
 
-        // ===== Bản 35: tìm cửa hàng, lọc tỉnh/quận có ô tìm =====
+        // ===== Bản 36: tìm cửa hàng, lọc tỉnh/quận có ô tìm =====
         let storeQ = '', pickKind = '';
         function storeKey(s) { return normTxt([s.name, s.owner, s.phone, s.address, s.district, s.city].join(' ')); }
         function storeMatch(s) { const k = normTxt(storeQ).trim(); return !k || storeKey(s).includes(k); }
@@ -1766,7 +1758,7 @@
         }
 
 
-        // ===== Bản 35: doanh thu, xem bill, dung lượng =====
+        // ===== Bản 36: doanh thu, xem bill, dung lượng =====
         function dayKeyOf(t) { return typeof t === 'string' ? t.trim().split(/\s+/).pop() : ''; }
         function parseMoneyStr(x) { const m = String(x || '').match(/([\d.,]+)\s*đ/); return m ? (parseInt(m[1].replace(/[.,]/g, '')) || 0) : 0; }
         function saleNet(h) { return typeof h.net === 'number' ? h.net : moneyOf(h.note); }
@@ -1891,7 +1883,7 @@
         }
 
 
-        // ===== Bản 35: nhập nhanh bằng văn bản/ảnh, trả hàng về kho =====
+        // ===== Bản 36: nhập nhanh bằng văn bản/ảnh, trả hàng về kho =====
         const QI_UNITS = 'cái|chiếc|bộ|sợi|cuộn|hộp|thùng|chai|đôi|cặp|pcs|pc|cây';
         const COLOR_RE = /(^|[^\p{L}])(?:màu\s+)?(đen|trắng|xanh\s+(?:lá|dương|ngọc|rêu|navy|lam|biển)|xanh|ghi|xám|hồng|đỏ|vàng|tím|cam|nâu|bạc|den|trang|hong|vang|tim|nau|bac|black|white|blue|gr[ae]y|silver|pink|red)(?![\p{L}])/iu;
         const COLOR_MAP = { den: 'Đen', trang: 'Trắng', hong: 'Hồng', vang: 'Vàng', tim: 'Tím', nau: 'Nâu', bac: 'Bạc', black: 'Đen', white: 'Trắng', blue: 'Xanh', gray: 'Ghi', grey: 'Ghi', 'xám': 'Ghi', silver: 'Bạc', pink: 'Hồng', red: 'Đỏ' };
@@ -1963,7 +1955,7 @@
         }
         function qiTok(x) { return new Set(normTxt(x).split(/[^a-z0-9]+/).filter(Boolean)); }
         function qiJac(a, b) { let i = 0; a.forEach(x => { if (b.has(x)) i++; }); const u = a.size + b.size - i; return u ? i / u : 0; }
-        // ----- Bản 35: bỏ VT, tách biến thể "Chân ...", màu; đối chiếu thông minh theo mã / viết tắt / số -----
+        // ----- Bản 36: bỏ VT, tách biến thể "Chân ...", màu; đối chiếu thông minh theo mã / viết tắt / số -----
         const QI_SEED = ['cáp', 'sạc', 'tai', 'nghe', 'củ', 'bộ', 'loa', 'quạt', 'kính', 'cường', 'lực', 'ốp', 'lưng', 'dự', 'phòng', 'đồng', 'hồ', 'dây', 'đeo', 'giá', 'đỡ', 'không', 'đầu', 'chân', 'chuyển', 'thẻ', 'nhớ', 'nhanh', 'thông', 'minh', 'trẻ', 'em', 'điện', 'thoại', 'máy', 'đèn', 'gậy', 'chụp', 'ảnh', 'túi', 'bình', 'nước', 'đen', 'trắng', 'xanh', 'ghi', 'xám', 'hồng', 'đỏ', 'vàng', 'tím', 'cam', 'nâu', 'bạc', 'bluetooth', 'iphone', 'samsung', 'type', 'usb', 'lightning', 'micro', 'wekome', 'picom', 'remax', 'hoco', 'combo', 'mini', 'pro', 'max', 'plus', 'ultra', 'chống', 'nước', 'siêu', 'bền', 'cổng'];
         let QI_VOC = null, QI_VOC_N = -1;
         function qiLev(a, b) {
@@ -2047,13 +2039,15 @@
         function qiVariantLabel(x) {
             const n = normTxt(x).trim();
             if (/iphone|lightning|lightening|^ip$/.test(n)) return 'Chân iPhone';
-            if (/type\s*-?\s*c|typec|^tc$/.test(n)) return 'Chân Type C';
+            if (/type\s*-?\s*c|typec|^tc$|^type$/.test(n)) return 'Chân Type C';
             if (/micro/.test(n)) return 'Chân Micro';
             if (/samsung|^ss$/.test(n)) return 'Chân Samsung';
             return 'Chân ' + String(x).trim().replace(/[.\s]+$/, '');
         }
+        let QI_EXACT = false;   // true khi nhập từ file Excel/PDF: chữ đã chuẩn, không tự sửa chính tả
         function qiCleanName(raw, noSpell) {
-            let s = String(raw || '').replace(/[|¦]/g, ' ');
+            if (noSpell === undefined) noSpell = QI_EXACT;
+            let s = String(raw || '').replace(/[|¦]/g, ' ').replace(/\bsam\s+sung\b/gi, 'Samsung');
             s = qiStripVT(s);
             if (!noSpell) s = qiSpell(s);
             s = s.replace(/([A-Z]{2})O(\d)/g, '$10$2').replace(/\b\d{1,2}\s*th[aáàảãạ]ng\b.*$/i, ' ');
@@ -2073,7 +2067,7 @@
                     for (const [re, v] of VARIANT_RULES.slice(0, 3)) { const vm = s.match(re); if (vm) { two = [vm[0], v]; break; } }
                     if (two) { variant = two[1]; s = s.replace(two[0], ' '); }
                     else {
-                        m = s.match(/(^|[^\p{L}])(iphone|lightning|lightening|ip|type\s*-?\s*c|typec|micro|samsung)(?![\p{L}])/iu);
+                        m = s.match(/(^|[^\p{L}])(iphone|lightning|lightening|ip|type\s*-?\s*c|typec|type|micro|samsung)(?![\p{L}])/iu);
                         if (m) { variant = qiVariantLabel(m[2]); s = s.replace(m[0], m[1] + ' '); }
                     }
                 }
@@ -2084,7 +2078,7 @@
             if (!watt) { const bm = s.match(/(^|\s)(\d{1,3})\s*W(?=\s|$)/i); if (bm) { watt = bm[2] + 'W'; s = s.replace(bm[0], ' '); } }
             if (!variant) {
                 const tail = s.replace(/[\s\-–~,.:;]+$/g, '');
-                const tm = tail.match(/(^|[\s(\-–])(type\s*-?\s*c|typec|tc|iphone|ip|lightning|lightening|micro|samsung|ss|3\.5\s*(?:mm)?)\s*\)?$/i);
+                const tm = tail.match(/(^|[\s(\-–])(type\s*-?\s*c|typec|type|tc|iphone|ip|lightning|lightening|micro|samsung|ss|3\.5\s*(?:mm)?)\s*\)?$/i);
                 if (tm && tail.slice(0, tm.index).trim().split(/\s+/).filter(Boolean).length >= 2) { variant = /^3\.5/.test(tm[2]) ? 'Chân 3.5' : qiVariantLabel(tm[2]); s = tail.slice(0, tm.index); }
             }
             s = s.replace(/(^|[^\p{L}])([A-Z]{2,4})\s*[-.]+\s*\.?(\d{1,3})(?![\d])/gu, '$1$2-$3');
@@ -2262,7 +2256,7 @@
         }
 
 
-        // ===== Bản 35: đọc hóa đơn dạng bảng (Sapo...) =====
+        // ===== Bản 36: đọc hóa đơn dạng bảng (Sapo...) =====
         const INV_SKIP = /(^|\s)(hoa don|giao hang|khach le|dien thoai|email|luu y|vui long|tong so|tong chiet|tong tien|tong cong|tong|ma don|ngay tao|nhan vien|chi tiet don|sapo|stt|ma sp|masp|ten sp|so luong|luong|don gia|chiet khau|thanh tien|bao hanh|dia chi|kieu nai|chung toi|hang hoa|cam on|trang thai)(\s|:|$)/;
         function qiNum(tok) {
             const t = String(tok).replace(/^[^\d]+|[^\d]+$/g, '');
@@ -2398,7 +2392,7 @@
             if (vals.length) return (qiSrc === 'ocrtab' || qiSrc === 'ocr') ? vals.reduce((a, b) => a + b, 0) : vals[vals.length - 1];
             return mm ? qiNum(mm[1]) : null;
         }
-        // ----- Bản 35: dán bảng hóa đơn (STT | Mã SP | Tên | BH | SL | Đơn giá | CK | Thành tiền) -----
+        // ----- Bản 36: dán bảng hóa đơn (STT | Mã SP | Tên | BH | SL | Đơn giá | CK | Thành tiền) -----
         let qiSrc = 'text';
         const QI_CODE_RE = /^[A-Za-z]{1,6}\d{2,}[A-Za-z0-9\-]*$/;
         function qiRecordToRow(cells) {
@@ -2462,7 +2456,7 @@
             });
             return rows;
         }
-        // ----- Bản 35: dựng lại bảng theo HÀNG NGANG từ vị trí từng chữ trong ảnh -----
+        // ----- Bản 36: dựng lại bảng theo HÀNG NGANG từ vị trí từng chữ trong ảnh -----
         function qiRowLines(gray, w, h) {
             const ys = [];
             for (let y = 0; y < h; y++) {
@@ -2555,32 +2549,16 @@
             QI_OUT = out;
             return out.join('\n');
         }
-        function qiCropDigits(canvas, w) {
-            const pad = 6, x0 = Math.max(0, Math.floor(w.x0 - pad)), y0 = Math.max(0, Math.floor(w.y0 - pad)), x1 = Math.min(canvas.width, Math.ceil(w.x1 + pad)), y1 = Math.min(canvas.height, Math.ceil(w.y1 + pad));
-            const k = Math.max(2, Math.min(5, 90 / Math.max(10, y1 - y0))), bw = Math.round((x1 - x0) * k), bh = Math.round((y1 - y0) * k), B = 14;
-            const c = document.createElement('canvas'); c.width = bw + 2 * B; c.height = bh + 2 * B;
-            const cx = c.getContext('2d'); cx.fillStyle = '#fff'; cx.fillRect(0, 0, c.width, c.height); cx.imageSmoothingQuality = 'high';
-            cx.drawImage(canvas, x0, y0, x1 - x0, y1 - y0, B, B, bw, bh); return c;
-        }
         // đọc lại những dòng số liệu nghi sai: phóng to + chỉ cho đọc chữ số
-        async function qiReread(canvas, worker, prog) {
-            if (!worker || !QI_OUT || !QI_SUS.length) return 0;
-            const sus = QI_SUS.slice(0, 40), out = QI_OUT; let fixed = 0;
-            try {
-                await worker.setParameters({ tessedit_char_whitelist: '0123456789,.', tessedit_pageseg_mode: '7' });
-                for (let s = 0; s < sus.length; s++) {
-                    const S = sus[s]; if (prog) prog.innerText = 'Làm nét & đọc lại số liệu nghi sai ' + (s + 1) + '/' + sus.length + '...';
-                    const vals = [];
-                    for (const w of S.words) { const r = await worker.recognize(qiCropDigits(canvas, w)); vals.push(String((r && r.data && r.data.text) || '').replace(/[^0-9,.]/g, '')); }
-                    const nums = vals.map((v, i) => ({ v: v && qiNum(v) != null ? qiNum(v) : -1, i })).filter(x => x.v >= 0);
-                    const tr = nums.length >= 3 ? qiTripleFrom(nums) : null;
-                    if (tr && !tr.fixed) { out[S.idx] = S.head.concat(vals.filter(Boolean)).join('\t'); fixed++; }
-                }
-            } catch (e) {}
-            try { await worker.setParameters({ tessedit_char_whitelist: '', tessedit_pageseg_mode: '4' }); } catch (e) {}
-            return fixed;
-        }
         function qiParse(text) {
+            const rows = qiParseRaw(text);
+            rows.forEach(r => {
+                r.name = String(r.name || '').replace(/^\s*(?:\d{1,3}\s+)?[A-Z]{2,4}\d{3,6}\s+(?=\S)/, '').replace(/^\s*\d{1,3}\s+(?=\p{L})/u, '').trim();
+                r.code = ''; r.codeFuzzy = ''; r.strict = false; r.fromCatalog = false;
+            });
+            return rows;
+        }
+        function qiParseRaw(text) {
             const ocr = qiSrc === 'ocr' || qiSrc === 'ocrtab';
             if (qiSrc !== 'ocr') {
                 const tb = parseTableText(text);
@@ -2610,17 +2588,15 @@
 
         // ----- giao diện nhập nhanh -----
         let qiRows = [], qiTabNow = 'text';
-        function openQuickImport() { document.getElementById('qi-text').value = ''; document.getElementById('qi-file').value = ''; try { document.getElementById('qi-docfile').value = ''; document.getElementById('qi-fprogress').innerText = ''; } catch (e) {} document.getElementById('qi-preview').classList.add('hidden'); document.getElementById('qi-progress').innerText = ''; setQiTab('text'); document.getElementById('quick-import-modal').classList.remove('hidden'); }
+        function openQuickImport() { document.getElementById('qi-text').value = ''; try { document.getElementById('qi-docfile').value = ''; document.getElementById('qi-fprogress').innerText = ''; } catch (e) {} setQiTab('text'); document.getElementById('quick-import-modal').classList.remove('hidden'); }
         function closeQuickImport() { document.getElementById('quick-import-modal').classList.add('hidden'); }
         function setQiTab(t) {
             qiTabNow = t;
             const on = 'flex-1 py-2.5 rounded-xl text-xs font-bold border bg-amber-500 text-slate-950 border-amber-500', off = 'flex-1 py-2.5 rounded-xl text-xs font-bold border bg-theme-input border-theme-border';
             document.getElementById('qi-tab-text').className = t === 'text' ? on : off;
-            document.getElementById('qi-tab-img').className = t === 'img' ? on : off;
             document.getElementById('qi-tab-file').className = t === 'file' ? on : off;
             document.getElementById('qi-pane-file').classList.toggle('hidden', t !== 'file');
             document.getElementById('qi-pane-text').classList.toggle('hidden', t !== 'text');
-            document.getElementById('qi-pane-img').classList.toggle('hidden', t !== 'img');
         }
         function quickParseText() {
             const txt = document.getElementById('qi-text').value;
@@ -2628,7 +2604,7 @@
             openQuickConfirm(txt);
         }
         function openQuickConfirm(rawText, src) {
-            qiSrc = src || 'text'; qiManualTotal = null;
+            qiSrc = src || 'text'; qiManualTotal = null; QI_EXACT = (src === 'file');
             document.getElementById('qc-raw').value = rawText;
             qiRows = qiParse(rawText);
             closeQuickImport();
@@ -2659,7 +2635,6 @@
                 return `<div class="p-3 rounded-2xl border ${r.guess ? 'border-amber-500/70' : 'border-theme-border'} bg-theme-input/40 space-y-2" data-qi="${i}">
                     <div class="flex gap-2"><input data-f="name" list="qc-names" value="${escHtml(r.name)}" onchange="qcChange(${i}, this)" placeholder="Tên sản phẩm" class="${inp} font-bold">
                         <button onclick="qcDelRow(${i})" class="px-3 rounded-xl bg-rose-500/15 text-rose-400 flex-shrink-0"><i class="fa-solid fa-trash-can"></i></button></div>
-                    <input data-f="code" value="${escHtml(r.code || '')}" onchange="qcChange(${i}, this)" placeholder="Mã SP (cột 2 của hóa đơn)" class="${inp} font-mono uppercase">
                     <div class="grid grid-cols-2 gap-2">
                         <select data-f="cat" onchange="qcChange(${i}, this)" class="${inp}">${qiCatOptions(r.cat)}</select>
                         <div><select data-f="color" onchange="qcChange(${i}, this)" class="${inp}"><option value="" ${!colorSel ? 'selected' : ''}>Màu: không</option>${COLORS.map(c => `<option ${colorSel === c ? 'selected' : ''}>${escHtml(c)}</option>`).join('')}<option value="__other" ${colorSel === '__other' ? 'selected' : ''}>+ Thêm màu mới...</option></select></div>
@@ -2867,14 +2842,6 @@
         }
 
         // ----- đọc ảnh (OCR) -----
-        function qiFilePicked(inp) {
-            const files = Array.from(inp.files || []); const pv = document.getElementById('qi-preview');
-            if (files.length > 15) { alert('Chỉ chọn được tối đa 15 ảnh. Đã giữ lại ' + 15 + ' ảnh đầu tiên.'); try { const dt = new DataTransfer(); files.slice(0, 15).forEach(x => dt.items.add(x)); inp.files = dt.files; } catch (e) {} }
-            const f = files[0];
-            if (!f) { pv.classList.add('hidden'); document.getElementById('qi-progress').innerText = ''; return; }
-            pv.src = URL.createObjectURL(f); pv.classList.remove('hidden');
-            document.getElementById('qi-progress').innerText = 'Đã chọn ' + Math.min(files.length, 15) + '/15 ảnh';
-        }
         // ===== NHẬP TỪ FILE EXCEL / CSV / PDF (chính xác 100%, không cần đọc ảnh) =====
         async function qiInflate(u8) {
             if (typeof DecompressionStream === 'undefined') throw new Error('Trình duyệt này quá cũ để mở file Excel. Hãy cập nhật iOS/Chrome hoặc xuất file CSV.');
@@ -2904,7 +2871,7 @@
             let x = parseFloat(v); if (!isFinite(x)) return String(v); x = Math.round(x * 10000) / 10000;
             return Math.abs(x) >= 1000 ? x.toLocaleString('en-US', { maximumFractionDigits: 4 }) : String(x);
         }
-        async function qiXlsxToText(buf) {
+        async function qiXlsxRows(buf) {
             const z = await qiUnzip(buf), dp = new DOMParser();
             const doc = s => dp.parseFromString(s, 'application/xml');
             const ss = [], sx = await z.read('xl/sharedStrings.xml');
@@ -2925,14 +2892,14 @@
                         cells[qiColIdx(c.getAttribute('r'))] = String(val).replace(/[\t\r\n]+/g, ' ').trim();
                     });
                     const arr = Array.from(cells, x => x || ''); while (arr.length && !arr[arr.length - 1]) arr.pop();
-                    if (arr.length) lines.push(arr.join('\t'));
+                    if (arr.length) lines.push(arr);
                 });
             }
-            return lines.join('\n');
+            return lines;
         }
-        function qiCsvToText(txt) {
+        function qiCsvRows(txt) {
             const first = txt.split('\n').slice(0, 5).join('\n');
-            if (first.includes('\t')) return txt.replace(/\r/g, '');
+            if (first.includes('\t')) return txt.replace(/\r/g, '').split('\n').map(l => l.split('\t').map(x => x.trim())).filter(r => r.some(x => x));
             const dl = (first.match(/;/g) || []).length > (first.match(/,/g) || []).length ? ';' : ',';
             const rows = []; let row = [], cur = '', q = false;
             for (let i = 0; i < txt.length; i++) {
@@ -2944,7 +2911,7 @@
                 else if (ch !== '\r') cur += ch;
             }
             row.push(cur); rows.push(row);
-            return rows.filter(r => r.some(x => x.trim())).map(r => r.map(x => x.replace(/\t/g, ' ').trim()).join('\t')).join('\n');
+            return rows.filter(r => r.some(x => x.trim())).map(r => r.map(x => x.replace(/\t/g, ' ').trim()));
         }
         function loadPdfJs() {
             return new Promise((res, rej) => {
@@ -2957,9 +2924,123 @@
             });
         }
         // PDF có chữ: lấy từng từ + vị trí -> dựng lại bảng đúng như ảnh (xử lý tên SP xuống dòng)
+        const QI_HDR = [
+            ['stt', /^(stt|tt|#|so tt)$/], ['code', /^(ma|ma (sp|hang|sku|san pham|hang hoa|vach)|sku|barcode)$/],
+            ['warr', /(bao hanh|^bh$)/], ['unit', /^(don vi|dvt|dv|don vi tinh)$/],
+            ['qty', /(so luong|^sl$|^sl )/], ['disc', /(chiet khau|^ck$|giam gia)/],
+            ['price', /(don gia|gia ban|gia nhap|gia von|^gia$)/], ['total', /(thanh tien|^tien$|tong tien)/],
+            ['name', /(ten|san pham|hang hoa|mat hang|phien ban|phan loai|thuoc tinh|bien the|mo ta|mau sac|^mau$|^loai$)/]
+        ];
+        function qiHdrType(txt) {
+            const n = normTxt(String(txt || '')).replace(/[^a-z0-9# ]/g, ' ').replace(/\s+/g, ' ').trim(); if (!n) return null;
+            for (const [k, re] of QI_HDR) if (re.test(n)) return k; return null;
+        }
+        // Bảng (Excel / CSV / PDF dựng lại) -> văn bản chuẩn: STT, Tên (đủ Tên SP + Phiên bản), SL, Đơn giá, CK, Thành tiền. Bỏ cột Mã SP, Bảo hành, ĐVT.
+        function qiGridToText(rows) {
+            if (!rows || !rows.length) return null;
+            let hi = -1, cols = null;
+            for (let i = 0; i < Math.min(rows.length, 30); i++) {
+                const t = (rows[i] || []).map(qiHdrType);
+                if (t.includes('qty') && t.includes('name') && (t.includes('price') || t.includes('total'))) { hi = i; cols = t; break; }
+            }
+            if (hi < 0) return null;
+            const idx = k => cols.map((t, i) => t === k ? i : -1).filter(i => i >= 0);
+            const nameI = idx('name'), qI = idx('qty')[0], pI = idx('price')[0], tI = idx('total')[0], lines = []; let total = null;
+            const cell = (r, i) => i == null ? '' : String(r[i] == null ? '' : r[i]).replace(/\s+/g, ' ').trim();
+            const num = v => { const x = qiNum(String(v).replace(/\s+/g, '')); return x == null || isNaN(x) ? 0 : x; };
+            const fmt = n => n >= 1000 ? Number(n).toLocaleString('en-US') : String(n);
+            for (let ri = hi + 1; ri < rows.length; ri++) {
+                const r = rows[ri] || [], first = r.map(x => String(x == null ? '' : x).trim()).find(Boolean) || '';
+                if (/^(tong|cong)\b/.test(normTxt(first))) { const v = Math.max(0, ...r.map(x => num(x))); if (v >= 10000) total = v; continue; }
+                const parts = nameI.map(i => cell(r, i)).filter(Boolean); if (!parts.length) continue;
+                let name = parts[0];
+                for (let k = 1; k < parts.length; k++) { const a = normTxt(name), b = normTxt(parts[k]); if (b.includes(a)) name = parts[k]; else if (!a.includes(b)) name = name + ' ' + parts[k]; }
+                let q = num(cell(r, qI)), p = pI != null ? num(cell(r, pI)) : 0, t = tI != null ? num(cell(r, tI)) : 0;
+                if (!(q > 0) && p > 0 && t > 0 && t % p === 0) q = t / p;
+                if (!(q > 0)) continue;
+                if (!(p > 0) && t > 0 && t % q === 0) p = t / q;
+                lines.push([lines.length + 1, name, fmt(q), p ? fmt(p) : '', '0', t ? fmt(t) : ''].join('\t'));
+            }
+            if (!lines.length) return null;
+            return lines.join('\n') + (total ? '\nTổng tiền\t' + fmt(total) : '');
+        }
+        // PDF có chữ: dựng lại bảng theo cột (tự tìm dòng tiêu đề + khoảng trống giữa các cột), xử lý ô xuống dòng
+        function qiPdfGrid(pages) {
+            const HK = /^(stt|ma|sku|ten|san|pham|hang|hoa|so|luong|sl|don|gia|chiet|khau|ck|thanh|tien|bh|bao|hanh|phien|ban|dvt|vi)$/;
+            const LAB = { stt: 'STT', code: 'Mã SP', name: 'Tên SP', qty: 'Số lượng', price: 'Đơn giá', disc: 'Chiết khấu', total: 'Thành tiền', warr: 'Bảo hành', unit: 'ĐVT' };
+            let segs = null; const out = []; let total = null, got = false;
+            const clusterLines = (ws, tol) => { const L = []; ws.slice().sort((a, b) => a.yc - b.yc).forEach(w => { const l = L[L.length - 1]; if (l && Math.abs(w.yc - l.yc) <= tol) { l.ws.push(w); l.yc = l.ws.reduce((a, z) => a + z.yc, 0) / l.ws.length; } else L.push({ yc: w.yc, ws: [w] }); }); return L; };
+            for (const pw of pages) {
+                let W = pw.map(x => ({ t: String(x.text).trim(), x0: x.bbox.x0, x1: x.bbox.x1, y0: x.bbox.y0, y1: x.bbox.y1 })).filter(w => w.t);
+                W.forEach(w => { w.xc = (w.x0 + w.x1) / 2; w.yc = (w.y0 + w.y1) / 2; w.h = w.y1 - w.y0; w.n = /^[\d.,]+$/.test(w.t) && /\d/.test(w.t) ? w.t : null; });
+                if (W.length < 8) continue;
+                const mh = qiMedian(W.map(w => w.h)) || 10;
+                // dòng Tổng cuối bảng
+                { const cs = W.filter(w => /^t[oổóòõ0]ng$/i.test(w.t)).sort((a, b) => b.yc - a.yc);
+                  for (const tw of cs) { const ln = W.filter(w => Math.abs(w.yc - tw.yc) < 0.6 * mh); if (ln.some(w => w.n !== null && w.xc < tw.xc && /^\d{1,3}$/.test(w.t))) continue;
+                      const nw = ln.filter(w => w.n !== null && w.xc > tw.xc && qiNum(w.n) >= 10000).sort((a, b) => b.xc - a.xc)[0]; if (!nw) continue;
+                      total = qiNum(nw.n); const rm = new Set(ln); W = W.filter(w => !rm.has(w)); break; } }
+                // dòng tiêu đề
+                const lines = clusterLines(W, 0.55 * mh); let band = null;
+                for (let i = 0; i < lines.length && !band; i++) {
+                    const kw = new Set(); let j = i;
+                    while (j < lines.length && (j === i || (lines[j].yc - lines[j - 1].yc < 1.45 * mh && !lines[j].ws.some(w => /^\d{1,3}$/.test(w.t))))) { lines[j].ws.forEach(w => { const k = normTxt(w.t).replace(/[^a-z]/g, ''); if (HK.test(k)) kw.add(k); }); j++; if (j - i >= 3) break; }
+                    if (kw.size >= 4 && (kw.has('luong') || kw.has('sl')) && (kw.has('gia') || kw.has('thanh') || kw.has('tien'))) band = { i, j: j - 1 };
+                }
+                let data, hdrBottom;
+                if (band) {
+                    const hl = lines.slice(band.i, band.j + 1), hw = hl.flatMap(l => l.ws); hdrBottom = Math.max(...hw.map(w => w.y1));
+                    const hs = hw.slice().sort((a, b) => a.x0 - b.x0), cl = [];
+                    hs.forEach(w => { const c = cl[cl.length - 1]; if (c && w.x0 <= c.x1 + 1.0 * mh) { c.ws.push(w); c.x1 = Math.max(c.x1, w.x1); } else cl.push({ ws: [w], x0: w.x0, x1: w.x1 }); });
+                    cl.forEach(c => { c.label = c.ws.slice().sort((a, b) => a.yc - b.yc || a.x0 - b.x0).map(w => w.t).join(' '); c.type = qiHdrType(c.label); c.xc = (c.x0 + c.x1) / 2; });
+                    data = W.filter(w => w.yc > hdrBottom + 0.1 * mh);
+                    // phân cột theo khoảng trống dọc
+                    const mn = Math.floor(Math.min(...data.map(w => w.x0))), mx = Math.ceil(Math.max(...data.map(w => w.x1))), cov = new Uint8Array(mx - mn + 2);
+                    data.forEach(w => { for (let x = Math.floor(w.x0) - mn; x <= Math.ceil(w.x1) - mn; x++) cov[x] = 1; });
+                    const sg = []; let st = -1, gapStart = -1; const gmin = Math.max(4, 0.7 * mh);
+                    for (let x = 0; x < cov.length; x++) {
+                        if (cov[x]) { if (st < 0) st = x; else if (gapStart >= 0 && x - gapStart >= gmin) { sg.push({ x0: st + mn, x1: gapStart - 1 + mn }); st = x; } gapStart = -1; }
+                        else if (st >= 0 && gapStart < 0) gapStart = x;
+                    }
+                    if (st >= 0) sg.push({ x0: st + mn, x1: (gapStart >= 0 ? gapStart - 1 : cov.length - 1) + mn });
+                    sg.forEach(sgm => { const inside = cl.filter(c => c.xc >= sgm.x0 - 2 && c.xc <= sgm.x1 + 2); sgm.types = inside.map(c => c.type).filter(Boolean); });
+                    // cụm tiêu đề rơi vào khoảng trống -> gán cho đoạn gần nhất
+                    cl.forEach(c => { if (!c.type) return; if (sg.some(sgm => sgm.types.includes(c.type) && c.xc >= sgm.x0 - 2 && c.xc <= sgm.x1 + 2)) return; let best = null, bd = 1e9; sg.forEach(sgm => { const d = c.xc < sgm.x0 ? sgm.x0 - c.xc : c.xc > sgm.x1 ? c.xc - sgm.x1 : 0; if (d < bd) { bd = d; best = sgm; } }); if (best) best.types.push(c.type); });
+                    segs = sg.map(sgm => ({ x0: sgm.x0, x1: sgm.x1, type: sgm.types.includes('name') ? 'name' : (sgm.types[0] || null) }));
+                    // đoạn chữ rời nhau cùng thuộc cột Tên SP (vd. ô có từ ngắn) -> gộp với cột tên liền kề
+                    for (let k = 0; k < segs.length; k++) if (!segs[k].type && segs[k - 1] && segs[k - 1].type === 'name' && segs[k].x0 - segs[k - 1].x1 < 2.5 * mh) segs[k].type = 'name';
+                    if (!out.length) out.push(Array.from(new Set(segs.map(sg2 => sg2.type))).length ? segs.map(sg2 => LAB[sg2.type] || '') : []);
+                } else if (segs && out.length) { data = W.filter(w => w.yc > 0); hdrBottom = -1; } else continue;
+                if (!segs.some(sg2 => sg2.type === 'qty') || !segs.some(sg2 => sg2.type === 'name')) continue;
+                const segOf = w => { let b = -1, bd = 1e9; segs.forEach((sg2, k) => { const d = w.xc < sg2.x0 ? sg2.x0 - w.xc : w.xc > sg2.x1 ? w.xc - sg2.x1 : 0; if (d < bd) { bd = d; b = k; } }); return b; };
+                const DL = clusterLines(data, 0.45 * mh);
+                const sttSeg = segs.findIndex(sg2 => sg2.type === 'stt'), totSeg = segs.findIndex(sg2 => sg2.type === 'total');
+                const aSeg = sttSeg >= 0 ? sttSeg : totSeg; if (aSeg < 0) continue;
+                const aLine = []; DL.forEach((l, li) => { if (l.ws.some(w => segOf(w) === aSeg && w.n !== null && (aSeg !== sttSeg || /^\d{1,3}$/.test(w.t)))) aLine.push(li); });
+                if (aLine.length < 1) continue;
+                const gaps = DL.slice(1).map((l, i) => l.yc - DL[i].yc), medGap = qiMedian(gaps) || mh;
+                const bounds = []; // bounds[k] = chỉ số dòng cuối cùng của hàng k
+                for (let k = 0; k < aLine.length; k++) {
+                    if (k === aLine.length - 1) { let e = aLine[k]; while (e + 1 < DL.length && DL[e + 1].yc - DL[e].yc <= 1.9 * medGap) e++; bounds.push(e); break; }
+                    const a = aLine[k], b = aLine[k + 1]; let best = a, bg = -1, mid = (a + b - 1) / 2;
+                    for (let j = a; j < b; j++) { const g = DL[j + 1].yc - DL[j].yc; if (g > bg + 0.1 * medGap || (Math.abs(g - bg) <= 0.1 * medGap && Math.abs(j - mid) < Math.abs(best - mid))) { bg = Math.max(g, bg); best = j; } }
+                    bounds.push(best);
+                }
+                let start = 0;
+                for (let k = 0; k < aLine.length; k++) {
+                    const end = bounds[k], cellsW = segs.map(() => []);
+                    for (let li = start; li <= end; li++) DL[li].ws.forEach(w => { const sIdx = segOf(w); if (sIdx >= 0) cellsW[sIdx].push({ w, li }); });
+                    out.push(cellsW.map(c => c.sort((a, b) => a.li - b.li || a.w.x0 - b.w.x0).map(o => o.w.t).join(' ')));
+                    start = end + 1; got = true;
+                }
+            }
+            if (!got) return null;
+            if (total) { const r = segs.map(() => ''); const nameSeg = segs.findIndex(sg2 => sg2.type === 'name'), tSeg = segs.findIndex(sg2 => sg2.type === 'total'); if (nameSeg >= 0 && tSeg >= 0) { r[nameSeg] = 'Tổng'; r[tSeg] = String(total); out.push(r); } }
+            return out;
+        }
         async function qiPdfExtract(buf, prog) {
             const lib = await loadPdfJs(), pdf = await lib.getDocument({ data: new Uint8Array(buf) }).promise, S = 2;
-            const parts = []; let totalWords = 0;
+            const parts = [], pagesW = []; let totalWords = 0;
             for (let pn = 1; pn <= pdf.numPages; pn++) {
                 if (prog) prog.innerText = 'Đang đọc PDF trang ' + pn + '/' + pdf.numPages + '...';
                 const page = await pdf.getPage(pn), vh = page.getViewport({ scale: 1 }).height, tc = await page.getTextContent(), words = [];
@@ -2972,7 +3053,7 @@
                         words.push({ text: m[0], bbox: { x0: x0 * S, x1: x1 * S, y0: (vh - f - h * 0.8) * S, y1: (vh - f + h * 0.2) * S } });
                     }
                 });
-                totalWords += words.length;
+                totalWords += words.length; pagesW.push(words);
                 let t = null; try { t = words.length >= 8 ? qiWordsToText(words, null) : null; } catch (e) { t = null; }
                 if (!t && words.length) {
                     const rows = []; words.slice().sort((a, b) => a.bbox.y0 - b.bbox.y0 || a.bbox.x0 - b.bbox.x0).forEach(w => { const R = rows[rows.length - 1]; if (R && Math.abs(R.y - w.bbox.y0) < 6) R.ws.push(w); else rows.push({ y: w.bbox.y0, ws: [w] }); });
@@ -2980,17 +3061,8 @@
                 }
                 if (t) parts.push(t);
             }
-            return { text: parts.join('\n'), words: totalWords, pdf };
-        }
-        async function qiPdfToImages(pdf, prog) {
-            const files = [];
-            for (let pn = 1; pn <= Math.min(pdf.numPages, 15); pn++) {
-                if (prog) prog.innerText = 'PDF dạng ảnh: đang chuyển trang ' + pn + '/' + Math.min(pdf.numPages, 15) + '...';
-                const page = await pdf.getPage(pn), vp = page.getViewport({ scale: 2.5 }), c = document.createElement('canvas'); c.width = vp.width; c.height = vp.height;
-                await page.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise;
-                const blob = await new Promise(r => c.toBlob(r, 'image/png')); files.push(new File([blob], 'trang' + pn + '.png', { type: 'image/png' }));
-            }
-            return files;
+            let gt = null; try { gt = qiGridToText(qiPdfGrid(pagesW)); } catch (e) { console.error(e); }
+            return { text: gt || parts.join('\n'), words: totalWords, pdf };
         }
         async function quickFileImport() {
             const inp = document.getElementById('qi-docfile'), f = inp.files && inp.files[0], prog = document.getElementById('qi-fprogress'), btn = document.getElementById('qi-file-btn');
@@ -2998,96 +3070,20 @@
             btn.disabled = true; prog.innerText = 'Đang đọc file...';
             try {
                 const name = f.name.toLowerCase(), buf = await f.arrayBuffer(); let text = '';
-                if (/\.(xlsx|xlsm)$/.test(name)) text = await qiXlsxToText(buf);
+                let grid = null;
+                if (/\.(xlsx|xlsm)$/.test(name)) { grid = await qiXlsxRows(buf); text = qiGridToText(grid) || grid.map(r => r.join('\t')).join('\n'); }
                 else if (/\.xls$/.test(name)) throw new Error('File .xls (Excel đời cũ) chưa mở được. Hãy mở bằng Excel rồi "Lưu thành" định dạng .xlsx hoặc .csv.');
-                else if (/\.(csv|tsv|txt)$/.test(name)) text = qiCsvToText(new TextDecoder('utf-8').decode(buf));
+                else if (/\.(csv|tsv|txt)$/.test(name)) { grid = qiCsvRows(new TextDecoder('utf-8').decode(buf)); text = qiGridToText(grid) || grid.map(r => r.join('\t')).join('\n'); }
                 else if (/\.pdf$/.test(name) || f.type === 'application/pdf') {
                     const r = await qiPdfExtract(buf, prog);
-                    if (r.words < 8) {
-                        prog.innerText = 'PDF này là dạng ảnh, chuyển sang đọc ảnh...';
-                        const imgs = await qiPdfToImages(r.pdf, prog); btn.disabled = false;
-                        await quickOcr(imgs); return;
-                    }
+                    if (r.words < 8) throw new Error('PDF này là dạng ảnh scan, không có chữ để đọc chính xác. Hãy xuất hóa đơn ra PDF gốc (có chữ) hoặc Excel từ phần mềm bán hàng.');
                     text = r.text;
                 } else throw new Error('Chỉ nhận file .xlsx, .csv, .pdf');
                 if (!text.trim()) throw new Error('Không thấy dữ liệu trong file.');
-                prog.innerText = ''; openQuickConfirm(text, 'text');
+                prog.innerText = ''; openQuickConfirm(text, 'file');
             } catch (e) { prog.innerText = ''; alert('Lỗi đọc file: ' + (e && e.message ? e.message : e)); }
             btn.disabled = false;
         }
-        function loadTesseract() {
-            return new Promise((res, rej) => {
-                if (window.Tesseract) return res();
-                const sc = document.createElement('script');
-                sc.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';
-                sc.onload = () => res(); sc.onerror = () => rej(new Error('Không tải được bộ đọc ảnh. Hãy kiểm tra kết nối mạng rồi thử lại.'));
-                document.head.appendChild(sc);
-            });
-        }
-        function ocrPrep(file) {
-            return new Promise((res, rej) => {
-                const fr = new FileReader();
-                fr.onload = () => {
-                    const img = new Image();
-                    img.onload = () => {
-                        let sc = Math.max(1, Math.min(3, 2200 / img.width));
-                        if (img.width * img.height * sc * sc > 14e6) sc = Math.sqrt(14e6 / (img.width * img.height));
-                        const w = Math.round(img.width * sc), h = Math.round(img.height * sc);
-                        const c = document.createElement('canvas'); c.width = w; c.height = h;
-                        const cx = c.getContext('2d'); cx.imageSmoothingEnabled = true; cx.imageSmoothingQuality = 'high'; cx.drawImage(img, 0, 0, w, h);
-                        const d = cx.getImageData(0, 0, w, h), px = d.data, n = w * h;
-                        const gray = new Uint8ClampedArray(n); let sum = 0; const hist = new Uint32Array(256);
-                        for (let i = 0, k = 0; i < px.length; i += 4, k++) { const g = px[i] * .299 + px[i + 1] * .587 + px[i + 2] * .114; gray[k] = g; sum += g; hist[g | 0]++; }
-                        const invert = (sum / n) < 110;
-                        if (invert) for (let k = 0; k < n; k++) gray[k] = 255 - gray[k];
-                        // kéo giãn tương phản theo phân vị 1% - 99%
-                        const h2 = new Uint32Array(256); for (let k = 0; k < n; k++) h2[gray[k]]++;
-                        let lo = 0, hi = 255, acc = 0; for (let v = 0; v < 256; v++) { acc += h2[v]; if (acc >= n * 0.01) { lo = v; break; } }
-                        acc = 0; for (let v = 255; v >= 0; v--) { acc += h2[v]; if (acc >= n * 0.01) { hi = v; break; } }
-                        const span = Math.max(40, hi - lo);
-                        for (let k = 0; k < n; k++) gray[k] = Math.max(0, Math.min(255, (gray[k] - lo) * 255 / span));
-                        c._qi = { gray: gray.slice(), w, h };
-                        // làm nét (unsharp mask 3x3)
-                        const out = new Uint8ClampedArray(n);
-                        for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-                            const k = y * w + x;
-                            if (x === 0 || y === 0 || x === w - 1 || y === h - 1) { out[k] = gray[k]; continue; }
-                            out[k] = 5 * gray[k] - gray[k - 1] - gray[k + 1] - gray[k - w] - gray[k + w];
-                        }
-                        for (let i = 0, k = 0; i < px.length; i += 4, k++) { const g = out[k]; px[i] = px[i + 1] = px[i + 2] = g; px[i + 3] = 255; }
-                        cx.putImageData(d, 0, 0); res(c);
-                    };
-                    img.onerror = () => rej(new Error('Không mở được ảnh này.')); img.src = fr.result;
-                };
-                fr.onerror = () => rej(new Error('Không đọc được file ảnh.')); fr.readAsDataURL(file);
-            });
-        }
-        async function quickOcr(over) {
-            const files = Array.isArray(over) ? over : Array.from(document.getElementById('qi-file').files || []).slice(0, 15);
-            if (!files.length) { alert('Hãy chọn ảnh đơn hàng trước.'); return; }
-            const prog = document.getElementById('qi-progress'), btn = document.getElementById('qi-ocr-btn'); btn.disabled = true;
-            let worker = null, tag = '', anyTab = false;
-            const logger = m => { if (m && m.status) prog.innerText = tag + (m.status === 'recognizing text' ? 'đang đọc chữ ' + Math.round((m.progress || 0) * 100) + '%' : 'đang xử lý: ' + m.status); };
-            try {
-                prog.innerText = 'Đang tải bộ đọc chữ (lần đầu hơi lâu)...'; await loadTesseract();
-                try { worker = await Tesseract.createWorker('vie+eng', 1, { logger }); await worker.setParameters({ tessedit_pageseg_mode: '4', preserve_interword_spaces: '1' }); } catch (e) { worker = null; }
-                const texts = [], n = files.length;
-                for (let i = 0; i < n; i++) {
-                    tag = n > 1 ? 'Ảnh ' + (i + 1) + '/' + n + ': ' : '';
-                    prog.innerText = tag + 'đang chuẩn bị ảnh...'; const canvas = await ocrPrep(files[i]);
-                    const r = worker ? await worker.recognize(canvas) : await Tesseract.recognize(canvas, 'vie+eng', { logger });
-                    let tt = null; try { tt = r && r.data && r.data.words && r.data.words.length ? qiWordsToText(r.data.words, canvas._qi) : null; } catch (e) { tt = null; }
-                    if (tt && worker) { try { if (await qiReread(canvas, worker, prog)) tt = QI_OUT.join('\n'); } catch (e) {} }
-                    if (tt) anyTab = true;
-                    texts.push(tt || (r && r.data && r.data.text) || '');
-                }
-                prog.innerText = '';
-                openQuickConfirm(texts.join('\n'), anyTab ? 'ocrtab' : 'ocr');
-            } catch (e) { prog.innerText = ''; alert('Lỗi đọc ảnh: ' + (e && e.message ? e.message : e)); }
-            try { if (worker) await worker.terminate(); } catch (e) {}
-            btn.disabled = false;
-        }
-
         // ----- trả hàng về kho -----
         let rtDraft = {};
         function openReturnModal() {
@@ -3705,7 +3701,7 @@
             return blocks;
         }
 
-        // ===== Bản 35: báo cáo toàn bộ lịch sử + bill chi tiết =====
+        // ===== Bản 36: báo cáo toàn bộ lịch sử + bill chi tiết =====
         let reportMode = 'day', reportToken = 0;
         const rpFmt = n => Number(n || 0).toLocaleString('vi-VN');
         function parseDayKey(k) { const m = String(k).match(/^(\d+)\/(\d+)\/(\d+)$/); return m ? new Date(+m[3], +m[2] - 1, +m[1]).getTime() : 0; }
@@ -4014,7 +4010,7 @@
             }
         }
 
-        // ===== Bản 35: tiện ích nhóm / mã / biến thể =====
+        // ===== Bản 36: tiện ích nhóm / mã / biến thể =====
         const CABLE_VARIANTS = ['USB - micro', 'USB - Type C', 'USB sang Lightning', 'C to C', 'Type C - Lightning'];
         let importFilter = { q: '', cat: '' };
         let manualVariant = '';
@@ -4026,7 +4022,7 @@
         let masterCollapsed = {};
 
         function normTxt(t) { return String(t == null ? '' : t).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd'); }
-        function isCableCat(c) { return true; /* Bản 35: biến thể dùng cho mọi nhóm */ }
+        function isCableCat(c) { return true; /* Bản 36: biến thể dùng cho mọi nhóm */ }
         function prodCode(p) { return p.code || String(p.id).slice(-6); }
         function newProductCode() {
             let mx = 0; (db.productsMaster || []).forEach(p => { const m = /^SP(\d+)$/.exec(p.code || ''); if (m) mx = Math.max(mx, parseInt(m[1])); });
@@ -4063,7 +4059,7 @@
             saveData(); render();
             alert('Đã thêm ' + list.length + ' sản phẩm vào ' + db.categories.length + ' nhóm.');
         }
-        // ===== Bản 35: biến thể / màu tự thêm, lưu vĩnh viễn =====
+        // ===== Bản 36: biến thể / màu tự thêm, lưu vĩnh viễn =====
         function loadCustomLists() {
             const st = db.settings || (db.settings = {});
             if (!Array.isArray(st.customVariants)) st.customVariants = [];
