@@ -211,6 +211,20 @@
                     <input type="text" id="e-address" class="w-full px-4 py-2.5 rounded-xl bg-theme-input border border-theme-border text-theme-text text-sm">
                 </div>
                 <div id="chips-e" class="space-y-3"></div>
+                <div class="grid grid-cols-3 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold uppercase mb-1">Độ tuổi chủ shop</label>
+                        <input type="number" inputmode="numeric" id="e-age" class="w-full px-3 py-2.5 rounded-xl bg-theme-input border border-theme-border text-theme-text text-sm" placeholder="VD: 35">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase mb-1">Giới tính</label>
+                        <select id="e-gender" class="w-full px-3 py-2.5 rounded-xl bg-theme-input border border-theme-border text-theme-text text-sm"><option value="">--</option><option>Nam</option><option>Nữ</option></select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase mb-1">Mục tiêu DT/tháng</label>
+                        <input type="number" inputmode="numeric" id="e-kpi" class="w-full px-3 py-2.5 rounded-xl bg-theme-input border border-theme-border text-theme-text text-sm" placeholder="để trống = mặc định">
+                    </div>
+                </div>
                 <div class="grid grid-cols-2 gap-3">
                     <div>
                         <label class="block text-xs font-semibold uppercase mb-1">Vĩ độ (Lat)</label>
@@ -680,6 +694,15 @@
     </div>
 
     <!-- MODAL SAO LƯU EXCEL -->
+    <div id="store-rev-modal" class="fixed inset-0 bg-slate-950/85 backdrop-blur-sm z-[60] hidden flex items-center justify-center p-4">
+        <div class="bg-theme-card border border-theme-border w-full max-w-2xl rounded-3xl shadow-2xl p-5 space-y-3 text-theme-text max-h-[92vh] overflow-y-auto">
+            <div class="flex justify-between items-start gap-2">
+                <h3 class="font-bold text-sm sm:text-base"><i class="fa-solid fa-chart-line text-amber-500 mr-2"></i>So sánh doanh thu các tháng</h3>
+                <button type="button" onclick="document.getElementById('store-rev-modal').classList.add('hidden')" class="px-3 py-1.5 rounded-lg bg-theme-input border border-theme-border text-xs font-bold">Đóng</button>
+            </div>
+            <div id="store-rev-body" class="text-xs space-y-3"></div>
+        </div>
+    </div>
     <div id="backup-modal" class="fixed inset-0 bg-slate-950/85 backdrop-blur-sm z-[65] hidden flex items-center justify-center p-4">
         <div class="bg-theme-card border border-theme-border rounded-3xl max-w-md w-full p-5 space-y-3 shadow-2xl max-h-[90vh] overflow-y-auto text-theme-text">
             <div class="flex justify-between items-center border-b border-theme-border pb-3">
@@ -789,7 +812,7 @@
             db.users.forEach(u => { if (!u.permissions) u.permissions = { stores: true, master: true, warehouse: true, history: true }; });
         }
 
-        // ===== Bản 41: ảnh lưu trong IndexedDB, chữ lưu trong localStorage =====
+        // ===== Bản 42: ảnh lưu trong IndexedDB, chữ lưu trong localStorage =====
         const PHOTO_KEYS = new Set(['photo', 'photos', 'storePhoto', 'img']);
         const IDB = { db: null, known: new Set() };
         function idbOpen() {
@@ -1287,7 +1310,7 @@
                         </div>
                         <div>
                             <h1 class="font-black text-xs sm:text-sm uppercase tracking-wider">PHỤ KIỆN HOÀNG ĐẾ</h1>
-                            <p class="text-[11px] sm:text-xs opacity-75">Nhân sự: <span class="font-bold text-amber-500">${user.fullname}</span> (${db.settings?.deviceMode === 'pc' ? 'Chế độ PC' : 'Chế độ Mobile'} • Bản 41)</p>
+                            <p class="text-[11px] sm:text-xs opacity-75">Nhân sự: <span class="font-bold text-amber-500">${user.fullname}</span> (${db.settings?.deviceMode === 'pc' ? 'Chế độ PC' : 'Chế độ Mobile'} • Bản 42)</p>
                         </div>
                     </div>
                     <div class="flex space-x-2 w-full sm:w-auto justify-end">
@@ -1311,7 +1334,7 @@
         }
 
 
-        // ===== Bản 41: tìm cửa hàng, lọc tỉnh/quận có ô tìm =====
+        // ===== Bản 42: tìm cửa hàng, lọc tỉnh/quận có ô tìm =====
         let storeQ = '', pickKind = '';
         function storeKey(s) { return normTxt([s.name, s.owner, s.phone, s.address, s.district, s.city].join(' ')); }
         function storeMatch(s) { const k = normTxt(storeQ).trim(); return !k || storeKey(s).includes(k); }
@@ -1480,6 +1503,7 @@
                                             <button onclick="openSalesOrderModal(${s.id})" class="px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg text-xs text-center shadow">
                                                 <i class="fa-solid fa-cart-shopping mr-1"></i> Bán hàng
                                             </button>
+                                            <button type="button" onclick="openStoreRev(${s.id})" class="px-3 py-2 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/30 font-semibold rounded-lg text-xs text-center"><i class="fa-solid fa-chart-line mr-1"></i> So doanh thu</button>
                                             <a href="${googleMapUrl}" target="_blank" class="px-3 py-2 bg-theme-input hover:opacity-80 font-semibold rounded-lg text-xs text-center inline-flex items-center justify-center border border-theme-border">
                                                 <i class="fa-solid fa-diamond-turn-right mr-1 text-blue-400"></i> Chỉ đường
                                             </a>
@@ -1562,6 +1586,7 @@
             document.getElementById('e-address').value = s.address;
             document.getElementById('e-lat').value = s.lat;
             document.getElementById('e-lng').value = s.lng;
+            document.getElementById('e-age').value = s.age || ''; document.getElementById('e-gender').value = s.gender || ''; document.getElementById('e-kpi').value = s.kpiTarget || '';
             loadChips('e', s);
             document.getElementById('edit-store-modal').classList.remove('hidden');
         }
@@ -1579,6 +1604,7 @@
             s.lat = parseFloat(document.getElementById('e-lat').value) || s.lat;
             s.lng = parseFloat(document.getElementById('e-lng').value) || s.lng;
             Object.assign(s, getChipValues('e'));
+            s.age = parseInt(document.getElementById('e-age').value) || ''; s.gender = document.getElementById('e-gender').value; s.kpiTarget = parseInt(document.getElementById('e-kpi').value) || '';
             saveData();
             document.getElementById('edit-store-modal').classList.add('hidden');
             alert('Cập nhật thông tin cửa hàng thành công!');
@@ -1760,7 +1786,7 @@
         }
 
 
-        // ===== Bản 41: doanh thu, xem bill, dung lượng =====
+        // ===== Bản 42: doanh thu, xem bill, dung lượng =====
         function dayKeyOf(t) { return typeof t === 'string' ? t.trim().split(/\s+/).pop() : ''; }
         function parseMoneyStr(x) { const m = String(x || '').match(/([\d.,]+)\s*đ/); return m ? (parseInt(m[1].replace(/[.,]/g, '')) || 0) : 0; }
         function saleNet(h) { return typeof h.net === 'number' ? h.net : moneyOf(h.note); }
@@ -1885,7 +1911,7 @@
         }
 
 
-        // ===== Bản 41: nhập nhanh bằng văn bản/ảnh, trả hàng về kho =====
+        // ===== Bản 42: nhập nhanh bằng văn bản/ảnh, trả hàng về kho =====
         const QI_UNITS = 'cái|chiếc|bộ|sợi|cuộn|hộp|thùng|chai|đôi|cặp|pcs|pc|cây';
         const COLOR_RE = /(^|[^\p{L}])(?:màu\s+)?(đen|trắng|xanh\s+(?:lá|dương|ngọc|rêu|navy|lam|biển|đậm|nhạt|da trời)|hồng\s+(?:đậm|nhạt|phấn|pastel)|xanh|ghi|xám|hồng|đỏ|vàng|tím|cam|nâu|bạc|den|trang|hong|vang|tim|nau|bac|black|white|blue|gr[ae]y|silver|pink|red)(?![\p{L}])/iu;
         const COLOR_MAP = { den: 'Đen', trang: 'Trắng', hong: 'Hồng', vang: 'Vàng', tim: 'Tím', nau: 'Nâu', bac: 'Bạc', black: 'Đen', white: 'Trắng', blue: 'Xanh', gray: 'Ghi', grey: 'Ghi', 'xám': 'Ghi', silver: 'Bạc', pink: 'Hồng', red: 'Đỏ' };
@@ -1957,7 +1983,7 @@
         }
         function qiTok(x) { return new Set(normTxt(x).split(/[^a-z0-9]+/).filter(Boolean)); }
         function qiJac(a, b) { let i = 0; a.forEach(x => { if (b.has(x)) i++; }); const u = a.size + b.size - i; return u ? i / u : 0; }
-        // ----- Bản 41: bỏ VT, tách biến thể "Chân ...", màu; đối chiếu thông minh theo mã / viết tắt / số -----
+        // ----- Bản 42: bỏ VT, tách biến thể "Chân ...", màu; đối chiếu thông minh theo mã / viết tắt / số -----
         const QI_SEED = ['cáp', 'sạc', 'tai', 'nghe', 'củ', 'bộ', 'loa', 'quạt', 'kính', 'cường', 'lực', 'ốp', 'lưng', 'dự', 'phòng', 'đồng', 'hồ', 'dây', 'đeo', 'giá', 'đỡ', 'không', 'đầu', 'chân', 'chuyển', 'thẻ', 'nhớ', 'nhanh', 'thông', 'minh', 'trẻ', 'em', 'điện', 'thoại', 'máy', 'đèn', 'gậy', 'chụp', 'ảnh', 'túi', 'bình', 'nước', 'đen', 'trắng', 'xanh', 'ghi', 'xám', 'hồng', 'đỏ', 'vàng', 'tím', 'cam', 'nâu', 'bạc', 'bluetooth', 'iphone', 'samsung', 'type', 'usb', 'lightning', 'micro', 'wekome', 'picom', 'remax', 'hoco', 'combo', 'mini', 'pro', 'max', 'plus', 'ultra', 'chống', 'nước', 'siêu', 'bền', 'cổng'];
         let QI_VOC = null, QI_VOC_N = -1;
         function qiLev(a, b) {
@@ -2258,7 +2284,7 @@
         }
 
 
-        // ===== Bản 41: đọc hóa đơn dạng bảng (Sapo...) =====
+        // ===== Bản 42: đọc hóa đơn dạng bảng (Sapo...) =====
         const INV_SKIP = /(^|\s)(hoa don|giao hang|khach le|dien thoai|email|luu y|vui long|tong so|tong chiet|tong tien|tong cong|tong|ma don|ngay tao|nhan vien|chi tiet don|sapo|stt|ma sp|masp|ten sp|so luong|luong|don gia|chiet khau|thanh tien|bao hanh|dia chi|kieu nai|chung toi|hang hoa|cam on|trang thai)(\s|:|$)/;
         function qiNum(tok) {
             const t = String(tok).replace(/^[^\d]+|[^\d]+$/g, '');
@@ -2394,7 +2420,7 @@
             if (vals.length) return (qiSrc === 'ocrtab' || qiSrc === 'ocr') ? vals.reduce((a, b) => a + b, 0) : vals[vals.length - 1];
             return mm ? qiNum(mm[1]) : null;
         }
-        // ----- Bản 41: dán bảng hóa đơn (STT | Mã SP | Tên | BH | SL | Đơn giá | CK | Thành tiền) -----
+        // ----- Bản 42: dán bảng hóa đơn (STT | Mã SP | Tên | BH | SL | Đơn giá | CK | Thành tiền) -----
         let qiSrc = 'text';
         const QI_CODE_RE = /^[A-Za-z]{1,6}\d{2,}[A-Za-z0-9\-]*$/;
         function qiRecordToRow(cells) {
@@ -2458,7 +2484,7 @@
             });
             return rows;
         }
-        // ----- Bản 41: dựng lại bảng theo HÀNG NGANG từ vị trí từng chữ trong ảnh -----
+        // ----- Bản 42: dựng lại bảng theo HÀNG NGANG từ vị trí từng chữ trong ảnh -----
         function qiRowLines(gray, w, h) {
             const ys = [];
             for (let y = 0; y < h; y++) {
@@ -3635,6 +3661,194 @@
             ['set-old-pass','set-new-pass','set-confirm-pass'].forEach(id => document.getElementById(id).value = '');
         }
 
+
+        // ===== Bản 42: KPI khách hàng + so sánh doanh thu theo tháng =====
+        let kpiCity = 'all', kpiDistrict = 'all', kpiMonthSel = '', kpiSort = 'rev';
+        const kpiNowKey = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); };
+        function kpiMonthKeyOf(t) { const m = String(dayKeyOf(t)).match(/^(\d+)\/(\d+)\/(\d+)$/); return m ? (+m[3]) + '-' + String(+m[2]).padStart(2, '0') : ''; }
+        function kpiPrevKey(k) { const [y, m] = k.split('-').map(Number); return m === 1 ? (y - 1) + '-12' : y + '-' + String(m - 1).padStart(2, '0'); }
+        function kpiLabel(k) { const [y, m] = k.split('-'); return 'T' + (+m) + '/' + y; }
+        function kpiSalesOf(store) {
+            const u = getCurrentUser(), admin = u.role === 'admin';
+            return (db.salesHistory || []).filter(h => h.storeName === store.name && (admin || h.username === u.username));
+        }
+        function kpiMonthly(store) {
+            const by = {};
+            kpiSalesOf(store).forEach(h => { const k = kpiMonthKeyOf(h.time); if (!k) return; (by[k] = by[k] || { c: 0, n: 0 }); by[k].c++; by[k].n += saleNet(h); });
+            return by;
+        }
+        const kpiFmt = n => Math.round(n || 0).toLocaleString('vi-VN');
+        const kpiShort = n => { n = Math.round(n || 0); const a = Math.abs(n); return a >= 1e6 ? (n / 1e6).toLocaleString('vi-VN', { maximumFractionDigits: 1 }) + 'tr' : a >= 1e3 ? (n / 1e3).toLocaleString('vi-VN', { maximumFractionDigits: 0 }) + 'k' : String(n); };
+        function kpiPct(cur, prev) {
+            if (!prev) return cur > 0 ? { t: 'Mới', v: null } : { t: '-', v: null };
+            const v = Math.round((cur - prev) / prev * 100); return { t: (v > 0 ? '+' : '') + v + '%', v };
+        }
+        function kpiTargetOf(s) { return Number(s.kpiTarget) > 0 ? Number(s.kpiTarget) : (Number(db.settings && db.settings.kpiTarget) > 0 ? Number(db.settings.kpiTarget) : 0); }
+        function kpiRows(monthKey) {
+            const prevKey = kpiPrevKey(monthKey);
+            return (db.stores || []).filter(s => (kpiCity === 'all' || s.city === kpiCity) && (kpiDistrict === 'all' || s.district === kpiDistrict)).map(s => {
+                const by = kpiMonthly(s), cur = by[monthKey] || { c: 0, n: 0 }, prev = by[prevKey] || { c: 0, n: 0 };
+                let target = kpiTargetOf(s), tsrc = 'target'; if (!target && prev.n > 0) { target = prev.n; tsrc = 'prev'; }
+                const ratio = target > 0 ? cur.n / target : null;
+                let status;
+                if (cur.c === 0) status = prev.c > 0 ? 'Mất đơn' : 'Chưa phát sinh';
+                else if (ratio == null) status = 'Chưa có mục tiêu';
+                else status = ratio >= 1.2 ? 'Vượt KPI' : ratio >= 1 ? 'Đạt KPI' : 'Cần thúc đẩy';
+                return { s, cur, prev, target, tsrc, ratio, status, dOrd: kpiPct(cur.c, prev.c), dRev: kpiPct(cur.n, prev.n) };
+            }).sort((a, b) => kpiSort === 'name' ? a.s.name.localeCompare(b.s.name, 'vi') : (b.cur.n - a.cur.n) || a.s.name.localeCompare(b.s.name, 'vi'));
+        }
+        const kpiArea = s => [[s.district, s.city].filter(Boolean).join(' - '), s.age ? s.age : '', s.gender || ''].filter(x => x !== '').join(' / ');
+        const kpiTrade = s => [s.industry, s.scale].filter(Boolean).join(' - ');
+        const kpiStatusCls = st => st === 'Vượt KPI' ? 'bg-emerald-500/20 text-emerald-400' : st === 'Đạt KPI' ? 'bg-sky-500/20 text-sky-400' : st === 'Cần thúc đẩy' ? 'bg-amber-500/20 text-amber-500' : st === 'Mất đơn' ? 'bg-rose-500/20 text-rose-400' : 'bg-slate-500/20 opacity-80';
+        const kpiDeltaCls = v => v == null ? 'opacity-70' : v > 0 ? 'text-emerald-400' : v < 0 ? 'text-rose-400' : 'opacity-70';
+        function kpiCardInner() {
+            const mk = kpiMonthSel || kpiNowKey();
+            const cities = [...new Set((db.stores || []).map(s => s.city).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'vi'));
+            const dists = [...new Set((db.stores || []).filter(s => kpiCity === 'all' || s.city === kpiCity).map(s => s.district).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'vi'));
+            if (kpiDistrict !== 'all' && !dists.includes(kpiDistrict)) kpiDistrict = 'all';
+            const rows = kpiRows(mk);
+            const sum = { c: 0, n: 0, v: 0, d: 0, k: 0, m: 0 }; rows.forEach(r => { sum.c += r.cur.c; sum.n += r.cur.n; if (r.status === 'Vượt KPI') sum.v++; else if (r.status === 'Đạt KPI') sum.d++; else if (r.status === 'Cần thúc đẩy') sum.k++; });
+            const sel = 'w-full px-3 py-2.5 rounded-xl bg-theme-input border border-theme-border text-theme-text text-xs font-semibold';
+            const defT = Number(db.settings && db.settings.kpiTarget) || '';
+            return `
+                <h3 class="font-bold text-base flex items-center space-x-2 border-b border-theme-border pb-3"><i class="fa-solid fa-bullseye text-amber-500"></i><span>Báo cáo KPI khách hàng thị trường</span></h3>
+                <p class="text-xs opacity-75">Theo dõi doanh số, tần suất mua, biến động so với tháng trước và đánh giá đạt mục tiêu của từng khách hàng. Lọc riêng theo Tỉnh và Quận/Huyện.</p>
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <div><label class="block text-[10px] font-semibold uppercase mb-1 opacity-70">Tháng</label><input type="month" id="kpi-month" value="${mk}" onchange="kpiSet('month', this.value)" class="${sel}"></div>
+                    <div><label class="block text-[10px] font-semibold uppercase mb-1 opacity-70">Tỉnh / Thành phố</label><select id="kpi-city" onchange="kpiSet('city', this.value)" class="${sel}"><option value="all">Tất cả</option>${cities.map(c => `<option value="${escHtml(c)}" ${c === kpiCity ? 'selected' : ''}>${escHtml(c)}</option>`).join('')}</select></div>
+                    <div><label class="block text-[10px] font-semibold uppercase mb-1 opacity-70">Quận / Huyện</label><select id="kpi-district" onchange="kpiSet('district', this.value)" class="${sel}"><option value="all">Tất cả</option>${dists.map(c => `<option value="${escHtml(c)}" ${c === kpiDistrict ? 'selected' : ''}>${escHtml(c)}</option>`).join('')}</select></div>
+                    <div><label class="block text-[10px] font-semibold uppercase mb-1 opacity-70">Mục tiêu mặc định (đ/tháng)</label><input type="number" inputmode="numeric" id="kpi-def" value="${defT}" onchange="kpiSaveDefault(this.value)" placeholder="VD: 10000000" class="${sel}"></div>
+                </div>
+                <p class="text-[11px] opacity-70">Mục tiêu riêng từng khách đặt ở nút <b>Sửa</b> của khách. Khách chưa có mục tiêu thì lấy mục tiêu mặc định; nếu cũng chưa có thì so với doanh thu tháng trước.</p>
+                <div class="grid grid-cols-2 sm:grid-cols-5 gap-2 text-center">
+                    <div class="p-2 rounded-xl bg-theme-input border border-theme-border"><div class="text-[10px] opacity-70">Khách</div><div class="font-bold">${rows.length}</div></div>
+                    <div class="p-2 rounded-xl bg-theme-input border border-theme-border"><div class="text-[10px] opacity-70">Tổng đơn</div><div class="font-bold">${sum.c}</div></div>
+                    <div class="p-2 rounded-xl bg-theme-input border border-theme-border"><div class="text-[10px] opacity-70">Doanh thu</div><div class="font-bold text-amber-500">${kpiFmt(sum.n)}</div></div>
+                    <div class="p-2 rounded-xl bg-theme-input border border-theme-border"><div class="text-[10px] opacity-70">Vượt / Đạt</div><div class="font-bold text-emerald-400">${sum.v} / ${sum.d}</div></div>
+                    <div class="p-2 rounded-xl bg-theme-input border border-theme-border col-span-2 sm:col-span-1"><div class="text-[10px] opacity-70">Cần thúc đẩy</div><div class="font-bold text-amber-500">${sum.k}</div></div>
+                </div>
+                <div class="flex gap-2">
+                    <button type="button" onclick="kpiExport()" class="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs shadow"><i class="fa-solid fa-file-excel mr-1"></i> Xuất Excel KPI</button>
+                    <button type="button" onclick="openReportModal('all')" class="flex-1 py-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-xl text-xs shadow"><i class="fa-solid fa-image mr-1"></i> Xem trong báo cáo JPG</button>
+                </div>
+                <div class="overflow-x-auto hide-scrollbar">
+                    <table class="w-full text-left border-collapse min-w-[820px] text-xs">
+                        <thead><tr class="uppercase font-semibold border-b border-theme-border text-[10px]">
+                            <th class="p-2">STT</th><th class="p-2">Khách hàng</th><th class="p-2">Ngành & Quy mô</th><th class="p-2">Khu vực / Tuổi / GT</th>
+                            <th class="p-2 text-center">Đơn/tháng</th><th class="p-2 text-right">Doanh thu</th><th class="p-2 text-center">Δ Lượt mua</th><th class="p-2 text-center">Δ Doanh thu</th><th class="p-2 text-right">Mục tiêu</th><th class="p-2 text-center">Đánh giá</th>
+                        </tr></thead>
+                        <tbody class="divide-y divide-theme-border">
+                            ${rows.length ? rows.slice(0, 300).map((r, i) => `<tr class="cursor-pointer hover:bg-white/5" onclick="openStoreRev(${r.s.id})">
+                                <td class="p-2 text-center">${i + 1}</td><td class="p-2 font-bold">${escHtml(r.s.name)}</td><td class="p-2">${escHtml(kpiTrade(r.s) || '-')}</td><td class="p-2">${escHtml(kpiArea(r.s) || '-')}</td>
+                                <td class="p-2 text-center">${r.cur.c}</td><td class="p-2 text-right font-semibold">${kpiFmt(r.cur.n)}</td>
+                                <td class="p-2 text-center font-bold ${kpiDeltaCls(r.dOrd.v)}">${r.dOrd.t}</td><td class="p-2 text-center font-bold ${kpiDeltaCls(r.dRev.v)}">${r.dRev.t}</td>
+                                <td class="p-2 text-right opacity-80">${r.target ? kpiFmt(r.target) + (r.tsrc === 'prev' ? '*' : '') : '-'}${r.ratio != null && r.cur.c ? `<div class="text-[10px] opacity-70">${Math.round(r.ratio * 100)}%</div>` : ''}</td>
+                                <td class="p-2 text-center"><span class="px-2 py-1 rounded-full text-[10px] font-bold whitespace-nowrap ${kpiStatusCls(r.status)}">${r.status}</span></td></tr>`).join('') : `<tr><td colspan="10" class="p-6 text-center opacity-60">Không có khách hàng nào trong bộ lọc này.</td></tr>`}
+                        </tbody>
+                    </table>
+                    ${rows.length > 300 ? `<p class="text-[11px] opacity-70 mt-2">Đang hiển thị 300/${rows.length} khách đầu bảng. File Excel xuất ra có đủ tất cả.</p>` : ''}
+                    <p class="text-[10px] opacity-60 mt-1">* mục tiêu lấy theo doanh thu tháng trước • Bấm vào dòng để xem so sánh các tháng.</p>
+                </div>`;
+        }
+        function kpiRefresh() { const el = document.getElementById('kpi-card'); if (el) el.innerHTML = kpiCardInner(); }
+        function kpiSet(k, v) {
+            if (k === 'month') kpiMonthSel = /^\d{4}-\d{2}$/.test(v) ? v : '';
+            else if (k === 'city') { kpiCity = v; kpiDistrict = 'all'; }
+            else if (k === 'district') kpiDistrict = v;
+            kpiRefresh();
+        }
+        function kpiSaveDefault(v) { db.settings = db.settings || {}; db.settings.kpiTarget = parseInt(v) || 0; saveData(); kpiRefresh(); }
+        function kpiTitleParts() {
+            const mk = kpiMonthSel || kpiNowKey(); const area = [kpiDistrict !== 'all' ? kpiDistrict : '', kpiCity !== 'all' ? kpiCity : ''].filter(Boolean).join(' - ');
+            return { mk, title: 'BẢNG ĐO LƯỜNG KPI KHÁCH HÀNG THỊ TRƯỜNG ' + kpiLabel(mk).toUpperCase() + (area ? ' (' + area + ')' : '') };
+        }
+        function kpiWriteSheet(wb, rows, mk, title, sheetName) {
+            const old = wb.getWorksheet(sheetName); if (old) wb.removeWorksheet(old.id);
+            const ws = wb.addWorksheet(sheetName);
+            const widths = [6, 28, 22, 34, 14, 18, 16, 16, 18, 10, 20]; widths.forEach((w, i) => { ws.getColumn(i + 1).width = w; });
+            ws.mergeCells('A1:K1'); const t = ws.getCell('A1'); t.value = title; t.font = { name: 'Arial', size: 16, bold: true, color: { argb: 'FFFFFFFF' } };
+            t.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F3864' } }; t.alignment = { vertical: 'middle', horizontal: 'center' }; ws.getRow(1).height = 36;
+            ws.mergeCells('A2:K2'); const st = ws.getCell('A2'); st.value = 'Theo dõi các chỉ số cốt lõi: Doanh số, Tần suất mua, Biến động tăng trưởng và Thông tin khách hàng'; st.font = { italic: true, size: 10, color: { argb: 'FF555555' } }; st.alignment = { horizontal: 'center' };
+            const thin = { style: 'thin', color: { argb: 'FFBFBFBF' } }, border = { top: thin, left: thin, bottom: thin, right: thin };
+            const hr = ws.addRow(['STT', 'Khách Hàng (Tên Shop)', 'Ngành Hàng & Quy Mô', 'Khu Vực / Độ Tuổi / Giới Tính', 'Tổng Số Đơn (Tháng)', 'Tổng Doanh Thu (VNĐ)', 'Biến Động Lượt Mua', 'Biến Động Doanh Thu', 'Mục Tiêu (VNĐ)', '% Đạt', 'Đánh Giá KPI / Trạng Thái']); hr.height = 34;
+            hr.eachCell(c => { c.font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FFFFFFFF' } }; c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2F5597' } }; c.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true }; c.border = border; });
+            let totC = 0, totN = 0;
+            rows.forEach((r, i) => {
+                totC += r.cur.c; totN += r.cur.n;
+                const row = ws.addRow([i + 1, r.s.name, kpiTrade(r.s), kpiArea(r.s), r.cur.c, r.cur.n, r.dOrd.t, r.dRev.t, r.target || '', r.ratio != null && r.cur.c ? r.ratio : '', r.status]);
+                row.eachCell({ includeEmpty: true }, (c, col) => {
+                    c.font = { name: 'Arial', size: 10 }; c.border = border; c.alignment = { vertical: 'middle', horizontal: (col === 2 || col === 3 || col === 4) ? 'left' : (col === 6 || col === 9 ? 'right' : 'center'), wrapText: true };
+                    if (col === 6 || col === 9) c.numFmt = '#,##0'; if (col === 10) c.numFmt = '0%';
+                    if (col === 7 || col === 8) { const v = col === 7 ? r.dOrd.v : r.dRev.v; c.font = { name: 'Arial', size: 10, bold: true, color: { argb: v == null ? 'FF666666' : v > 0 ? 'FF1E8E3E' : v < 0 ? 'FFD93025' : 'FF666666' } }; }
+                    if (col === 11) { c.font = { name: 'Arial', size: 10, bold: true, color: { argb: r.status === 'Vượt KPI' ? 'FF1E8E3E' : r.status === 'Đạt KPI' ? 'FF1A73E8' : r.status === 'Cần thúc đẩy' ? 'FFE37400' : 'FF666666' } }; }
+                });
+            });
+            const tr = ws.addRow(['', 'TỔNG CỘNG (' + rows.length + ' khách)', '', '', totC, totN, '', '', '', '', '']); tr.height = 24;
+            tr.eachCell({ includeEmpty: true }, (c, col) => { c.font = { name: 'Arial', size: 11, bold: true }; c.border = border; c.alignment = { vertical: 'middle', horizontal: col === 6 ? 'right' : 'center' }; if (col === 6) c.numFmt = '#,##0'; });
+            ws.views = [{ state: 'frozen', ySplit: 3 }];
+            return ws;
+        }
+        function kpiSaveBlob(blob, name) {
+            try {
+                const file = new File([blob], name, { type: blob.type });
+                if (/iPhone|iPad|Android/i.test(navigator.userAgent) && navigator.canShare && navigator.canShare({ files: [file] })) { navigator.share({ files: [file], title: name }).catch(err => { if (!(err && err.name === 'AbortError')) kpiDl(blob, name); }); return; }
+            } catch (e) {}
+            kpiDl(blob, name);
+        }
+        function kpiDl(blob, name) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(a.href); }, 1500); }
+        async function kpiExport() {
+            if (typeof ExcelJS === 'undefined') { alert('Chưa tải được thư viện Excel, vui lòng kiểm tra mạng rồi thử lại.'); return; }
+            const { mk, title } = kpiTitleParts(), rows = kpiRows(mk);
+            if (!rows.length) { alert('Không có khách hàng nào trong bộ lọc này.'); return; }
+            try {
+                const wb = new ExcelJS.Workbook(); kpiWriteSheet(wb, rows, mk, title, 'KPI ' + kpiLabel(mk).replace('/', '-'));
+                const buf = await wb.xlsx.writeBuffer();
+                kpiSaveBlob(new Blob([buf], { type: XLSX_MIME }), 'KPI-Khach-Hang-' + mk + '.xlsx');
+            } catch (e) { console.error(e); alert('Lỗi xuất Excel KPI: ' + e.message); }
+        }
+        // thẻ doanh thu từng tháng của 1 khách (dùng trong báo cáo JPG)
+        function kpiStoreMonthLine(s, n) {
+            const by = kpiMonthly(s), keys = Object.keys(by).sort().slice(-(n || 3)); if (!keys.length) return '';
+            return '<div style="margin-top:2px;color:#a7f3d0">📈 ' + keys.map((k, i) => { const p = i ? kpiPct(by[k].n, by[keys[i - 1]].n) : null; return kpiLabel(k) + ': <b>' + rpFmt(by[k].n) + '</b>' + (p && p.v != null ? ' (' + p.t + ')' : ''); }).join(' → ') + '</div>';
+        }
+        function kpiReportBlocks() {
+            const mk = kpiNowKey(), save = [kpiCity, kpiDistrict]; kpiCity = 'all'; kpiDistrict = 'all';
+            const rows = kpiRows(mk); [kpiCity, kpiDistrict] = save;
+            return rpSection('📊 KPI khách hàng ' + kpiLabel(mk) + ' (' + rows.length + ' khách)', rows.map((r, i) => rpCard('<div style="display:flex;justify-content:space-between;gap:6px"><b style="color:#fcd34d">' + (i + 1) + '. ' + escHtml(r.s.name) + '</b><b style="color:' + (r.status === 'Vượt KPI' ? '#34d399' : r.status === 'Đạt KPI' ? '#60a5fa' : r.status === 'Cần thúc đẩy' ? '#fbbf24' : '#94a3b8') + '">' + r.status + '</b></div><div style="opacity:.85">' + escHtml(kpiTrade(r.s) || '-') + ' • ' + escHtml(kpiArea(r.s) || '-') + '</div><div>' + r.cur.c + ' đơn • <b>' + rpFmt(r.cur.n) + ' đ</b> • Δ đơn ' + r.dOrd.t + ' • Δ doanh thu ' + r.dRev.t + (r.target ? ' • Mục tiêu ' + rpFmt(r.target) : '') + '</div>')), 'Chưa có khách hàng.');
+        }
+        // ---- So sánh doanh thu các tháng của 1 khách
+        let revStoreId = null;
+        function openStoreRev(id) { revStoreId = id; storeRevRender(); document.getElementById('store-rev-modal').classList.remove('hidden'); }
+        function storeRevRender(a, b) {
+            const s = (db.stores || []).find(x => String(x.id) === String(revStoreId)); if (!s) return;
+            const by = kpiMonthly(s), keys = Object.keys(by).sort(); const el = document.getElementById('store-rev-body');
+            if (!keys.length) { el.innerHTML = `<div class="font-bold text-sm">${escHtml(s.name)}</div><p class="opacity-70 py-6 text-center">Khách hàng này chưa có đơn hàng nào để so sánh.</p>`; return; }
+            // đủ các tháng liên tục từ tháng đầu đến tháng hiện tại
+            const all = []; let k = keys[0]; const end = kpiNowKey() > keys[keys.length - 1] ? kpiNowKey() : keys[keys.length - 1]; while (k <= end && all.length < 60) { all.push(k); const [y, m] = k.split('-').map(Number); k = m === 12 ? (y + 1) + '-01' : y + '-' + String(m + 1).padStart(2, '0'); }
+            const show = all.slice(-12), max = Math.max(1, ...show.map(x => (by[x] || { n: 0 }).n)), total = all.reduce((t, x) => t + (by[x] || { n: 0 }).n, 0), orders = all.reduce((t, x) => t + (by[x] || { c: 0 }).c, 0);
+            const best = all.reduce((p, x) => ((by[x] || { n: 0 }).n > (by[p] || { n: 0 }).n ? x : p), all[0]);
+            const A = a || show[Math.max(0, show.length - 2)], B = b || show[show.length - 1];
+            const va = (by[A] || { c: 0, n: 0 }), vb = (by[B] || { c: 0, n: 0 }), dv = vb.n - va.n, pc = kpiPct(vb.n, va.n);
+            const opt = sel => show.map(x => `<option value="${x}" ${x === sel ? 'selected' : ''}>${kpiLabel(x)}</option>`).join('');
+            const sc = 'px-3 py-2 rounded-xl bg-theme-input border border-theme-border text-xs font-semibold';
+            el.innerHTML = `
+                <div><div class="font-bold text-sm">${escHtml(s.name)}</div><div class="opacity-70">${escHtml([s.address, s.district, s.city].filter(Boolean).join(', '))}</div></div>
+                <div class="grid grid-cols-3 gap-2 text-center">
+                    <div class="p-2 rounded-xl bg-theme-input border border-theme-border"><div class="text-[10px] opacity-70">Tổng doanh thu</div><div class="font-bold text-amber-500">${kpiFmt(total)}</div></div>
+                    <div class="p-2 rounded-xl bg-theme-input border border-theme-border"><div class="text-[10px] opacity-70">Tổng đơn</div><div class="font-bold">${orders}</div></div>
+                    <div class="p-2 rounded-xl bg-theme-input border border-theme-border"><div class="text-[10px] opacity-70">Tháng cao nhất</div><div class="font-bold">${kpiLabel(best)}</div></div>
+                </div>
+                <div class="p-3 rounded-xl bg-theme-input border border-theme-border space-y-2">
+                    <div class="font-bold">So sánh 2 tháng bất kỳ</div>
+                    <div class="flex items-center gap-2 flex-wrap"><select id="rev-a" onchange="storeRevRender(this.value, document.getElementById('rev-b').value)" class="${sc}">${opt(A)}</select><span>so với</span><select id="rev-b" onchange="storeRevRender(document.getElementById('rev-a').value, this.value)" class="${sc}">${opt(B)}</select></div>
+                    <div>${kpiLabel(A)}: <b>${kpiFmt(va.n)} đ</b> (${va.c} đơn) → ${kpiLabel(B)}: <b>${kpiFmt(vb.n)} đ</b> (${vb.c} đơn)</div>
+                    <div class="font-bold ${kpiDeltaCls(pc.v == null ? (dv > 0 ? 1 : 0) : pc.v)}">${dv > 0 ? 'Tăng' : dv < 0 ? 'Giảm' : 'Không đổi'} ${kpiFmt(Math.abs(dv))} đ ${pc.v != null ? '(' + pc.t + ')' : ''}</div>
+                </div>
+                <table class="w-full text-left border-collapse"><thead><tr class="uppercase text-[10px] font-semibold border-b border-theme-border"><th class="p-2">Tháng</th><th class="p-2 text-center">Đơn</th><th class="p-2 text-right">Doanh thu</th><th class="p-2 text-center">So tháng trước</th><th class="p-2 w-1/4"></th></tr></thead><tbody class="divide-y divide-theme-border">
+                ${show.map(x => { const v = by[x] || { c: 0, n: 0 }, pv = by[kpiPrevKey(x)] || { c: 0, n: 0 }, p = kpiPct(v.n, pv.n); return `<tr><td class="p-2 font-bold">${kpiLabel(x)}</td><td class="p-2 text-center">${v.c}</td><td class="p-2 text-right">${kpiFmt(v.n)}</td><td class="p-2 text-center font-bold ${kpiDeltaCls(p.v)}">${p.t}${pv.n || v.n ? ` <span class="opacity-60 font-normal">(${v.n - pv.n >= 0 ? '+' : '-'}${kpiShort(Math.abs(v.n - pv.n))})</span>` : ''}</td><td class="p-2"><div class="h-2 rounded bg-amber-500" style="width:${Math.round(v.n / max * 100)}%"></div></td></tr>`; }).join('')}
+                </tbody></table>`;
+        }
+
         function renderAdminView() {
             const pendingUsers = db.users.filter(x => x.status === 'pending');
             const saleUsers = db.users.filter(x => x.role !== 'admin');
@@ -3688,6 +3902,8 @@
                             </table>
                         </div>
                     </div>
+
+                    <div id="kpi-card" class="bg-theme-card border border-theme-border p-4 sm:p-6 rounded-3xl shadow-xl space-y-3">${kpiCardInner()}</div>
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div class="bg-theme-card border border-theme-border p-6 rounded-3xl shadow-xl space-y-4">
@@ -3930,7 +4146,7 @@
             return blocks;
         }
 
-        // ===== Bản 41: báo cáo toàn bộ lịch sử + bill chi tiết =====
+        // ===== Bản 42: báo cáo toàn bộ lịch sử + bill chi tiết =====
         let reportMode = 'day', reportToken = 0;
         const rpFmt = n => Number(n || 0).toLocaleString('vi-VN');
         function parseDayKey(k) { const m = String(k).match(/^(\d+)\/(\d+)\/(\d+)$/); return m ? new Date(+m[3], +m[2] - 1, +m[1]).getTime() : 0; }
@@ -3989,8 +4205,9 @@
                 const nCheck = checks.filter(h => h.storeName === s.name).length;
                 const added = !isNaN(Number(s.id)) && Number(s.id) > 1e12 ? new Date(Number(s.id)).toLocaleDateString('vi-VN') : '-';
                 const gps = s.lat != null && s.lng != null ? `[${Number(s.lat).toFixed(5)}, ${Number(s.lng).toFixed(5)}]` : 'N/A';
-                return rpCard(`<div style="font-weight:800;color:#fcd34d">${i + 1}. ${escHtml(s.name)}</div><div>Chủ: <b>${escHtml(s.owner || 'N/A')}</b> - SĐT: <span style="color:#60a5fa">${escHtml(s.phone || 'N/A')}</span></div><div style="opacity:.85">Địa chỉ: ${escHtml(s.address || '')}, ${escHtml(s.district || '')}, ${escHtml(s.city || '')}</div><div style="opacity:.9;margin-top:2px">Quy mô: <b>${escHtml(s.scale || '-')}</b> • Ngành: <b>${escHtml(s.industry || '-')}</b> • ${escHtml(relLabel(s.relation) || '-')}</div><div style="margin-top:2px">📍 <span style="color:#fbbf24;font-family:monospace">${gps}</span> • Thêm: ${added}</div><div style="margin-top:2px;color:#6ee7b7">${ps.c} đơn • Net <b>${rpFmt(ps.n)} đ</b> • ${nCheck} lần check-in</div>`);
+                return rpCard(`<div style="font-weight:800;color:#fcd34d">${i + 1}. ${escHtml(s.name)}</div><div>Chủ: <b>${escHtml(s.owner || 'N/A')}</b> - SĐT: <span style="color:#60a5fa">${escHtml(s.phone || 'N/A')}</span></div><div style="opacity:.85">Địa chỉ: ${escHtml(s.address || '')}, ${escHtml(s.district || '')}, ${escHtml(s.city || '')}</div><div style="opacity:.9;margin-top:2px">Quy mô: <b>${escHtml(s.scale || '-')}</b> • Ngành: <b>${escHtml(s.industry || '-')}</b> • ${escHtml(relLabel(s.relation) || '-')}</div><div style="margin-top:2px">📍 <span style="color:#fbbf24;font-family:monospace">${gps}</span> • Thêm: ${added}</div><div style="margin-top:2px;color:#6ee7b7">${ps.c} đơn • Net <b>${rpFmt(ps.n)} đ</b> • ${nCheck} lần check-in</div>` + kpiStoreMonthLine(s, 3));
             }), 'Chưa có khách hàng nào.').forEach(b => blocks.push(b));
+            kpiReportBlocks().forEach(b => blocks.push(b));
             rpSection(`✅ Lịch sử check-in (${checks.length})`, checks.map((h, i) => rpLine(`${i + 1}. <b style="color:#6ee7b7">${escHtml(h.storeName)}</b> <span style="opacity:.7">• ${escHtml(h.time)}</span>${h.note ? '<br><span style="opacity:.85">📝 ' + escHtml(h.note) + '</span>' : ''}`)), 'Chưa có lịch sử check-in.').forEach(b => blocks.push(b));
             rpBillBlocks(sales, `🧾 Bill thanh toán từng cửa hàng (${sales.length} đơn)`).forEach(b => blocks.push(b));
             const imps = db.importHistory || [];
@@ -4239,7 +4456,7 @@
             }
         }
 
-        // ===== Bản 41: tiện ích nhóm / mã / biến thể =====
+        // ===== Bản 42: tiện ích nhóm / mã / biến thể =====
         const CABLE_VARIANTS = ['USB - micro', 'USB - Type C', 'USB sang Lightning', 'C to C', 'Type C - Lightning'];
         let importFilter = { q: '', cat: '' };
         let manualVariant = '';
@@ -4251,7 +4468,7 @@
         let masterCollapsed = {};
 
         function normTxt(t) { return String(t == null ? '' : t).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd'); }
-        function isCableCat(c) { return true; /* Bản 41: biến thể dùng cho mọi nhóm */ }
+        function isCableCat(c) { return true; /* Bản 42: biến thể dùng cho mọi nhóm */ }
         function prodCode(p) { return p.code || String(p.id).slice(-6); }
         function newProductCode() {
             let mx = 0; (db.productsMaster || []).forEach(p => { const m = /^SP(\d+)$/.exec(p.code || ''); if (m) mx = Math.max(mx, parseInt(m[1])); });
@@ -4288,7 +4505,7 @@
             saveData(); render();
             alert('Đã thêm ' + list.length + ' sản phẩm vào ' + db.categories.length + ' nhóm.');
         }
-        // ===== Bản 41: biến thể / màu tự thêm, lưu vĩnh viễn =====
+        // ===== Bản 42: biến thể / màu tự thêm, lưu vĩnh viễn =====
         function loadCustomLists() {
             const st = db.settings || (db.settings = {});
             if (!Array.isArray(st.customVariants)) st.customVariants = [];
@@ -5421,6 +5638,7 @@
             bkWriteSheet(wb, 'Cửa hàng', -6, H.store, stores);
             bkWriteSheet(wb, 'Sản phẩm & Tồn kho', -5, H.prod, products);
             bkMarketSheet(wb, salesToday, checkinsToday);
+            try { const sv = [kpiCity, kpiDistrict]; kpiCity = 'all'; kpiDistrict = 'all'; const mk = kpiNowKey(), rr = kpiRows(mk); [kpiCity, kpiDistrict] = sv; kpiWriteSheet(wb, rr, mk, 'BẢNG ĐO LƯỜNG KPI KHÁCH HÀNG THỊ TRƯỜNG ' + kpiLabel(mk).toUpperCase(), 'KPI ' + kpiLabel(mk).replace('/', '-')); } catch (e) { console.warn('KPI sheet', e); }
             const buf = await wb.xlsx.writeBuffer();
             return new Blob([buf], { type: XLSX_MIME });
         }
