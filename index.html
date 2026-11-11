@@ -694,6 +694,12 @@
     </div>
 
     <!-- MODAL SAO LƯU EXCEL -->
+    <div id="date-range-modal" class="fixed inset-0 bg-slate-950/85 backdrop-blur-sm z-[70] hidden flex items-center justify-center p-4">
+        <div class="bg-theme-card border border-theme-border w-full max-w-sm rounded-3xl shadow-2xl p-4 space-y-3 text-theme-text max-h-[92vh] overflow-y-auto">
+            <div class="flex justify-between items-center"><h3 class="font-bold text-sm"><i class="fa-solid fa-calendar-days text-amber-500 mr-2"></i>Chọn khoảng ngày</h3><button type="button" onclick="dpClose()" class="px-3 py-1.5 rounded-lg bg-theme-input border border-theme-border text-xs font-bold">Đóng</button></div>
+            <div id="dp-body" class="space-y-3 text-xs"></div>
+        </div>
+    </div>
     <div id="store-rev-modal" class="fixed inset-0 bg-slate-950/85 backdrop-blur-sm z-[60] hidden flex items-center justify-center p-4">
         <div class="bg-theme-card border border-theme-border w-full max-w-2xl rounded-3xl shadow-2xl p-5 space-y-3 text-theme-text max-h-[92vh] overflow-y-auto">
             <div class="flex justify-between items-start gap-2">
@@ -1313,7 +1319,7 @@
                         </div>
                         <div>
                             <h1 class="font-black text-xs sm:text-sm uppercase tracking-wider">PHỤ KIỆN HOÀNG ĐẾ</h1>
-                            <p class="text-[11px] sm:text-xs opacity-75">Nhân sự: <span class="font-bold text-amber-500">${user.fullname}</span> (${db.settings?.deviceMode === 'pc' ? 'Chế độ PC' : 'Chế độ Mobile'} • Bản 43)</p>
+                            <p class="text-[11px] sm:text-xs opacity-75">Nhân sự: <span class="font-bold text-amber-500">${user.fullname}</span> (${db.settings?.deviceMode === 'pc' ? 'Chế độ PC' : 'Chế độ Mobile'} • Bản 44)</p>
                         </div>
                     </div>
                     <div class="flex space-x-2 w-full sm:w-auto justify-end">
@@ -3461,10 +3467,22 @@
             });
             return n;
         }
-        function archiveOldNow() {
-            if (!confirm('Chuyển lịch sử các ngày trước hôm nay vào kho lưu trữ?\n\nLịch sử vẫn được giữ và xem được ở mục Lịch sử / Tổng lịch sử. Chỉ làm gọn danh sách hằng ngày.')) return;
-            const n = archiveHistory(true); saveData(); alert('Đã chuyển ' + n + ' bản ghi vào kho lưu trữ. Không có dữ liệu nào bị xóa.'); render();
+        // Tự động: hết ngày (0h giờ Việt Nam) -> bản ghi của các ngày trước tự chuyển sang kho lưu trữ, lịch sử hôm nay bắt đầu mới
+        function autoArchiveCheck() {
+            try {
+                if (!getCurrentUser()) return false;
+                if (isCloudConfigured() && (!cloudOk || pulling)) return false;
+                const today = parseDayKey(todayVN()); if (!today) return false;
+                const hasOld = [db.salesHistory, db.checkinHistory, db.importHistory].some(l => (l || []).some(h => { const d = dayKeyOf(h && h.time); return d && parseDayKey(d) < today; }));
+                if (!hasOld) return false;
+                const n = archiveHistory(true); if (!n) return false;
+                saveData(); return true;
+            } catch (e) { console.warn('autoArchive', e); return false; }
         }
+        function autoArchiveTick() { if (autoArchiveCheck() && ['history', 'admin', 'stores'].includes(currentTab) && !document.querySelector('.fixed.inset-0.z-50:not(.hidden)')) render(); }
+        setInterval(autoArchiveTick, 30000);
+        document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') setTimeout(autoArchiveTick, 1500); });
+        setTimeout(autoArchiveTick, 5000);
         function recTs(h) {
             const t = String(h.time || ''), d = parseDayKey(dayKeyOf(t)), m = t.match(/(\d{1,2}):(\d{2})(?::(\d{2}))?/);
             return d + (m ? ((+m[1]) * 3600 + (+m[2]) * 60 + (+(m[3] || 0))) * 1000 : 0);
@@ -3477,7 +3495,7 @@
         const HDOW = ['Chủ nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
         function histDayLabel(k) { if (k === '?') return 'Không rõ ngày'; return HDOW[new Date(parseDayKey(k)).getDay()] + ' ' + k + (k === todayVN() ? ' • Hôm nay' : ''); }
         function histGroups(recs) { const g = [], ix = {}; recs.forEach(r => { const k = dayKeyOf(r.h.time) || '?'; if (!(k in ix)) { ix[k] = g.length; g.push({ k, rows: [] }); } g[ix[k]].rows.push(r); }); return g; }
-        let histDaysShown = 7, histRange = 'month', histFrom = '', histTo = '';
+        let histDaysShown = 7, histRange = 'month', histFrom = '', histTo = '', histArchKind = 'sales';
         const histIso = ms => { const d = new Date(ms); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
         function histBounds() {
             const p = vnParts(new Date()), mk = (y, mi, d) => new Date(y, mi, d).getTime(), today = mk(p.y, p.m - 1, p.d);
@@ -3504,6 +3522,64 @@
             const days = Object.keys(byDay).filter(Boolean).sort((a, b) => parseDayKey(b) - parseDayKey(a));
             return { from, to, sales, checks, stores, byDay, days, g, n };
         }
+
+        // ===== Bảng chọn ngày (lịch) - bấm chọn hoặc gõ số trực tiếp dd/mm/yyyy =====
+        const isoOf = (y, m, d) => y + '-' + String(m).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+        const isoShow = iso => /^\d{4}-\d{2}-\d{2}$/.test(iso || '') ? iso.slice(8) + '/' + iso.slice(5, 7) + '/' + iso.slice(0, 4) : '';
+        function parseDmy(str) {
+            const m = String(str || '').trim().match(/^(\d{1,2})[\/\-. ](\d{1,2})[\/\-. ](\d{4})$/); if (!m) return null;
+            const d = +m[1], mo = +m[2], y = +m[3], t = new Date(y, mo - 1, d);
+            if (t.getFullYear() !== y || t.getMonth() !== mo - 1 || t.getDate() !== d) return null;
+            return isoOf(y, mo, d);
+        }
+        function dpMask(el) { const v = el.value.replace(/\D/g, '').slice(0, 8); el.value = v.slice(0, 2) + (v.length > 2 ? '/' : '') + v.slice(2, 4) + (v.length > 4 ? '/' : '') + v.slice(4); }
+        function histTyped(which, val) {
+            const iso = parseDmy(val);
+            if (!iso) { alert('Ngày không hợp lệ. Hãy nhập theo dạng ngày/tháng/năm, ví dụ 25/12/2026.'); render(); return; }
+            if (which === 'from') histFrom = iso; else histTo = iso;
+            if (histFrom && histTo && histFrom > histTo) { const t = histFrom; histFrom = histTo; histTo = t; }
+            histRange = 'custom'; render();
+        }
+        let dp = { from: '', to: '', step: 'from', y: 2026, m: 1 };
+        function dpOpen(which) {
+            const [f, t] = histBounds(); dp.from = histFrom || histIso(f); dp.to = histTo || histIso(t); dp.step = which === 'to' ? 'to' : 'from';
+            const base = (which === 'to' ? dp.to : dp.from) || dp.from; dp.y = +base.slice(0, 4); dp.m = +base.slice(5, 7);
+            dpRender(); document.getElementById('date-range-modal').classList.remove('hidden');
+        }
+        function dpClose() { document.getElementById('date-range-modal').classList.add('hidden'); }
+        function dpNav(dm, dy) { let m = dp.m + (dm || 0), y = dp.y + (dy || 0); while (m < 1) { m += 12; y--; } while (m > 12) { m -= 12; y++; } dp.m = m; dp.y = y; dpRender(); }
+        function dpPick(iso) {
+            if (dp.step === 'from') { dp.from = iso; dp.to = iso; dp.step = 'to'; }
+            else { if (iso < dp.from) { dp.to = dp.from; dp.from = iso; } else dp.to = iso; dp.step = 'from'; }
+            dpRender();
+        }
+        function dpTyped(which, val) {
+            const iso = parseDmy(val); if (!iso) { alert('Ngày không hợp lệ. Hãy nhập theo dạng ngày/tháng/năm, ví dụ 25/12/2026.'); dpRender(); return; }
+            dp[which] = iso; if (dp.from > dp.to) { const t = dp.from; dp.from = dp.to; dp.to = t; }
+            dp.y = +iso.slice(0, 4); dp.m = +iso.slice(5, 7); dpRender();
+        }
+        function dpToday() { const p = vnParts(new Date()), iso = isoOf(p.y, p.m, p.d); dp.from = iso; dp.to = iso; dp.y = p.y; dp.m = p.m; dp.step = 'from'; dpRender(); }
+        function dpApply() { histFrom = dp.from; histTo = dp.to; histRange = 'custom'; dpClose(); render(); }
+        function dpRender() {
+            const el = document.getElementById('dp-body'); if (!el) return;
+            const first = (new Date(dp.y, dp.m - 1, 1).getDay() + 6) % 7, dim = new Date(dp.y, dp.m, 0).getDate(), tp = vnParts(new Date()), today = isoOf(tp.y, tp.m, tp.d);
+            let cells = ''; for (let i = 0; i < first; i++) cells += '<span></span>';
+            for (let d = 1; d <= dim; d++) {
+                const iso = isoOf(dp.y, dp.m, d), end = iso === dp.from || iso === dp.to, inr = iso > dp.from && iso < dp.to;
+                cells += `<button type="button" onclick="dpPick('${iso}')" class="py-2 rounded-lg text-xs font-semibold ${end ? 'bg-amber-500 text-slate-950 font-bold' : inr ? 'bg-amber-500/25' : 'bg-theme-input'} ${iso === today && !end ? 'ring-1 ring-sky-400' : ''}">${d}</button>`;
+            }
+            const inp = 'w-full px-3 py-2.5 rounded-xl bg-theme-input border border-theme-border text-theme-text text-sm font-semibold';
+            const nb = 'px-3 py-2 rounded-lg bg-theme-input border border-theme-border text-xs font-bold';
+            el.innerHTML = `
+                <div class="grid grid-cols-2 gap-2">
+                    <div><label class="block text-[10px] font-semibold uppercase mb-1 opacity-70 ${dp.step === 'from' ? 'text-amber-500' : ''}">Từ ngày (gõ được)</label><input type="text" inputmode="numeric" maxlength="10" placeholder="dd/mm/yyyy" value="${isoShow(dp.from)}" oninput="dpMask(this)" onchange="dpTyped('from', this.value)" class="${inp}"></div>
+                    <div><label class="block text-[10px] font-semibold uppercase mb-1 opacity-70 ${dp.step === 'to' ? 'text-amber-500' : ''}">Đến ngày (gõ được)</label><input type="text" inputmode="numeric" maxlength="10" placeholder="dd/mm/yyyy" value="${isoShow(dp.to)}" oninput="dpMask(this)" onchange="dpTyped('to', this.value)" class="${inp}"></div>
+                </div>
+                <div class="flex items-center justify-between gap-1"><button type="button" onclick="dpNav(0,-1)" class="${nb}">«</button><button type="button" onclick="dpNav(-1,0)" class="${nb}">‹</button><b class="flex-1 text-center text-sm">Tháng ${dp.m}/${dp.y}</b><button type="button" onclick="dpNav(1,0)" class="${nb}">›</button><button type="button" onclick="dpNav(0,1)" class="${nb}">»</button></div>
+                <div class="grid grid-cols-7 gap-1 text-center"><b class="opacity-60 text-[10px]">T2</b><b class="opacity-60 text-[10px]">T3</b><b class="opacity-60 text-[10px]">T4</b><b class="opacity-60 text-[10px]">T5</b><b class="opacity-60 text-[10px]">T6</b><b class="opacity-60 text-[10px]">T7</b><b class="opacity-60 text-[10px]">CN</b>${cells}</div>
+                <p class="text-[11px] opacity-70">${dp.step === 'from' ? 'Bấm một ngày để chọn <b>Từ ngày</b>.' : 'Bấm ngày thứ hai để chọn <b>Đến ngày</b> (hoặc bấm lại cùng ngày để chỉ xem 1 ngày).'}</p>
+                <div class="flex gap-2"><button type="button" onclick="dpToday()" class="flex-1 py-3 rounded-xl bg-theme-input border border-theme-border text-xs font-bold">Hôm nay</button><button type="button" onclick="dpApply()" class="flex-1 py-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-bold">Áp dụng</button></div>`;
+        }
         function histSet(k, v) {
             if (k === 'range') histRange = v; else if (k === 'from') histFrom = v; else if (k === 'to') histTo = v;
             if (k === 'range' && v === 'custom') { const [f, t] = histBounds(); if (!histFrom) histFrom = histIso(f); if (!histTo) histTo = histIso(t); }
@@ -3517,7 +3593,9 @@
                 <div class="bg-theme-card border border-theme-border p-4 sm:p-5 rounded-2xl shadow-sm space-y-3">
                     <div class="font-bold text-sm"><i class="fa-solid fa-calendar-days text-amber-500 mr-2"></i>Xem tổng lịch sử theo khoảng ngày</div>
                     <div class="flex flex-wrap gap-2">${chip('today', 'Hôm nay')}${chip('month', 'Tháng này')}${chip('last', 'Tháng trước')}${chip('3m', '3 tháng gần đây')}${chip('custom', 'Tùy chỉnh')}</div>
-                    ${histRange === 'custom' ? `<div class="grid grid-cols-2 gap-2"><div><label class="block text-[10px] font-semibold uppercase mb-1 opacity-70">Từ ngày</label><input type="date" value="${histFrom}" onchange="histSet('from', this.value)" class="w-full px-3 py-2.5 rounded-xl bg-theme-input border border-theme-border text-xs font-semibold"></div><div><label class="block text-[10px] font-semibold uppercase mb-1 opacity-70">Đến ngày</label><input type="date" value="${histTo}" onchange="histSet('to', this.value)" class="w-full px-3 py-2.5 rounded-xl bg-theme-input border border-theme-border text-xs font-semibold"></div></div>` : ''}
+                    ${histRange === 'custom' ? `<div class="grid grid-cols-2 gap-2">
+                        <div><label class="block text-[10px] font-semibold uppercase mb-1 opacity-70">Từ ngày (gõ hoặc chọn lịch)</label><div class="flex gap-1"><input type="text" inputmode="numeric" maxlength="10" placeholder="dd/mm/yyyy" value="${isoShow(histFrom)}" oninput="dpMask(this)" onchange="histTyped('from', this.value)" class="flex-1 min-w-0 px-3 py-2.5 rounded-xl bg-theme-input border border-theme-border text-xs font-semibold"><button type="button" onclick="dpOpen('from')" title="Mở bảng chọn ngày" class="px-3 rounded-xl bg-amber-500 text-slate-950"><i class="fa-solid fa-calendar-days"></i></button></div></div>
+                        <div><label class="block text-[10px] font-semibold uppercase mb-1 opacity-70">Đến ngày (gõ hoặc chọn lịch)</label><div class="flex gap-1"><input type="text" inputmode="numeric" maxlength="10" placeholder="dd/mm/yyyy" value="${isoShow(histTo)}" oninput="dpMask(this)" onchange="histTyped('to', this.value)" class="flex-1 min-w-0 px-3 py-2.5 rounded-xl bg-theme-input border border-theme-border text-xs font-semibold"><button type="button" onclick="dpOpen('to')" title="Mở bảng chọn ngày" class="px-3 rounded-xl bg-amber-500 text-slate-950"><i class="fa-solid fa-calendar-days"></i></button></div></div></div>` : ''}
                     <p class="text-xs opacity-75">Khoảng ngày đang xem (giờ Việt Nam): <b class="text-amber-500">${histRangeTitle(R)}</b> • gồm cả lịch sử trong kho lưu trữ</p>
                     <div class="grid grid-cols-2 sm:grid-cols-5 gap-2">${box('Số đơn', R.sales.length)}${box('Cửa hàng mua', R.stores.length)}${box('Doanh thu Gross', kpiFmt(R.g))}${box('Doanh thu Net', kpiFmt(R.n), 'text-amber-500')}${box('Lượt check-in', R.checks.length, 'text-sky-400')}</div>
                     <div class="flex gap-2">
@@ -3577,7 +3655,7 @@
             let bodyHtml = '';
             if (tab === 'range') bodyHtml = histRangeHtml();
             else {
-                const kind = tab === 'checkin' ? 'checkin' : 'sales', recs = histRecs(kind), groups = histGroups(recs), shown = groups.slice(0, histDaysShown);
+                const isArch = tab === 'archive', kind = isArch ? histArchKind : (tab === 'checkin' ? 'checkin' : 'sales'), recs = histRecs(kind).filter(r => isArch ? r.src === 'a' : r.src === 's'), groups = histGroups(recs), shown = groups.slice(0, histDaysShown);
                 const more = groups.length > shown.length ? `<button onclick="histDaysShown+=7; render();" class="w-full py-3 rounded-xl bg-theme-input border border-theme-border text-xs font-bold">Xem thêm 7 ngày cũ hơn (còn ${groups.length - shown.length} ngày)</button>` : '';
                 const photoCell = (r, cls) => { const h = r.h; if (r.src === 'a') return h.photoCount ? `<span class="text-[11px] opacity-60">📷 ${h.photoCount} ảnh (kho lưu trữ không giữ ảnh)</span>` : 'Không có ảnh'; return null; };
                 const saleRow = r => { const h = r.h, hIdx = r.idx, arch = r.src === 'a';
@@ -3607,12 +3685,12 @@
                     : '<th class="p-3.5">Thời gian</th><th class="p-3.5">Sale</th><th class="p-3.5">Cửa hàng</th><th class="p-3.5">Trạng thái / Ghi chú</th><th class="p-3.5">Ảnh check-in thực tế</th>';
                 bodyHtml = `
                     <div class="bg-theme-card border border-theme-border rounded-2xl shadow-sm overflow-hidden">
-                        <div class="p-3 bg-black/20 border-b border-theme-border font-bold text-xs uppercase">${kind === 'sales' ? 'Bảng 1: Lịch sử bán hàng theo ngày (giờ Việt Nam)' : 'Bảng 2: Lịch sử check-in theo ngày (giờ Việt Nam)'}</div>
+                        <div class="p-3 bg-black/20 border-b border-theme-border font-bold text-xs uppercase flex flex-wrap items-center justify-between gap-2"><span>${isArch ? 'Kho lưu trữ các ngày trước (tự động chuyển khi hết ngày)' : (kind === 'sales' ? 'Bảng 1: Lịch sử bán hàng hôm nay (giờ Việt Nam)' : 'Bảng 2: Lịch sử check-in hôm nay (giờ Việt Nam)')}</span>${isArch ? `<span class="flex gap-1 normal-case"><button type="button" onclick="histArchKind='sales';histDaysShown=7;render();" class="px-3 py-1.5 rounded-lg text-[11px] font-bold border ${kind === 'sales' ? 'bg-amber-500 text-slate-950 border-amber-500' : 'bg-theme-input border-theme-border'}">Bán hàng</button><button type="button" onclick="histArchKind='checkin';histDaysShown=7;render();" class="px-3 py-1.5 rounded-lg text-[11px] font-bold border ${kind === 'checkin' ? 'bg-amber-500 text-slate-950 border-amber-500' : 'bg-theme-input border-theme-border'}">Check-in</button></span>` : ''}</div>
                         <div class="overflow-x-auto hide-scrollbar">
                             <table class="w-full text-left border-collapse ${kind === 'sales' ? 'min-w-[800px]' : 'min-w-[700px]'}">
                                 <thead><tr class="text-xs uppercase font-semibold border-b border-theme-border">${head}</tr></thead>
                                 <tbody class="divide-y divide-theme-border text-xs sm:text-sm">
-                                    ${recs.length ? shown.map(g => dayHead(g) + g.rows.map(kind === 'sales' ? saleRow : checkRow).join('')).join('') : `<tr><td colspan="${cols}" class="p-8 text-center opacity-50 italic">${kind === 'sales' ? 'Chưa có lịch sử bán hàng nào.' : 'Chưa có lịch sử check-in nào.'}</td></tr>`}
+                                    ${recs.length ? shown.map(g => dayHead(g) + g.rows.map(kind === 'sales' ? saleRow : checkRow).join('')).join('') : `<tr><td colspan="${cols}" class="p-8 text-center opacity-50 italic">${isArch ? 'Chưa có ngày nào được lưu trữ. Sau 0h hằng ngày, lịch sử của ngày trước sẽ tự chuyển vào đây.' : (kind === 'sales' ? 'Hôm nay chưa có đơn hàng nào.' : 'Hôm nay chưa có lượt check-in nào.')}</td></tr>`}
                                 </tbody>
                             </table>
                         </div>
@@ -3623,14 +3701,14 @@
                     <div class="bg-theme-card border border-theme-border p-4 sm:p-6 rounded-2xl shadow-sm space-y-3">
                         <div>
                             <h2 class="font-bold text-base sm:text-lg">Lịch sử Hoạt động & Đơn hàng</h2>
-                            <p class="text-xs sm:text-sm opacity-75 mt-1">Chia theo ngày thực tế (giờ Việt Nam). Lịch sử đã dọn khỏi bộ nhớ đệm vẫn được giữ trong kho lưu trữ (${nArch} bản ghi).</p>
+                            <p class="text-xs sm:text-sm opacity-75 mt-1">Lịch sử của ngày hôm nay. Hết ngày (0h giờ Việt Nam) hệ thống <b>tự chuyển</b> sang mục Lưu trữ và bắt đầu lịch sử mới (đang lưu trữ ${nArch} bản ghi).</p>
                         </div>
                         <div class="flex flex-wrap gap-2 w-full">
-                            ${tb('sales', 'fa-cart-shopping', 'Bán hàng (' + (db.salesHistory?.length || 0) + (A.sales.length ? ' + ' + A.sales.length + ' lưu trữ' : '') + ')')}
-                            ${tb('checkin', 'fa-store', 'Check-in (' + (db.checkinHistory?.length || 0) + (A.checkin.length ? ' + ' + A.checkin.length + ' lưu trữ' : '') + ')')}
+                            ${tb('sales', 'fa-cart-shopping', 'Bán hàng hôm nay (' + (db.salesHistory?.length || 0) + ')')}
+                            ${tb('checkin', 'fa-store', 'Check-in hôm nay (' + (db.checkinHistory?.length || 0) + ')')}
+                            ${tb('archive', 'fa-box-archive', 'Lưu trữ (' + (A.sales.length + A.checkin.length) + ')')}
                             ${tb('range', 'fa-chart-column', 'Tổng lịch sử')}
                         </div>
-                        <button type="button" onclick="archiveOldNow()" class="w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs font-bold bg-sky-500/10 border border-sky-500/30 text-sky-400"><i class="fa-solid fa-box-archive mr-1"></i>Lưu trữ lịch sử các ngày trước (giữ lại, làm gọn danh sách)</button>
                     </div>
                     ${bodyHtml}
                 </div>
@@ -4040,7 +4118,7 @@
                                     <i class="fa-solid fa-clock-rotate-left"></i><span>Báo cáo toàn bộ lịch sử (JPG)</span>
                                 </button>
                                 <button onclick="clearHistoryOnly()" class="py-3.5 px-4 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-bold rounded-xl text-xs transition border border-rose-500/30 flex items-center justify-center space-x-2">
-                                    <i class="fa-solid fa-trash-can"></i><span>Dọn bộ nhớ đệm (lưu trữ lịch sử)</span>
+                                    <i class="fa-solid fa-trash-can"></i><span>Xóa bộ nhớ đệm (chỉ ảnh lịch sử)</span>
                                 </button>
                                 <button onclick="exportBackupExcel()" class="sm:col-span-2 py-3.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs transition shadow-lg flex items-center justify-center space-x-2">
                                     <i class="fa-solid fa-file-excel"></i><span>Sao lưu toàn bộ ra Excel</span>
@@ -4529,13 +4607,21 @@
 
         function clearHistoryOnly() { openBackupModal('clear'); }
 
+        // Chỉ xóa ảnh trong lịch sử (bán hàng + check-in, cả kho lưu trữ); giữ nguyên mọi dữ liệu chữ
+        function clearHistoryPhotos() {
+            let n = 0;
+            const strip = h => { const c = (Array.isArray(h.photos) ? h.photos.filter(Boolean).length : 0) || (h.photo ? 1 : 0); if (!c && !('photos' in h) && !('photo' in h)) return; n += c; if (c && !h.photoCount) h.photoCount = c; delete h.photos; delete h.photo; };
+            [db.salesHistory, db.checkinHistory, (db.historyArchive || {}).sales, (db.historyArchive || {}).checkin].forEach(l => (l || []).forEach(strip));
+            return n;
+        }
         function confirmClearHistory() {
-            if (!bk.saved) { alert('Hãy lưu hoặc tải file Excel về máy trước khi xóa lịch sử!'); return; }
-            if (!confirm('Bạn đã chắc chắn file Excel đã được lưu?\n\nBấm OK để DỌN danh sách Lịch sử bán hàng, check-in và nhập kho.\nLịch sử KHÔNG bị mất: được chuyển vào kho lưu trữ, vẫn xem được ở mục Lịch sử > Tổng lịch sử.')) return;
-            const moved = archiveHistory(false);
+            if (!bk.saved) { alert('Hãy xuất và lưu file Excel về máy xong thì mới được xóa bộ nhớ đệm (ảnh lịch sử)!'); return; }
+            if (!confirm('Bạn đã chắc chắn file Excel đã được lưu?\n\nBấm OK để XÓA ẢNH trong lịch sử bán hàng và check-in (giải phóng bộ nhớ).\nToàn bộ dữ liệu chữ của lịch sử (đơn hàng, doanh thu, check-in), khách hàng, sản phẩm và kho tồn được GIỮ NGUYÊN.')) return;
+            const cnt = clearHistoryPhotos();
             saveData();
+            setTimeout(() => { try { photoMaintenance(false); } catch (e) {} }, 800);
             closeBackupModal();
-            alert('Đã chuyển ' + moved + ' bản ghi vào kho lưu trữ. Lịch sử không bị mất - xem lại ở mục Lịch sử > Tổng lịch sử. Khách hàng, sản phẩm và kho tồn được giữ nguyên.');
+            alert('Đã xóa ' + cnt + ' ảnh lịch sử. Dữ liệu chữ của lịch sử vẫn được giữ nguyên.');
             render();
         }
 
@@ -5720,7 +5806,7 @@
                 try { await wb.xlsx.load(existingBuf); } catch (e) { throw new Error('Không đọc được file Excel cũ. Hãy chọn đúng file sao lưu của app (.xlsx).'); }
                 if (!wb.getWorksheet('Lịch sử bán hàng')) throw new Error('File này không phải file sao lưu của app (thiếu sheet "Lịch sử bán hàng").');
             }
-            const salesAll = db.salesHistory || [], checkAll = db.checkinHistory || [];
+            const salesAll = allSales(), checkAll = allCheckins();
             const salesToday = salesAll.filter(h => isTodayTime(h.time)), checkinsToday = checkAll.filter(h => isTodayTime(h.time));
 
             const H = {
@@ -5733,7 +5819,7 @@
             };
             let sales = salesAll.map(h => ({ 'Thời gian': h.time, 'Nhân viên': h.username, 'Cửa hàng': h.storeName, 'Địa chỉ': h.address || '', 'Chi tiết đơn hàng': h.note, 'Chiết khấu': h.discountStr || '0 đ', 'Tổng tiền (đ)': moneyOf(h.note), 'Số ảnh': (h.photos && h.photos.length) || (h.photo ? 1 : 0) }));
             let checkins = checkAll.map(h => ({ 'Thời gian': h.time, 'Nhân viên': h.username, 'Cửa hàng': h.storeName, 'SĐT': h.phone || '', 'Địa chỉ': h.address || '', 'Vĩ độ': h.lat == null ? '' : h.lat, 'Kinh độ': h.lng == null ? '' : h.lng, 'Ghi chú': h.note, 'Có ảnh': h.photo ? 'Có' : 'Không' }));
-            let imports = (db.importHistory || []).map(h => ({ 'Thời gian': h.time, 'Sản phẩm': h.productName, 'Số lượng nhập': h.qty }));
+            let imports = allImports().map(h => ({ 'Thời gian': h.time, 'Sản phẩm': h.productName, 'Số lượng nhập': h.qty }));
             let returns = (db.returnHistory || []).map(h => ({ 'Thời gian': h.time, 'Người trả': h.byName || h.username || '', 'Người nhận ở kho': h.receiverName || '', 'SĐT người nhận': h.receiverPhone || '', 'Ghi chú': h.note || '', 'Sản phẩm trả': (h.items || []).map(i => i.name + ' x' + i.q).join('; ') }));
             if (existingBuf) {
                 sales = bkMerge(wb, 'Lịch sử bán hàng', H.sales, sales);
@@ -5777,7 +5863,7 @@
             const btn = 'w-full py-3.5 rounded-xl font-bold text-xs transition shadow flex items-center justify-center space-x-2 ';
             if (bk.status === 'choose') {
                 el.innerHTML = `
-                    <p class="opacity-80 leading-relaxed">File Excel gồm: tổng quan, lịch sử bán hàng, check-in, nhập kho, cửa hàng, sản phẩm & tồn kho, và <b class="text-amber-500">sheet "Thị trường ngày..." kèm ảnh cửa hàng</b> của hôm nay.${bk.reason === 'clear' ? '<br><b class="text-rose-400">Bạn phải lưu file trước thì mới xóa được lịch sử.</b>' : ''}${bk.reason === 'report' ? '<br><b class="text-amber-500">Hãy sao lưu sau khi gửi báo cáo để không mất dữ liệu.</b>' : ''}</p>
+                    <p class="opacity-80 leading-relaxed">File Excel gồm: tổng quan, lịch sử bán hàng, check-in, nhập kho, cửa hàng, sản phẩm & tồn kho, và <b class="text-amber-500">sheet "Thị trường ngày..." kèm ảnh cửa hàng</b> của hôm nay.${bk.reason === 'clear' ? '<br><b class="text-rose-400">Bạn phải xuất và lưu file Excel trước thì mới xóa được bộ nhớ đệm. Việc này chỉ xóa ảnh lịch sử, dữ liệu chữ được giữ nguyên.</b>' : ''}${bk.reason === 'report' ? '<br><b class="text-amber-500">Hãy sao lưu sau khi gửi báo cáo để không mất dữ liệu.</b>' : ''}</p>
                     <button onclick="backupCreate(null, BK_NAME)" class="${btn}bg-emerald-600 hover:bg-emerald-700 text-white"><i class="fa-solid fa-file-circle-plus"></i><span>Tạo file Excel mới</span></button>
                     <button onclick="backupPickOld()" class="${btn}bg-blue-600 hover:bg-blue-700 text-white"><i class="fa-solid fa-layer-group"></i><span>Cộng dồn vào file Excel cũ (chọn từ Tệp)</span></button>
                     <p class="text-[11px] opacity-75 text-center">${lastBackupText()}</p>`;
@@ -5792,7 +5878,7 @@
                     <button onclick="backupShare()" class="${btn}bg-amber-500 hover:bg-amber-600 text-slate-950"><i class="fa-solid fa-share-from-square"></i><span>Lưu vào Tệp / Chia sẻ (iPhone)</span></button>
                     <button onclick="backupDownload()" class="${btn}bg-theme-input border border-theme-border"><i class="fa-solid fa-download"></i><span>Tải xuống máy</span></button>
                     <p class="text-[11px] opacity-75 leading-relaxed">iPhone: bấm nút vàng → chọn <b>"Lưu vào Tệp"</b> → chọn thư mục (iCloud Drive/Trên iPhone). Nếu đã có file cùng tên, chọn <b>"Thay thế"</b> để chỉ giữ 1 file duy nhất.</p>
-                    ${bk.reason === 'clear' ? `<button onclick="confirmClearHistory()" class="${btn}${bk.saved ? 'bg-rose-600 hover:bg-rose-700 text-white' : 'bg-theme-input opacity-50 cursor-not-allowed'}"><i class="fa-solid fa-trash-can"></i><span>Dọn lịch sử vào kho lưu trữ${bk.saved ? '' : ' (lưu file trước)'}</span></button>` : (bk.reason === 'report' ? `<button onclick="archiveOldNow()" class="${btn}bg-sky-600 hover:bg-sky-700 text-white"><i class="fa-solid fa-box-archive"></i><span>Lưu trữ lịch sử các ngày trước (giữ lại)</span></button>` : '')}`;
+                    ${bk.reason === 'clear' ? `<button onclick="confirmClearHistory()" class="${btn}${bk.saved ? 'bg-rose-600 hover:bg-rose-700 text-white' : 'bg-theme-input opacity-50 cursor-not-allowed'}"><i class="fa-solid fa-trash-can"></i><span>Xóa ảnh lịch sử (giữ nguyên dữ liệu chữ)${bk.saved ? '' : ' - lưu file trước'}</span></button>` : ''}`;
             }
         }
 
