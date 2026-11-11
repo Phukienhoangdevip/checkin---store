@@ -769,6 +769,7 @@
             salesHistory: [],
             checkinHistory: [],
             importHistory: [],
+            historyArchive: { sales: [], checkin: [], imports: [] },
             settings: { checkinRadius: 50, requiredMinutes: 5, deviceMode: 'mobile' },
             categories: ['Cáp sạc', 'Củ sạc', 'Tai nghe', 'Kính cường lực', 'Ốp lưng']
         };
@@ -802,6 +803,7 @@
             if (!db.users || !db.users.length) db.users = [{ username: 'admin', password: '123', role: 'admin', status: 'approved', fullname: 'Quản trị viên (Hoàng Đế)', permissions: { stores: true, master: true, warehouse: true, history: true } }];
             ['stores', 'productsMaster', 'warehouse', 'checkinHistory', 'importHistory', 'routes', 'returnHistory'].forEach(k => { if (!Array.isArray(db[k])) db[k] = []; });
             if (!db.salesHistory) db.salesHistory = db.history || [];
+            archiveOf();
             if (!db.settings) db.settings = { checkinRadius: 50, requiredMinutes: 5, deviceMode: 'mobile' };
             if (!db.categories || !db.categories.length) db.categories = ['Cáp sạc', 'Củ sạc', 'Tai nghe', 'Kính cường lực', 'Ốp lưng'];
             try { loadCustomLists(); } catch (e) {}
@@ -1000,6 +1002,7 @@
             db.importHistory = data.importHistory || [];
             db.routes = data.routes || [];
             db.returnHistory = data.returnHistory || [];
+            db.historyArchive = data.historyArchive || { sales: [], checkin: [], imports: [] };
             if (data.settings) db.settings = data.settings;
             if (data.categories && data.categories.length) db.categories = data.categories;
             normalizeDb();
@@ -1310,7 +1313,7 @@
                         </div>
                         <div>
                             <h1 class="font-black text-xs sm:text-sm uppercase tracking-wider">PHỤ KIỆN HOÀNG ĐẾ</h1>
-                            <p class="text-[11px] sm:text-xs opacity-75">Nhân sự: <span class="font-bold text-amber-500">${user.fullname}</span> (${db.settings?.deviceMode === 'pc' ? 'Chế độ PC' : 'Chế độ Mobile'} • Bản 42)</p>
+                            <p class="text-[11px] sm:text-xs opacity-75">Nhân sự: <span class="font-bold text-amber-500">${user.fullname}</span> (${db.settings?.deviceMode === 'pc' ? 'Chế độ PC' : 'Chế độ Mobile'} • Bản 43)</p>
                         </div>
                     </div>
                     <div class="flex space-x-2 w-full sm:w-auto justify-end">
@@ -1465,6 +1468,7 @@
                                                 <p class="text-xs opacity-75 mt-0.5">Chủ: <b class="opacity-100">${s.owner || 'N/A'}</b> | SĐT: <a href="tel:${s.phone}" class="text-blue-400 underline">${s.phone || 'N/A'}</a></p>
                                                 <p class="text-xs opacity-75 mt-0.5"><i class="fa-solid fa-location-dot mr-1 text-amber-500"></i>${s.address}, ${s.district}, ${s.city} <span class="text-[10px] text-blue-400 bg-blue-500/10 border border-blue-500/20 px-1.5 py-0.5 rounded font-mono">[${s.lat}, ${s.lng}]</span></p>
                                                 ${(s.scale || s.industry || s.relation) ? `<div class="flex flex-wrap gap-1 mt-1.5">${s.scale ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-500 border border-amber-500/30 font-semibold">Quy mô: ${s.scale}</span>` : ''}${s.industry ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-400 border border-blue-500/30 font-semibold">${s.industry}</span>` : ''}${s.relation ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-semibold">${s.relation}</span>` : ''}</div>` : ''}
+                                                ${(s.interests && s.interests.length) ? `<div class="text-[11px] mt-1.5 text-sky-300"><i class="fa-solid fa-heart mr-1"></i>Quan tâm: ${s.interests.map(escHtml).join(', ')}</div>` : ''}
                                                 ${s.storePhoto ? `<div class="mt-2"><img src="${s.storePhoto}" class="w-24 h-14 object-cover rounded-lg border border-theme-border shadow-sm cursor-pointer hover:opacity-80 transition" onclick="openGlobalPhotoEdit('store_edit', ${s.id})" title="Nhấn để đổi ảnh shop" alt="Ảnh shop" /></div>` : ''}
                                             </div>
                                         </div>
@@ -1787,7 +1791,16 @@
 
 
         // ===== Bản 42: doanh thu, xem bill, dung lượng =====
-        function dayKeyOf(t) { return typeof t === 'string' ? t.trim().split(/\s+/).pop() : ''; }
+        const VN_TZ = 'Asia/Ho_Chi_Minh';
+        function vnParts(d) {
+            try {
+                const p = {}; new Intl.DateTimeFormat('en-GB', { timeZone: VN_TZ, hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric' }).formatToParts(d || new Date()).forEach(x => { p[x.type] = x.value; });
+                return { y: +p.year, m: +p.month, d: +p.day, H: (+p.hour) % 24, M: +p.minute, S: +p.second };
+            } catch (e) { const x = d || new Date(); return { y: x.getFullYear(), m: x.getMonth() + 1, d: x.getDate(), H: x.getHours(), M: x.getMinutes(), S: x.getSeconds() }; }
+        }
+        function vnDateStr(d) { const p = vnParts(d); return p.d + '/' + p.m + '/' + p.y; }
+        function vnNowStr(d) { const p = vnParts(d), z = n => String(n).padStart(2, '0'); return z(p.H) + ':' + z(p.M) + ':' + z(p.S) + ' ' + p.d + '/' + p.m + '/' + p.y; }
+        function dayKeyOf(t) { const m = String(t == null ? '' : t).match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/); return m ? (+m[1]) + '/' + (+m[2]) + '/' + m[3] : ''; }
         function parseMoneyStr(x) { const m = String(x || '').match(/([\d.,]+)\s*đ/); return m ? (parseInt(m[1].replace(/[.,]/g, '')) || 0) : 0; }
         function saleNet(h) { return typeof h.net === 'number' ? h.net : moneyOf(h.note); }
         function saleGross(h) {
@@ -1799,7 +1812,7 @@
         function fmtVnd(n) { return Math.round(n).toLocaleString('vi-VN') + ' đ'; }
         function revenuePanelHtml() {
             const u = getCurrentUser(); const admin = u.role === 'admin';
-            const mine = (db.salesHistory || []).filter(h => admin || h.username === u.username);
+            const mine = allSales().filter(h => admin || h.username === u.username);
             const today = todayVN();
             const days = {};
             mine.forEach(h => { const k = dayKeyOf(h.time); if (!k) return; (days[k] = days[k] || { g: 0, n: 0, c: 0 }); days[k].g += saleGross(h); days[k].n += saleNet(h); days[k].c++; });
@@ -1812,7 +1825,7 @@
             });
             const spanDays = isFinite(firstT) ? Math.floor((new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate()).getTime() - firstT) / 86400000) + 1 : 0;
             const past = [];
-            for (let i = 1; i <= 7; i++) { const d = new Date(); d.setDate(d.getDate() - i); const k = d.toLocaleDateString('vi-VN'); if (days[k]) past.push([k, days[k]]); }
+            for (let i = 1; i <= 7; i++) { const d = new Date(); d.setDate(d.getDate() - i); const k = vnDateStr(d); if (days[k]) past.push([k, days[k]]); }
             return `<div class="bg-theme-card border border-theme-border p-4 sm:p-5 rounded-2xl shadow-sm space-y-3">
                 <div class="flex items-center justify-between">
                     <h3 class="font-bold text-sm"><i class="fa-solid fa-sack-dollar text-amber-500 mr-2"></i>Doanh thu hôm nay <span class="opacity-60 font-normal">(${today}${admin ? ' · toàn đội' : ''})</span></h3>
@@ -1832,8 +1845,8 @@
             </div>`;
         }
 
-        function viewSavedBill(i) {
-            const h = (db.salesHistory || [])[i]; if (!h) return;
+        function viewSavedBill(i, arch) {
+            const h = (arch ? ((db.historyArchive || {}).sales || []) : (db.salesHistory || []))[i]; if (!h) return;
             const st = db.stores.find(x => x.name === h.storeName) || {};
             let items = h.items;
             if (!items || !items.length) {
@@ -2981,7 +2994,7 @@
                 grand += r.qty * (Number(r.price) > 0 ? Number(r.price) : (target.price || 0));
                 const w = db.warehouse.find(z => String(z.productId) === String(target.id));
                 if (w) w.qty += r.qty; else db.warehouse.push({ id: Date.now().toString() + Math.floor(Math.random() * 100000), productId: target.id, qty: r.qty });
-                db.importHistory.unshift({ time: new Date().toLocaleTimeString('vi-VN'), productName: target.name, qty: r.qty, amount: r.qty * (Number(r.price) > 0 ? Number(r.price) : (target.price || 0)) });
+                db.importHistory.unshift({ time: vnNowStr(), productName: target.name, qty: r.qty, amount: r.qty * (Number(r.price) > 0 ? Number(r.price) : (target.price || 0)) });
                 done.push(`${prodCode(target)} – ${target.name} x${r.qty}`);
             });
             saveData();
@@ -3391,7 +3404,7 @@
             items.forEach(i => { const w = db.warehouse.find(x => String(x.productId) === String(i.productId)); if (w) w.qty = Math.max(0, w.qty - i.q); });
             const u = getCurrentUser();
             if (!db.returnHistory) db.returnHistory = [];
-            db.returnHistory.unshift({ id: Date.now().toString(), time: new Date().toLocaleString('vi-VN'), username: u.username, byName: u.fullname || u.username, receiverName: name, receiverPhone: document.getElementById('rt-phone').value.trim(), note: document.getElementById('rt-note').value.trim(), items });
+            db.returnHistory.unshift({ id: Date.now().toString(), time: vnNowStr(), username: u.username, byName: u.fullname || u.username, receiverName: name, receiverPhone: document.getElementById('rt-phone').value.trim(), note: document.getElementById('rt-note').value.trim(), items });
             saveData(); rtDraft = {};
             document.getElementById('return-modal').classList.add('hidden');
             alert(`Đã trả ${total} cái về kho cho ${name}.`);
@@ -3422,95 +3435,204 @@
             db.salesHistory.splice(i, 1);
             saveData(); render();
         }
+
+        // ===== Bản 43: kho lưu trữ lịch sử (không mất khi dọn bộ nhớ đệm), lịch sử theo ngày Việt Nam =====
+        function archiveOf() {
+            if (!db.historyArchive || typeof db.historyArchive !== 'object') db.historyArchive = {};
+            ['sales', 'checkin', 'imports'].forEach(k => { if (!Array.isArray(db.historyArchive[k])) db.historyArchive[k] = []; });
+            return db.historyArchive;
+        }
+        function allSales() { const a = (db.historyArchive && db.historyArchive.sales) || []; return a.length ? a.concat(db.salesHistory || []) : (db.salesHistory || []); }
+        function allCheckins() { const a = (db.historyArchive && db.historyArchive.checkin) || []; return a.length ? a.concat(db.checkinHistory || []) : (db.checkinHistory || []); }
+        function allImports() { const a = (db.historyArchive && db.historyArchive.imports) || []; return a.length ? a.concat(db.importHistory || []) : (db.importHistory || []); }
+        const slimRec = h => { const o = Object.assign({}, h); const pc = (Array.isArray(o.photos) ? o.photos.length : 0) || (o.photo ? 1 : 0); delete o.photos; delete o.photo; if (pc) o.photoCount = pc; return o; };
+        const recSig = (k, h) => k === 'imports' ? [h.time, h.productName, h.qty].join('|') : [h.time, h.storeName, h.username, h.note].join('|');
+        // onlyBefore = true: chỉ lưu trữ các ngày trước hôm nay; false: toàn bộ lịch sử hiện có
+        function archiveHistory(onlyBefore) {
+            const A = archiveOf(), today = parseDayKey(todayVN()); let n = 0;
+            [['sales', 'salesHistory'], ['checkin', 'checkinHistory'], ['imports', 'importHistory']].forEach(([ak, dk]) => {
+                const seen = new Set(A[ak].map(h => recSig(ak, h))), stay = [], move = [];
+                (db[dk] || []).forEach(h => {
+                    const day = dayKeyOf(h.time);
+                    if (onlyBefore && (!day || parseDayKey(day) >= today)) stay.push(h); else move.push(h);
+                });
+                const add = move.filter(h => { const g = recSig(ak, h); if (seen.has(g)) return false; seen.add(g); return true; }).map(slimRec);
+                A[ak] = add.concat(A[ak]); n += move.length; db[dk] = stay;
+            });
+            return n;
+        }
+        function archiveOldNow() {
+            if (!confirm('Chuyển lịch sử các ngày trước hôm nay vào kho lưu trữ?\n\nLịch sử vẫn được giữ và xem được ở mục Lịch sử / Tổng lịch sử. Chỉ làm gọn danh sách hằng ngày.')) return;
+            const n = archiveHistory(true); saveData(); alert('Đã chuyển ' + n + ' bản ghi vào kho lưu trữ. Không có dữ liệu nào bị xóa.'); render();
+        }
+        function recTs(h) {
+            const t = String(h.time || ''), d = parseDayKey(dayKeyOf(t)), m = t.match(/(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+            return d + (m ? ((+m[1]) * 3600 + (+m[2]) * 60 + (+(m[3] || 0))) * 1000 : 0);
+        }
+        function histRecs(kind) {
+            const A = (db.historyArchive && db.historyArchive[kind]) || [], cur = kind === 'sales' ? (db.salesHistory || []) : (db.checkinHistory || []), out = [];
+            cur.forEach((h, idx) => out.push({ h, src: 's', idx, ts: recTs(h) })); A.forEach((h, idx) => out.push({ h, src: 'a', idx, ts: recTs(h) }));
+            return out.sort((a, b) => b.ts - a.ts);
+        }
+        const HDOW = ['Chủ nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
+        function histDayLabel(k) { if (k === '?') return 'Không rõ ngày'; return HDOW[new Date(parseDayKey(k)).getDay()] + ' ' + k + (k === todayVN() ? ' • Hôm nay' : ''); }
+        function histGroups(recs) { const g = [], ix = {}; recs.forEach(r => { const k = dayKeyOf(r.h.time) || '?'; if (!(k in ix)) { ix[k] = g.length; g.push({ k, rows: [] }); } g[ix[k]].rows.push(r); }); return g; }
+        let histDaysShown = 7, histRange = 'month', histFrom = '', histTo = '';
+        const histIso = ms => { const d = new Date(ms); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+        function histBounds() {
+            const p = vnParts(new Date()), mk = (y, mi, d) => new Date(y, mi, d).getTime(), today = mk(p.y, p.m - 1, p.d);
+            if (histRange === 'today') return [today, today];
+            if (histRange === 'month') return [mk(p.y, p.m - 1, 1), today];
+            if (histRange === 'last') return [mk(p.y, p.m - 2, 1), mk(p.y, p.m - 1, 0)];
+            if (histRange === '3m') return [mk(p.y, p.m - 3, 1), today];
+            const f = /^\d{4}-\d{2}-\d{2}$/.test(histFrom) ? new Date(histFrom + 'T00:00:00').getTime() : today, t = /^\d{4}-\d{2}-\d{2}$/.test(histTo) ? new Date(histTo + 'T00:00:00').getTime() : today;
+            return f <= t ? [f, t] : [t, f];
+        }
+        const histFmtDay = ms => { const d = new Date(ms); return d.getDate() + '/' + (d.getMonth() + 1) + '/' + d.getFullYear(); };
+        function histRangeData() {
+            const [from, to] = histBounds(), u = getCurrentUser(), admin = u.role === 'admin';
+            const sales = allSales().filter(h => { const t = parseDayKey(dayKeyOf(h.time)); return t >= from && t <= to && (admin || h.username === u.username); });
+            const checks = allCheckins().filter(h => { const t = parseDayKey(dayKeyOf(h.time)); return t >= from && t <= to && (admin || h.username === u.username); });
+            const byStore = {}, byDay = {}; let g = 0, n = 0;
+            sales.forEach(h => {
+                const gg = saleGross(h), nn = saleNet(h); g += gg; n += nn;
+                const b = (byStore[h.storeName] = byStore[h.storeName] || { name: h.storeName, c: 0, g: 0, n: 0, list: [] }); b.c++; b.g += gg; b.n += nn; b.list.push(h);
+                const k = dayKeyOf(h.time), d = (byDay[k] = byDay[k] || { c: 0, n: 0 }); d.c++; d.n += nn;
+            });
+            const stores = Object.values(byStore).sort((a, b) => b.n - a.n || a.name.localeCompare(b.name, 'vi'));
+            stores.forEach(b => b.list.sort((a, c) => recTs(c) - recTs(a)));
+            const days = Object.keys(byDay).filter(Boolean).sort((a, b) => parseDayKey(b) - parseDayKey(a));
+            return { from, to, sales, checks, stores, byDay, days, g, n };
+        }
+        function histSet(k, v) {
+            if (k === 'range') histRange = v; else if (k === 'from') histFrom = v; else if (k === 'to') histTo = v;
+            if (k === 'range' && v === 'custom') { const [f, t] = histBounds(); if (!histFrom) histFrom = histIso(f); if (!histTo) histTo = histIso(t); }
+            render();
+        }
+        function histRangeTitle(R) { return histFmtDay(R.from) + ' → ' + histFmtDay(R.to); }
+        function histRangeHtml() {
+            const R = histRangeData(), chip = (v, l) => `<button type="button" onclick="histSet('range','${v}')" class="px-3 py-2 rounded-xl text-xs font-bold border ${histRange === v ? 'bg-amber-500 text-slate-950 border-amber-500 shadow' : 'bg-theme-input border-theme-border'}">${l}</button>`;
+            const box = (l, v, c) => `<div class="p-3 rounded-xl bg-theme-input border border-theme-border text-center"><div class="text-[10px] opacity-70">${l}</div><div class="font-bold text-sm ${c || ''}">${v}</div></div>`;
+            return `
+                <div class="bg-theme-card border border-theme-border p-4 sm:p-5 rounded-2xl shadow-sm space-y-3">
+                    <div class="font-bold text-sm"><i class="fa-solid fa-calendar-days text-amber-500 mr-2"></i>Xem tổng lịch sử theo khoảng ngày</div>
+                    <div class="flex flex-wrap gap-2">${chip('today', 'Hôm nay')}${chip('month', 'Tháng này')}${chip('last', 'Tháng trước')}${chip('3m', '3 tháng gần đây')}${chip('custom', 'Tùy chỉnh')}</div>
+                    ${histRange === 'custom' ? `<div class="grid grid-cols-2 gap-2"><div><label class="block text-[10px] font-semibold uppercase mb-1 opacity-70">Từ ngày</label><input type="date" value="${histFrom}" onchange="histSet('from', this.value)" class="w-full px-3 py-2.5 rounded-xl bg-theme-input border border-theme-border text-xs font-semibold"></div><div><label class="block text-[10px] font-semibold uppercase mb-1 opacity-70">Đến ngày</label><input type="date" value="${histTo}" onchange="histSet('to', this.value)" class="w-full px-3 py-2.5 rounded-xl bg-theme-input border border-theme-border text-xs font-semibold"></div></div>` : ''}
+                    <p class="text-xs opacity-75">Khoảng ngày đang xem (giờ Việt Nam): <b class="text-amber-500">${histRangeTitle(R)}</b> • gồm cả lịch sử trong kho lưu trữ</p>
+                    <div class="grid grid-cols-2 sm:grid-cols-5 gap-2">${box('Số đơn', R.sales.length)}${box('Cửa hàng mua', R.stores.length)}${box('Doanh thu Gross', kpiFmt(R.g))}${box('Doanh thu Net', kpiFmt(R.n), 'text-amber-500')}${box('Lượt check-in', R.checks.length, 'text-sky-400')}</div>
+                    <div class="flex gap-2">
+                        <button type="button" onclick="openReportModal('range')" class="flex-1 py-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-xl text-xs shadow"><i class="fa-solid fa-image mr-1"></i> Xuất báo cáo (JPG)</button>
+                        <button type="button" onclick="histExportExcel()" class="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs shadow"><i class="fa-solid fa-file-excel mr-1"></i> Xuất Excel</button>
+                    </div>
+                </div>
+                <div class="bg-theme-card border border-theme-border rounded-2xl shadow-sm overflow-hidden">
+                    <div class="p-3 bg-black/20 border-b border-theme-border font-bold text-xs uppercase">Doanh thu theo ngày</div>
+                    <div class="divide-y divide-theme-border text-xs">${R.days.length ? R.days.map(k => `<div class="flex justify-between px-3 py-2"><span class="font-semibold">${histDayLabel(k)}</span><span>${R.byDay[k].c} đơn • <b class="text-amber-500">${kpiFmt(R.byDay[k].n)} đ</b></span></div>`).join('') : '<p class="p-4 text-center opacity-60">Chưa có đơn hàng trong khoảng này.</p>'}</div>
+                </div>
+                <div class="bg-theme-card border border-theme-border rounded-2xl shadow-sm overflow-hidden">
+                    <div class="p-3 bg-black/20 border-b border-theme-border font-bold text-xs uppercase">Danh sách mua hàng theo cửa hàng (${R.stores.length})</div>
+                    <div class="divide-y divide-theme-border text-xs">
+                        ${R.stores.length ? R.stores.map(b => `<details class="px-3 py-2"><summary class="cursor-pointer flex justify-between gap-2 items-center"><span class="font-bold">${escHtml(b.name)}</span><span class="whitespace-nowrap">${b.c} đơn • <b class="text-amber-500">${kpiFmt(b.n)} đ</b></span></summary>
+                            <div class="mt-2 space-y-1.5">${b.list.map(h => `<div class="p-2 rounded-lg bg-theme-input border border-theme-border"><div class="flex justify-between gap-2"><b>${escHtml(h.time)}</b><b class="text-amber-500">${kpiFmt(saleNet(h))} đ</b></div><div class="opacity-80 break-words">${escHtml(String(h.note || '').replace(/^[^:]*\):\s*/, '').replace(/\s*\|\s*Tổng:.*$/, ''))}</div><div class="opacity-60">@${escHtml(h.username || '')}${h.discountStr && h.discountStr !== '0 đ' ? ' • CK ' + escHtml(h.discountStr) : ''}</div></div>`).join('')}</div></details>`).join('') : '<p class="p-4 text-center opacity-60">Chưa có cửa hàng nào mua hàng trong khoảng này.</p>'}
+                    </div>
+                </div>`;
+        }
+        function buildRangeReportBlocks() {
+            const R = histRangeData(), blocks = [];
+            const box = (l, v, c) => `<div style="flex:1;background:rgba(0,0,0,.4);border:1px solid rgba(245,158,11,.25);border-radius:10px;padding:8px"><div style="font-size:10px;color:#cbd5e1;font-weight:600">${l}</div><div style="font-size:13px;font-weight:800;color:${c}">${v}</div></div>`;
+            blocks.push(`<div style="text-align:center;border-bottom:1px solid rgba(245,158,11,.4);padding-bottom:8px;margin-bottom:8px"><div style="font-weight:900;color:#fbbf24;font-size:14px;letter-spacing:1px">PHỤ KIỆN HOÀNG ĐẾ</div><div style="font-size:11px;color:#e2e8f0;margin-top:2px">BÁO CÁO TỔNG LỊCH SỬ • ${histRangeTitle(R)}</div></div>`);
+            blocks.push(`<div style="display:flex;gap:6px;margin-bottom:6px">${box('Doanh thu Gross', rpFmt(R.g) + ' đ', '#fff')}${box('Doanh thu Net', rpFmt(R.n) + ' đ', '#fbbf24')}</div>`);
+            blocks.push(`<div style="display:flex;gap:6px;margin-bottom:6px">${box('Số đơn', R.sales.length, '#fff')}${box('Cửa hàng mua', R.stores.length, '#34d399')}${box('Check-in', R.checks.length, '#60a5fa')}</div>`);
+            rpSection('📅 Doanh thu theo ngày', R.days.map(k => rpLine(`🔹 <b>${k}</b>: ${R.byDay[k].c} đơn • <b style="color:#fbbf24">Net ${rpFmt(R.byDay[k].n)}</b>`)), 'Chưa có đơn hàng nào.').forEach(b => blocks.push(b));
+            rpSection('🏪 Tổng hợp theo cửa hàng', R.stores.map((b, i) => rpLine(`${i + 1}. <b style="color:#6ee7b7">${escHtml(b.name)}</b>: ${b.c} đơn • <b style="color:#fbbf24">${rpFmt(b.n)} đ</b>`)), 'Chưa có cửa hàng nào mua hàng.').forEach(b => blocks.push(b));
+            rpBillBlocks(R.sales.slice().sort((a, b) => recTs(a) - recTs(b)), `🧾 Danh sách mua hàng từng cửa hàng (${R.sales.length} đơn)`).forEach(b => blocks.push(b));
+            return blocks;
+        }
+        async function histExportExcel() {
+            if (typeof ExcelJS === 'undefined') { alert('Chưa tải được thư viện Excel, vui lòng kiểm tra mạng rồi thử lại.'); return; }
+            const R = histRangeData(); if (!R.sales.length) { alert('Khoảng ngày này chưa có đơn hàng để xuất.'); return; }
+            try {
+                const wb = new ExcelJS.Workbook(), thin = { style: 'thin', color: { argb: 'FFBFBFBF' } }, border = { top: thin, left: thin, bottom: thin, right: thin };
+                const head = (ws, title, cols, widths) => {
+                    widths.forEach((w, i) => { ws.getColumn(i + 1).width = w; });
+                    ws.mergeCells(1, 1, 1, cols.length); const t = ws.getCell(1, 1); t.value = title; t.font = { name: 'Arial', size: 14, bold: true, color: { argb: 'FFFFFFFF' } }; t.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F3864' } }; t.alignment = { horizontal: 'center', vertical: 'middle' }; ws.getRow(1).height = 30;
+                    const hr = ws.addRow(cols); hr.height = 26; hr.eachCell(c => { c.font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FFFFFFFF' } }; c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2F5597' } }; c.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true }; c.border = border; });
+                };
+                const body = (r, moneyCols) => r.eachCell({ includeEmpty: true }, (c, col) => { c.font = { name: 'Arial', size: 10 }; c.border = border; c.alignment = { vertical: 'middle', wrapText: true, horizontal: moneyCols.includes(col) ? 'right' : 'left' }; if (moneyCols.includes(col)) c.numFmt = '#,##0'; });
+                const ws1 = wb.addWorksheet('Tổng hợp cửa hàng'); head(ws1, 'TỔNG HỢP MUA HÀNG THEO CỬA HÀNG ' + histRangeTitle(R), ['STT', 'Cửa hàng', 'Địa chỉ', 'Số đơn', 'Doanh thu Gross (đ)', 'Doanh thu Net (đ)'], [6, 30, 40, 10, 20, 20]);
+                R.stores.forEach((b, i) => { const st = (db.stores || []).find(x => x.name === b.name) || {}; body(ws1.addRow([i + 1, b.name, [st.address, st.district, st.city].filter(Boolean).join(', '), b.c, b.g, b.n]), [5, 6]); });
+                const tr = ws1.addRow(['', 'TỔNG CỘNG', '', R.sales.length, R.g, R.n]); tr.eachCell({ includeEmpty: true }, (c, col) => { c.font = { name: 'Arial', size: 11, bold: true }; c.border = border; if (col >= 5) c.numFmt = '#,##0'; });
+                const ws2 = wb.addWorksheet('Chi tiết đơn hàng'); head(ws2, 'CHI TIẾT ĐƠN HÀNG ' + histRangeTitle(R), ['Thời gian', 'Nhân viên', 'Cửa hàng', 'Chi tiết đơn hàng', 'Chiết khấu', 'Tổng tiền (đ)'], [22, 14, 28, 70, 14, 18]);
+                R.sales.slice().sort((a, b) => recTs(a) - recTs(b)).forEach(h => body(ws2.addRow([h.time, h.username || '', h.storeName, String(h.note || '').replace(/^[^:]*\):\s*/, '').replace(/\s*\|\s*Tổng:.*$/, ''), h.discountStr || '0 đ', saleNet(h)]), [6]));
+                const ws3 = wb.addWorksheet('Theo ngày'); head(ws3, 'DOANH THU THEO NGÀY ' + histRangeTitle(R), ['Ngày', 'Số đơn', 'Doanh thu Net (đ)'], [26, 12, 22]);
+                R.days.slice().reverse().forEach(k => body(ws3.addRow([histDayLabel(k), R.byDay[k].c, R.byDay[k].n]), [3]));
+                const buf = await wb.xlsx.writeBuffer();
+                kpiSaveBlob(new Blob([buf], { type: XLSX_MIME }), 'Lich-Su-' + histIso(R.from) + '_' + histIso(R.to) + '.xlsx');
+            } catch (e) { console.error(e); alert('Lỗi xuất Excel: ' + e.message); }
+        }
+
         function renderHistoryView() {
+            const tab = historySubTab, tb = (k, ic, l) => `<button onclick="historySubTab='${k}'; render();" class="flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-xs font-bold transition ${tab === k ? 'bg-amber-500 text-slate-950 shadow' : 'bg-theme-input opacity-75 border border-theme-border'}"><i class="fa-solid ${ic} mr-1"></i> ${l}</button>`;
+            const A = archiveOf(), nArch = A.sales.length + A.checkin.length + A.imports.length;
+            let bodyHtml = '';
+            if (tab === 'range') bodyHtml = histRangeHtml();
+            else {
+                const kind = tab === 'checkin' ? 'checkin' : 'sales', recs = histRecs(kind), groups = histGroups(recs), shown = groups.slice(0, histDaysShown);
+                const more = groups.length > shown.length ? `<button onclick="histDaysShown+=7; render();" class="w-full py-3 rounded-xl bg-theme-input border border-theme-border text-xs font-bold">Xem thêm 7 ngày cũ hơn (còn ${groups.length - shown.length} ngày)</button>` : '';
+                const photoCell = (r, cls) => { const h = r.h; if (r.src === 'a') return h.photoCount ? `<span class="text-[11px] opacity-60">📷 ${h.photoCount} ảnh (kho lưu trữ không giữ ảnh)</span>` : 'Không có ảnh'; return null; };
+                const saleRow = r => { const h = r.h, hIdx = r.idx, arch = r.src === 'a';
+                    const ph = arch ? photoCell(r) : (h.photos && h.photos.length > 0 ? h.photos.map((img, pIdx) => `<img src="${img}" class="w-14 h-10 object-cover rounded border border-theme-border shadow-sm cursor-pointer hover:opacity-80 transition" onclick="openGlobalPhotoEdit('sales_history_photo', ${hIdx}, ${pIdx})" title="Nhấn để đổi ảnh" />`).join('') : (h.photo ? `<img src="${h.photo}" class="w-14 h-10 object-cover rounded border border-theme-border shadow-sm cursor-pointer hover:opacity-80 transition" onclick="openGlobalPhotoEdit('sales_history_photo', ${hIdx}, 0)" title="Nhấn để đổi ảnh" />` : 'Không có ảnh'));
+                    return `<tr>
+                        <td class="p-3.5 text-xs opacity-75 whitespace-nowrap font-semibold">${h.time}</td>
+                        <td class="p-3.5 font-semibold text-amber-500">@${h.username}</td>
+                        <td class="p-3.5 font-bold">${h.storeName}</td>
+                        <td class="p-3.5 text-xs opacity-90">${h.note}</td>
+                        <td class="p-3.5 text-xs font-bold text-amber-500 whitespace-nowrap">${h.discountStr || '0 đ'}</td>
+                        <td class="p-3.5"><div class="flex gap-1.5 flex-wrap">${ph}</div></td>
+                        <td class="p-3.5 text-center"><button onclick="viewSavedBill(${hIdx}${arch ? ', true' : ''})" class="px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded text-xs font-semibold whitespace-nowrap"><i class="fa-solid fa-receipt mr-1"></i>Xem bill</button></td>
+                        <td class="p-3.5 text-center">${arch ? '<span class="text-[10px] opacity-60">Đã lưu trữ</span>' : `<button onclick="deleteSalesRecord(${hIdx})" class="px-3 py-1 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded text-xs font-semibold whitespace-nowrap"><i class="fa-solid fa-trash-can mr-1"></i>Xóa</button>`}</td>
+                    </tr>`; };
+                const checkRow = r => { const h = r.h, idx = r.idx, arch = r.src === 'a';
+                    const ph = arch ? photoCell(r) : (h.photo ? `<img src="${h.photo}" class="w-16 h-10 object-cover rounded border border-theme-border shadow-sm cursor-pointer hover:opacity-80 transition" onclick="openGlobalPhotoEdit('checkin_history_photo', ${idx})" title="Nhấn để đổi ảnh" />` : 'N/A');
+                    return `<tr>
+                        <td class="p-3.5 text-xs opacity-75 whitespace-nowrap font-semibold">${h.time}</td>
+                        <td class="p-3.5 font-semibold text-amber-500">@${h.username}</td>
+                        <td class="p-3.5 font-bold">${h.storeName}</td>
+                        <td class="p-3.5 text-xs opacity-90">${h.note}</td>
+                        <td class="p-3.5">${ph}</td></tr>`; };
+                const cols = kind === 'sales' ? 8 : 5;
+                const dayHead = g => { const net = kind === 'sales' ? g.rows.reduce((t, r) => t + saleNet(r.h), 0) : 0; return `<tr class="bg-amber-500/10"><td colspan="${cols}" class="p-2.5 text-xs font-bold text-amber-500"><i class="fa-solid fa-calendar-day mr-1"></i>${histDayLabel(g.k)} — ${g.rows.length} ${kind === 'sales' ? 'đơn • Net ' + kpiFmt(net) + ' đ' : 'lượt check-in'}</td></tr>`; };
+                const head = kind === 'sales'
+                    ? '<th class="p-3.5">Thời gian</th><th class="p-3.5">Sale</th><th class="p-3.5">Cửa hàng</th><th class="p-3.5">Chi tiết đơn hàng</th><th class="p-3.5">Chiết khấu</th><th class="p-3.5">Ảnh sản phẩm bán (Tối đa 3)</th><th class="p-3.5 text-center">Bill</th><th class="p-3.5 text-center">Xóa</th>'
+                    : '<th class="p-3.5">Thời gian</th><th class="p-3.5">Sale</th><th class="p-3.5">Cửa hàng</th><th class="p-3.5">Trạng thái / Ghi chú</th><th class="p-3.5">Ảnh check-in thực tế</th>';
+                bodyHtml = `
+                    <div class="bg-theme-card border border-theme-border rounded-2xl shadow-sm overflow-hidden">
+                        <div class="p-3 bg-black/20 border-b border-theme-border font-bold text-xs uppercase">${kind === 'sales' ? 'Bảng 1: Lịch sử bán hàng theo ngày (giờ Việt Nam)' : 'Bảng 2: Lịch sử check-in theo ngày (giờ Việt Nam)'}</div>
+                        <div class="overflow-x-auto hide-scrollbar">
+                            <table class="w-full text-left border-collapse ${kind === 'sales' ? 'min-w-[800px]' : 'min-w-[700px]'}">
+                                <thead><tr class="text-xs uppercase font-semibold border-b border-theme-border">${head}</tr></thead>
+                                <tbody class="divide-y divide-theme-border text-xs sm:text-sm">
+                                    ${recs.length ? shown.map(g => dayHead(g) + g.rows.map(kind === 'sales' ? saleRow : checkRow).join('')).join('') : `<tr><td colspan="${cols}" class="p-8 text-center opacity-50 italic">${kind === 'sales' ? 'Chưa có lịch sử bán hàng nào.' : 'Chưa có lịch sử check-in nào.'}</td></tr>`}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>${more}`;
+            }
             return `
                 <div class="space-y-4 sm:space-y-6 text-theme-text">
-                    <div class="bg-theme-card border border-theme-border p-4 sm:p-6 rounded-2xl shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <div class="bg-theme-card border border-theme-border p-4 sm:p-6 rounded-2xl shadow-sm space-y-3">
                         <div>
                             <h2 class="font-bold text-base sm:text-lg">Lịch sử Hoạt động & Đơn hàng</h2>
-                            <p class="text-xs sm:text-sm opacity-75 mt-1">Lưu vết toàn bộ đơn hàng bán và quá trình check-in cửa hàng.</p>
+                            <p class="text-xs sm:text-sm opacity-75 mt-1">Chia theo ngày thực tế (giờ Việt Nam). Lịch sử đã dọn khỏi bộ nhớ đệm vẫn được giữ trong kho lưu trữ (${nArch} bản ghi).</p>
                         </div>
-                        <div class="flex gap-2 w-full sm:w-auto">
-                            <button onclick="historySubTab='sales'; render();" class="flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-xs font-bold transition ${historySubTab==='sales'?'bg-amber-500 text-slate-950 shadow':'bg-theme-input opacity-75 border border-theme-border'}">
-                                <i class="fa-solid fa-cart-shopping mr-1"></i> Lịch sử bán hàng (${db.salesHistory?.length || 0})
-                            </button>
-                            <button onclick="historySubTab='checkin'; render();" class="flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-xs font-bold transition ${historySubTab==='checkin'?'bg-amber-500 text-slate-950 shadow':'bg-theme-input opacity-75 border border-theme-border'}">
-                                <i class="fa-solid fa-store mr-1"></i> Lịch sử check-in (${db.checkinHistory?.length || 0})
-                            </button>
+                        <div class="flex flex-wrap gap-2 w-full">
+                            ${tb('sales', 'fa-cart-shopping', 'Bán hàng (' + (db.salesHistory?.length || 0) + (A.sales.length ? ' + ' + A.sales.length + ' lưu trữ' : '') + ')')}
+                            ${tb('checkin', 'fa-store', 'Check-in (' + (db.checkinHistory?.length || 0) + (A.checkin.length ? ' + ' + A.checkin.length + ' lưu trữ' : '') + ')')}
+                            ${tb('range', 'fa-chart-column', 'Tổng lịch sử')}
                         </div>
+                        <button type="button" onclick="archiveOldNow()" class="w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs font-bold bg-sky-500/10 border border-sky-500/30 text-sky-400"><i class="fa-solid fa-box-archive mr-1"></i>Lưu trữ lịch sử các ngày trước (giữ lại, làm gọn danh sách)</button>
                     </div>
-
-                    ${historySubTab === 'sales' ? `
-                        <div class="bg-theme-card border border-theme-border rounded-2xl shadow-sm overflow-hidden">
-                            <div class="p-3 bg-black/20 border-b border-theme-border font-bold text-xs uppercase">Bảng 1: Lịch sử bán hàng, Chiết khấu & Ảnh sản phẩm</div>
-                            <div class="overflow-x-auto hide-scrollbar">
-                                <table class="w-full text-left border-collapse min-w-[800px]">
-                                    <thead>
-                                        <tr class="text-xs uppercase font-semibold border-b border-theme-border">
-                                            <th class="p-3.5">Thời gian</th>
-                                            <th class="p-3.5">Sale</th>
-                                            <th class="p-3.5">Cửa hàng</th>
-                                            <th class="p-3.5">Chi tiết đơn hàng</th>
-                                            <th class="p-3.5">Chiết khấu</th>
-                                            <th class="p-3.5">Ảnh sản phẩm bán (Tối đa 3)</th>
-                                            <th class="p-3.5 text-center">Bill</th>
-                                            <th class="p-3.5 text-center">Xóa</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody class="divide-y divide-theme-border text-xs sm:text-sm">
-                                        ${(!db.salesHistory || db.salesHistory.length === 0) ? `<tr><td colspan="8" class="p-8 text-center opacity-50 italic">Chưa có lịch sử bán hàng nào.</td></tr>` : ''}
-                                        ${(db.salesHistory || []).map((h, hIdx) => `
-                                            <tr>
-                                                <td class="p-3.5 text-xs opacity-75 whitespace-nowrap font-semibold">${h.time}</td>
-                                                <td class="p-3.5 font-semibold text-amber-500">@${h.username}</td>
-                                                <td class="p-3.5 font-bold">${h.storeName}</td>
-                                                <td class="p-3.5 text-xs opacity-90">${h.note}</td>
-                                                <td class="p-3.5 text-xs font-bold text-amber-500 whitespace-nowrap">${h.discountStr || '0 đ'}</td>
-                                                <td class="p-3.5">
-                                                    <div class="flex gap-1.5 flex-wrap">
-                                                        ${h.photos && h.photos.length > 0 ? h.photos.map((img, pIdx) => `<img src="${img}" class="w-14 h-10 object-cover rounded border border-theme-border shadow-sm cursor-pointer hover:opacity-80 transition" onclick="openGlobalPhotoEdit('sales_history_photo', ${hIdx}, ${pIdx})" title="Nhấn để đổi ảnh" />`).join('') : (h.photo ? `<img src="${h.photo}" class="w-14 h-10 object-cover rounded border border-theme-border shadow-sm cursor-pointer hover:opacity-80 transition" onclick="openGlobalPhotoEdit('sales_history_photo', ${hIdx}, 0)" title="Nhấn để đổi ảnh" />` : 'Không có ảnh')}
-                                                    </div>
-                                                </td>
-                                                <td class="p-3.5 text-center"><button onclick="viewSavedBill(${hIdx})" class="px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded text-xs font-semibold whitespace-nowrap"><i class="fa-solid fa-receipt mr-1"></i>Xem bill</button></td>
-                                                <td class="p-3.5 text-center"><button onclick="deleteSalesRecord(${hIdx})" class="px-3 py-1 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded text-xs font-semibold whitespace-nowrap"><i class="fa-solid fa-trash-can mr-1"></i>Xóa</button></td>
-                                            </tr>
-                                        `).join('')}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    ` : `
-                        <div class="bg-theme-card border border-theme-border rounded-2xl shadow-sm overflow-hidden">
-                            <div class="p-3 bg-black/20 border-b border-theme-border font-bold text-xs uppercase">Bảng 2: Lịch sử check-in cửa hàng</div>
-                            <div class="overflow-x-auto hide-scrollbar">
-                                <table class="w-full text-left border-collapse min-w-[700px]">
-                                    <thead>
-                                        <tr class="text-xs uppercase font-semibold border-b border-theme-border">
-                                            <th class="p-3.5">Thời gian</th>
-                                            <th class="p-3.5">Sale</th>
-                                            <th class="p-3.5">Cửa hàng</th>
-                                            <th class="p-3.5">Trạng thái / Ghi chú</th>
-                                            <th class="p-3.5">Ảnh check-in thực tế</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody class="divide-y divide-theme-border text-xs sm:text-sm">
-                                        ${(!db.checkinHistory || db.checkinHistory.length === 0) ? `<tr><td colspan="5" class="p-8 text-center opacity-50 italic">Chưa có lịch sử check-in nào.</td></tr>` : ''}
-                                        ${(db.checkinHistory || []).map((h, idx) => `
-                                            <tr>
-                                                <td class="p-3.5 text-xs opacity-75 whitespace-nowrap font-semibold">${h.time}</td>
-                                                <td class="p-3.5 font-semibold text-amber-500">@${h.username}</td>
-                                                <td class="p-3.5 font-bold">${h.storeName}</td>
-                                                <td class="p-3.5 text-xs opacity-90">${h.note}</td>
-                                                <td class="p-3.5">
-                                                    ${h.photo ? `<img src="${h.photo}" class="w-16 h-10 object-cover rounded border border-theme-border shadow-sm cursor-pointer hover:opacity-80 transition" onclick="openGlobalPhotoEdit('checkin_history_photo', ${idx})" title="Nhấn để đổi ảnh" />` : 'N/A'}
-                                                </td>
-                                            </tr>
-                                        `).join('')}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    `}
+                    ${bodyHtml}
                 </div>
             `;
         }
@@ -3670,7 +3792,7 @@
         function kpiLabel(k) { const [y, m] = k.split('-'); return 'T' + (+m) + '/' + y; }
         function kpiSalesOf(store) {
             const u = getCurrentUser(), admin = u.role === 'admin';
-            return (db.salesHistory || []).filter(h => h.storeName === store.name && (admin || h.username === u.username));
+            return allSales().filter(h => h.storeName === store.name && (admin || h.username === u.username));
         }
         function kpiMonthly(store) {
             const by = {};
@@ -3918,7 +4040,7 @@
                                     <i class="fa-solid fa-clock-rotate-left"></i><span>Báo cáo toàn bộ lịch sử (JPG)</span>
                                 </button>
                                 <button onclick="clearHistoryOnly()" class="py-3.5 px-4 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-bold rounded-xl text-xs transition border border-rose-500/30 flex items-center justify-center space-x-2">
-                                    <i class="fa-solid fa-trash-can"></i><span>Xóa bộ nhớ đệm (Lịch sử)</span>
+                                    <i class="fa-solid fa-trash-can"></i><span>Dọn bộ nhớ đệm (lưu trữ lịch sử)</span>
                                 </button>
                                 <button onclick="exportBackupExcel()" class="sm:col-span-2 py-3.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs transition shadow-lg flex items-center justify-center space-x-2">
                                     <i class="fa-solid fa-file-excel"></i><span>Sao lưu toàn bộ ra Excel</span>
@@ -4185,7 +4307,7 @@
             return out;
         }
         function buildAllReportBlocks() {
-            const sales = db.salesHistory || [], checks = db.checkinHistory || [], stores = db.stores || [];
+            const sales = allSales(), checks = allCheckins(), stores = db.stores || [];
             const blocks = [];
             let g = 0, n = 0; const days = {}, perStore = {};
             sales.forEach(h => {
@@ -4205,12 +4327,12 @@
                 const nCheck = checks.filter(h => h.storeName === s.name).length;
                 const added = !isNaN(Number(s.id)) && Number(s.id) > 1e12 ? new Date(Number(s.id)).toLocaleDateString('vi-VN') : '-';
                 const gps = s.lat != null && s.lng != null ? `[${Number(s.lat).toFixed(5)}, ${Number(s.lng).toFixed(5)}]` : 'N/A';
-                return rpCard(`<div style="font-weight:800;color:#fcd34d">${i + 1}. ${escHtml(s.name)}</div><div>Chủ: <b>${escHtml(s.owner || 'N/A')}</b> - SĐT: <span style="color:#60a5fa">${escHtml(s.phone || 'N/A')}</span></div><div style="opacity:.85">Địa chỉ: ${escHtml(s.address || '')}, ${escHtml(s.district || '')}, ${escHtml(s.city || '')}</div><div style="opacity:.9;margin-top:2px">Quy mô: <b>${escHtml(s.scale || '-')}</b> • Ngành: <b>${escHtml(s.industry || '-')}</b> • ${escHtml(relLabel(s.relation) || '-')}</div><div style="margin-top:2px">📍 <span style="color:#fbbf24;font-family:monospace">${gps}</span> • Thêm: ${added}</div><div style="margin-top:2px;color:#6ee7b7">${ps.c} đơn • Net <b>${rpFmt(ps.n)} đ</b> • ${nCheck} lần check-in</div>` + kpiStoreMonthLine(s, 3));
+                return rpCard(`<div style="font-weight:800;color:#fcd34d">${i + 1}. ${escHtml(s.name)}</div><div>Chủ: <b>${escHtml(s.owner || 'N/A')}</b> - SĐT: <span style="color:#60a5fa">${escHtml(s.phone || 'N/A')}</span></div><div style="opacity:.85">Địa chỉ: ${escHtml(s.address || '')}, ${escHtml(s.district || '')}, ${escHtml(s.city || '')}</div><div style="opacity:.9;margin-top:2px">Quy mô: <b>${escHtml(s.scale || '-')}</b> • Ngành: <b>${escHtml(s.industry || '-')}</b> • ${escHtml(relLabel(s.relation) || '-')}</div>${s.interests && s.interests.length ? '<div style="margin-top:2px;color:#7dd3fc">❤ Quan tâm: ' + s.interests.map(escHtml).join(', ') + '</div>' : ''}<div style="margin-top:2px">📍 <span style="color:#fbbf24;font-family:monospace">${gps}</span> • Thêm: ${added}</div><div style="margin-top:2px;color:#6ee7b7">${ps.c} đơn • Net <b>${rpFmt(ps.n)} đ</b> • ${nCheck} lần check-in</div>` + kpiStoreMonthLine(s, 3));
             }), 'Chưa có khách hàng nào.').forEach(b => blocks.push(b));
             kpiReportBlocks().forEach(b => blocks.push(b));
             rpSection(`✅ Lịch sử check-in (${checks.length})`, checks.map((h, i) => rpLine(`${i + 1}. <b style="color:#6ee7b7">${escHtml(h.storeName)}</b> <span style="opacity:.7">• ${escHtml(h.time)}</span>${h.note ? '<br><span style="opacity:.85">📝 ' + escHtml(h.note) + '</span>' : ''}`)), 'Chưa có lịch sử check-in.').forEach(b => blocks.push(b));
             rpBillBlocks(sales, `🧾 Bill thanh toán từng cửa hàng (${sales.length} đơn)`).forEach(b => blocks.push(b));
-            const imps = db.importHistory || [];
+            const imps = allImports();
             rpSection(`📦 Lịch sử nhập kho (${imps.length})`, imps.map(i => rpLine(`🔹 ${escHtml(i.productName)}: <b>+${i.qty} cái</b> (${escHtml(i.time)})`)), 'Chưa có lịch sử nhập kho.').forEach(b => blocks.push(b));
             rpInventoryBlocks().forEach(b => blocks.push(b));
             return blocks;
@@ -4220,7 +4342,7 @@
             const todayStr = new Date().toDateString();
             const sales = (db.salesHistory || []).filter(h => isTodayTime(h.time));
             const checkins = (db.checkinHistory || []).filter(h => isTodayTime(h.time));
-            const imports = db.importHistory || [];
+            const imports = (db.importHistory || []).filter(i => !dayKeyOf(i.time) || isTodayTime(i.time));
             let revenue = 0, outQty = 0;
             const byStore = {};
             sales.forEach(h => {
@@ -4240,7 +4362,7 @@
             rpSection(`📤 Đã xuất bán hôm nay: Tổng ${outQty} sản phẩm`, sales.map(h => rpLine(`🔹 Tại ${escHtml(h.storeName)}: ${escHtml(h.note)}`)), 'Chưa có sản phẩm nào được xuất bán.').forEach(b => blocks.push(b));
 
             const newStores = (db.stores || []).filter(addedToday);
-            rpSection('🏪 Danh sách cửa hàng mới thêm', newStores.map((s, i) => rpCard(`<div style="font-weight:800;color:#fcd34d">${i + 1}. ${escHtml(s.name)}</div><div>Chủ: <b>${escHtml(s.owner || 'N/A')}</b> - SĐT: <span style="color:#60a5fa">${escHtml(s.phone || 'N/A')}</span></div><div style="opacity:.8">Địa chỉ: ${escHtml(s.address)}, ${escHtml(s.district)}, ${escHtml(s.city)}</div><div style="opacity:.9;margin-top:2px">Quy mô: <b>${escHtml(s.scale || '-')}</b> • Ngành: <b>${escHtml(s.industry || '-')}</b> • ${escHtml(relLabel(s.relation) || '-')}</div>`)), 'Không có cửa hàng mới trong ngày.').forEach(b => blocks.push(b));
+            rpSection('🏪 Danh sách cửa hàng mới thêm', newStores.map((s, i) => rpCard(`<div style="font-weight:800;color:#fcd34d">${i + 1}. ${escHtml(s.name)}</div><div>Chủ: <b>${escHtml(s.owner || 'N/A')}</b> - SĐT: <span style="color:#60a5fa">${escHtml(s.phone || 'N/A')}</span></div><div style="opacity:.8">Địa chỉ: ${escHtml(s.address)}, ${escHtml(s.district)}, ${escHtml(s.city)}</div><div style="opacity:.9;margin-top:2px">Quy mô: <b>${escHtml(s.scale || '-')}</b> • Ngành: <b>${escHtml(s.industry || '-')}</b> • ${escHtml(relLabel(s.relation) || '-')}</div>${s.interests && s.interests.length ? '<div style="margin-top:2px;color:#7dd3fc">❤ Quan tâm: ' + s.interests.map(escHtml).join(', ') + '</div>' : ''}`)), 'Không có cửa hàng mới trong ngày.').forEach(b => blocks.push(b));
 
             rpSection('✅ Cửa hàng check-in & đơn hàng', checkins.map((h, i) => {
                 const st = byStore[h.storeName] || { count: 0, revenue: 0 };
@@ -4280,11 +4402,11 @@
         }
 
         function openReportModal(mode) {
-            reportMode = mode === 'all' ? 'all' : 'day';
+            reportMode = mode === 'all' ? 'all' : mode === 'range' ? 'range' : 'day';
             const token = ++reportToken;
             reportImages = [];
             document.getElementById('report-modal').classList.remove('hidden');
-            document.getElementById('report-title').innerHTML = '<i class="fa-solid fa-file-invoice-dollar text-amber-500 mr-2"></i>' + (reportMode === 'all' ? 'Báo Cáo Toàn Bộ Lịch Sử' : 'Báo Cáo Doanh Thu & Thị Trường Trong Ngày');
+            document.getElementById('report-title').innerHTML = '<i class="fa-solid fa-file-invoice-dollar text-amber-500 mr-2"></i>' + (reportMode === 'all' ? 'Báo Cáo Toàn Bộ Lịch Sử' : reportMode === 'range' ? 'Báo Cáo Tổng Lịch Sử Theo Khoảng Ngày' : 'Báo Cáo Doanh Thu & Thị Trường Trong Ngày');
             const act = 'flex-1 py-2.5 rounded-xl text-xs font-bold border bg-amber-500 text-slate-950 border-amber-500', off = 'flex-1 py-2.5 rounded-xl text-xs font-bold border bg-theme-input border-theme-border';
             document.getElementById('rp-tab-day').className = reportMode === 'day' ? act : off;
             document.getElementById('rp-tab-all').className = reportMode === 'all' ? act : off;
@@ -4292,10 +4414,10 @@
             const host = document.getElementById('report-pages'); host.innerHTML = '';
             setTimeout(async () => {
                 if (token !== reportToken) return;
-                const pages = paginateReport(reportMode === 'all' ? buildAllReportBlocks() : buildReportBlocks());
-                const scale = reportMode === 'all' ? 2 : 3;
+                const pages = paginateReport(reportMode === 'all' ? buildAllReportBlocks() : reportMode === 'range' ? buildRangeReportBlocks() : buildReportBlocks());
+                const scale = reportMode === 'day' ? 3 : 2;
                 const out = [], d = new Date(), tag = `${d.getDate()}-${d.getMonth() + 1}-${d.getFullYear()}`;
-                const prefix = reportMode === 'all' ? 'Bao-Cao-Toan-Bo-Lich-Su' : 'Bao-Cao';
+                const prefix = reportMode === 'all' ? 'Bao-Cao-Toan-Bo-Lich-Su' : reportMode === 'range' ? 'Bao-Cao-Lich-Su' : 'Bao-Cao';
                 for (let i = 0; i < pages.length; i++) {
                     if (token !== reportToken) return;
                     prog.innerText = `Đang tạo ảnh ${i + 1}/${pages.length}...`;
@@ -4409,11 +4531,11 @@
 
         function confirmClearHistory() {
             if (!bk.saved) { alert('Hãy lưu hoặc tải file Excel về máy trước khi xóa lịch sử!'); return; }
-            if (!confirm('Bạn đã chắc chắn file Excel đã được lưu?\n\nBấm OK để XÓA Lịch sử bán hàng, check-in và nhập kho.\n(Khách hàng, Sản phẩm, Tồn kho được giữ nguyên.)')) return;
-            db.salesHistory = []; db.checkinHistory = []; db.importHistory = [];
+            if (!confirm('Bạn đã chắc chắn file Excel đã được lưu?\n\nBấm OK để DỌN danh sách Lịch sử bán hàng, check-in và nhập kho.\nLịch sử KHÔNG bị mất: được chuyển vào kho lưu trữ, vẫn xem được ở mục Lịch sử > Tổng lịch sử.')) return;
+            const moved = archiveHistory(false);
             saveData();
             closeBackupModal();
-            alert('Đã xóa sạch phần lịch sử! Dữ liệu khách hàng, sản phẩm và kho tồn vẫn được giữ nguyên.');
+            alert('Đã chuyển ' + moved + ' bản ghi vào kho lưu trữ. Lịch sử không bị mất - xem lại ở mục Lịch sử > Tổng lịch sử. Khách hàng, sản phẩm và kho tồn được giữ nguyên.');
             render();
         }
 
@@ -4639,7 +4761,7 @@
             let w = db.warehouse.find(x => String(x.productId) === String(target.id));
             if (w) w.qty += q; else db.warehouse.push({ id: Date.now().toString() + Math.floor(Math.random() * 1000), productId: target.id, qty: q });
             if (!db.importHistory) db.importHistory = [];
-            db.importHistory.unshift({ time: new Date().toLocaleTimeString('vi-VN'), productName: target.name, qty: q });
+            db.importHistory.unshift({ time: vnNowStr(), productName: target.name, qty: q });
             saveData();
             closeImportQty();
             document.getElementById('import-stock-modal').classList.add('hidden');
@@ -4745,7 +4867,7 @@
             db.warehouse.push({ id: Date.now().toString(), productId: newId, qty: qty });
             
             if(!db.importHistory) db.importHistory = [];
-            db.importHistory.unshift({ time: new Date().toLocaleTimeString('vi-VN'), productName: name, qty: qty });
+            db.importHistory.unshift({ time: vnNowStr(), productName: name, qty: qty });
 
             saveData();
             alert('Nhập hàng và thêm sản phẩm thành công!');
@@ -4973,7 +5095,7 @@
             if(discountAmount > subTotal) discountAmount = subTotal;
             let grandTotal = subTotal - discountAmount;
 
-            const time = new Date().toLocaleString('vi-VN');
+            const time = vnNowStr();
             
             if(!db.salesHistory) db.salesHistory = [];
             db.salesHistory.unshift({ 
@@ -5218,7 +5340,7 @@
                 alert(`Chưa đủ thời gian tối thiểu (${reqMins} phút). Vui lòng đợi thêm.`);
                 return;
             }
-            const now = new Date(), timeStr = now.toLocaleString('vi-VN');
+            const now = new Date(), timeStr = vnNowStr(now);
             s.visited = true;
             s.checkinTime = null;
             s.lastVisitDate = now.toDateString();
@@ -5670,7 +5792,7 @@
                     <button onclick="backupShare()" class="${btn}bg-amber-500 hover:bg-amber-600 text-slate-950"><i class="fa-solid fa-share-from-square"></i><span>Lưu vào Tệp / Chia sẻ (iPhone)</span></button>
                     <button onclick="backupDownload()" class="${btn}bg-theme-input border border-theme-border"><i class="fa-solid fa-download"></i><span>Tải xuống máy</span></button>
                     <p class="text-[11px] opacity-75 leading-relaxed">iPhone: bấm nút vàng → chọn <b>"Lưu vào Tệp"</b> → chọn thư mục (iCloud Drive/Trên iPhone). Nếu đã có file cùng tên, chọn <b>"Thay thế"</b> để chỉ giữ 1 file duy nhất.</p>
-                    ${bk.reason === 'clear' ? `<button onclick="confirmClearHistory()" class="${btn}${bk.saved ? 'bg-rose-600 hover:bg-rose-700 text-white' : 'bg-theme-input opacity-50 cursor-not-allowed'}"><i class="fa-solid fa-trash-can"></i><span>Xóa lịch sử ngay${bk.saved ? '' : ' (lưu file trước)'}</span></button>` : ''}`;
+                    ${bk.reason === 'clear' ? `<button onclick="confirmClearHistory()" class="${btn}${bk.saved ? 'bg-rose-600 hover:bg-rose-700 text-white' : 'bg-theme-input opacity-50 cursor-not-allowed'}"><i class="fa-solid fa-trash-can"></i><span>Dọn lịch sử vào kho lưu trữ${bk.saved ? '' : ' (lưu file trước)'}</span></button>` : (bk.reason === 'report' ? `<button onclick="archiveOldNow()" class="${btn}bg-sky-600 hover:bg-sky-700 text-white"><i class="fa-solid fa-box-archive"></i><span>Lưu trữ lịch sử các ngày trước (giữ lại)</span></button>` : '')}`;
             }
         }
 
@@ -5721,6 +5843,24 @@
         function escHtml(t) { return String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
 
         const CHIP_DEF = { scale: ['Nhỏ', 'Vừa', 'To'], industry: ['Phụ kiện', 'Điện thoại', 'Tự nhập'], relation: ['Cũ', 'Mới', 'Winback'] };
+        const INTEREST_DEFAULT = ['Cáp sạc', 'Củ sạc', 'Tai nghe', 'Sạc dự phòng', 'Kính cường lực', 'Ốp lưng', 'Đồng hồ thông minh'];
+        function interestOptions() { db.settings = db.settings || {}; if (!Array.isArray(db.settings.interestOptions)) db.settings.interestOptions = INTEREST_DEFAULT.slice(); return db.settings.interestOptions; }
+        function addInterestValue(p, v) {
+            v = String(v || '').trim(); if (!v) return false;
+            const opts = interestOptions(); let ex = opts.find(x => normTxt(x) === normTxt(v)), isNew = false;
+            if (!ex) { opts.push(v); ex = v; isNew = true; }
+            const st = chipState[p] = chipState[p] || {}; st.interests = st.interests || [];
+            if (!st.interests.includes(ex)) st.interests.push(ex);
+            if (isNew) saveData();
+            return true;
+        }
+        function addInterest(p) { const el = document.getElementById('int-in-' + p); if (!el) return; if (addInterestValue(p, el.value)) { el.value = ''; renderChips(p); } }
+        function toggleInterest(p, i) { const v = interestOptions()[i]; if (v == null) return; const st = chipState[p] = chipState[p] || {}; st.interests = st.interests || []; const k = st.interests.indexOf(v); if (k >= 0) st.interests.splice(k, 1); else st.interests.push(v); renderChips(p); }
+        function removeInterest(p, i) {
+            const opts = interestOptions(), v = opts[i]; if (v == null || INTEREST_DEFAULT.includes(v)) return;
+            if (!confirm('Xóa tùy chọn "' + v + '" khỏi danh sách lưu sẵn?\n(Các khách đã chọn tùy chọn này vẫn giữ nguyên.)')) return;
+            opts.splice(i, 1); Object.keys(chipState).forEach(k => { const st = chipState[k]; if (st && st.interests) st.interests = st.interests.filter(x => x !== v); }); saveData(); renderChips(p);
+        }
         let chipState = { s: {}, e: {}, a: {} };
         function chipBtnClass(active) {
             return 'flex-1 py-2.5 rounded-xl border text-xs font-bold transition ' + (active ? 'bg-amber-500 text-slate-950 border-amber-500 shadow' : 'bg-theme-input border-theme-border');
@@ -5729,28 +5869,37 @@
             const el = document.getElementById('chips-' + p);
             if (!el) return;
             const st = chipState[p];
+            const keepInt = (document.getElementById('int-in-' + p) || {}).value || '';
+            const sel = st.interests || [], opts = interestOptions(), cb = (on) => 'px-3 py-2 rounded-xl border text-xs font-bold transition ' + (on ? 'bg-sky-500 text-slate-950 border-sky-500 shadow' : 'bg-theme-input border-theme-border');
+            const extra = sel.filter(x => !opts.includes(x));
+            const interestHtml = `<div><label class="block text-xs font-semibold uppercase mb-1">Sản phẩm khách hàng đang quan tâm</label>
+                <div class="flex flex-wrap gap-2">${opts.map((v, i) => `<span class="inline-flex items-stretch"><button type="button" onclick="toggleInterest('${p}',${i})" class="${cb(sel.includes(v))}${INTEREST_DEFAULT.includes(v) ? '' : ' rounded-r-none'}">${escHtml(v)}</button>${INTEREST_DEFAULT.includes(v) ? '' : `<button type="button" onclick="removeInterest('${p}',${i})" title="Xóa tùy chọn này" class="px-2 rounded-r-xl border border-l-0 border-theme-border bg-theme-input text-rose-400 text-xs font-bold">×</button>`}</span>`).join('')}${extra.map(v => `<span class="${cb(true)}">${escHtml(v)}</span>`).join('')}</div>
+                <div class="flex gap-2 mt-2"><input type="text" id="int-in-${p}" value="${escHtml(keepInt)}" onkeydown="if(event.key==='Enter'){event.preventDefault();addInterest('${p}')}" class="flex-1 px-4 py-2.5 rounded-xl bg-theme-input border border-theme-border text-theme-text text-sm focus:outline-none" placeholder="Nhập thêm sản phẩm khách quan tâm..."><button type="button" onclick="addInterest('${p}')" class="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold">Thêm</button></div>
+                <p class="text-[10px] opacity-60 mt-1">Chọn nhiều sản phẩm được. Tùy chọn bạn nhập tay sẽ được lưu lại cho các lần tạo điểm bán sau (bấm × để xóa tùy chọn đã lưu).</p></div>`;
             const row = (field, label) => `<div><label class="block text-xs font-semibold uppercase mb-1">${label}</label><div class="flex gap-2">${CHIP_DEF[field].map(v => `<button type="button" onclick="pickChip('${p}','${field}','${v}')" class="${chipBtnClass(st[field] === v)}">${v}</button>`).join('')}</div></div>`;
             el.innerHTML = row('scale', 'Quy mô cửa hàng *')
                 + row('industry', 'Ngành hàng *')
                 + `<input type="text" value="${escHtml(st.custom || '')}" oninput="chipState['${p}'].custom=this.value" class="w-full px-4 py-2.5 rounded-xl bg-theme-input border border-theme-border text-theme-text text-sm focus:outline-none ${st.industry === 'Tự nhập' ? '' : 'hidden'}" placeholder="Nhập ngành hàng bằng tay...">`
-                + row('relation', 'Tình trạng khách hàng *');
+                + row('relation', 'Tình trạng khách hàng *')
+                + interestHtml;
         }
         function pickChip(p, field, v) { chipState[p][field] = v; renderChips(p); }
         function resetChips(p) { chipState[p] = {}; renderChips(p); }
         function loadChips(p, s) {
-            const st = { scale: s.scale || '', relation: s.relation || '' };
+            const st = { scale: s.scale || '', relation: s.relation || '', interests: Array.isArray(s.interests) ? s.interests.slice() : [] };
             if (s.industry === 'Phụ kiện' || s.industry === 'Điện thoại') st.industry = s.industry;
             else if (s.industry) { st.industry = 'Tự nhập'; st.custom = s.industry; }
             chipState[p] = st; renderChips(p);
         }
         function getChipValues(p) {
+            const pend = document.getElementById('int-in-' + p); if (pend && pend.value.trim()) { addInterestValue(p, pend.value); pend.value = ''; }
             const st = chipState[p] || {};
-            return { scale: st.scale || '', industry: st.industry === 'Tự nhập' ? (st.custom || '').trim() : (st.industry || ''), relation: st.relation || '' };
+            return { interests: (st.interests || []).slice(), scale: st.scale || '', industry: st.industry === 'Tự nhập' ? (st.custom || '').trim() : (st.industry || ''), relation: st.relation || '' };
         }
         function relLabel(r) { return r === 'Cũ' ? 'Khách cũ' : r === 'Mới' ? 'Khách mới' : (r || ''); }
 
-        const todayVN = () => new Date().toLocaleDateString('vi-VN');
-        const isTodayTime = t => typeof t === 'string' && (' ' + t.trim()).endsWith(' ' + todayVN());
+        const todayVN = () => vnDateStr(new Date());
+        const isTodayTime = t => typeof t === 'string' && dayKeyOf(t) === todayVN();
         const moneyOf = txt => { const m = (txt || '').match(/Tổng:\s*([\d.,]+)\s*đ/); return m ? (parseInt(m[1].replace(/[.,]/g, '')) || 0) : 0; };
         const addedToday = s => !isNaN(Number(s.id)) && new Date(Number(s.id)).toDateString() === new Date().toDateString();
         const visitedToday = s => s.visited && s.lastVisitDate === new Date().toDateString();
