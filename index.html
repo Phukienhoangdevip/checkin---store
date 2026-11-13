@@ -383,6 +383,7 @@
                 <div>
                     <label class="block text-xs font-semibold uppercase mb-1">Tên / Mẫu mã sản phẩm *</label>
                     <input type="text" id="p-name" class="w-full px-4 py-3 rounded-xl bg-theme-input border border-theme-border text-theme-text text-sm outline-none" placeholder="VD: Cáp sạc iPhone 20W">
+                    <label class="flex items-center gap-2 text-xs font-semibold mt-2"><input type="checkbox" id="p-vat" class="w-4 h-4 accent-emerald-500"> Sản phẩm đã gồm VAT (VT)</label>
                 </div>
                 <div class="grid grid-cols-2 gap-3">
                     <div>
@@ -1281,22 +1282,43 @@
                 </div>`; 
         }
 
-        function handleLogin(e) { 
+
+        // ===== Bản 46: mật khẩu được mã hóa (SHA-256), không còn lưu/hiển thị dạng chữ thường =====
+        const pwIsHash = x => /^h1:[0-9a-f]{64}$/.test(String(x || ''));
+        async function pwHash(u, p) {
+            try { const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('hd1|' + String(u).toLowerCase() + '|' + p)); return 'h1:' + Array.from(new Uint8Array(d)).map(x => x.toString(16).padStart(2, '0')).join(''); }
+            catch (e) { return p; }
+        }
+        async function pwCheck(user, p) { return !!user && (user.password === p || (pwIsHash(user.password) && user.password === await pwHash(user.username, p))); }
+        async function forcePwChange(user) {
+            for (let i = 0; i < 3; i++) {
+                const np = prompt('Mật khẩu mặc định "123" không an toàn.\nHãy đặt mật khẩu mới cho tài khoản quản trị (ít nhất 4 ký tự, khác 123):');
+                if (np === null) return;
+                const t = np.trim();
+                if (t.length >= 4 && t !== '123') { user.password = await pwHash(user.username, t); saveData(); alert('Đã đổi mật khẩu quản trị. Lần sau hãy đăng nhập bằng mật khẩu mới.'); return; }
+                alert('Mật khẩu chưa hợp lệ (ít nhất 4 ký tự và khác 123).');
+            }
+        }
+
+        async function handleLogin(e) { 
             e.preventDefault();
             if (isCloudConfigured() && cloudState === 'loading') { alert('Đang tải dữ liệu từ cloud, vui lòng đợi vài giây rồi bấm đăng nhập lại.'); return; }
             if (isCloudConfigured() && cloudState === 'error' && !confirm('Chưa kết nối được cloud nên dữ liệu có thể chưa phải bản mới nhất.\n\nBấm OK để đăng nhập tạm (chế độ offline), Hủy để thử lại.')) { syncNow(); return; } 
             const u = document.getElementById('login-user').value.trim(), p = document.getElementById('login-pass').value.trim();
-            const found = db.users.find(x => x.username.toLowerCase() === u.toLowerCase() && x.password === p); 
+            const cand = db.users.find(x => x.username.toLowerCase() === u.toLowerCase());
+            const found = cand && await pwCheck(cand, p) ? cand : null;
             if (!found) { alert('Sai thông tin tài khoản hoặc mật khẩu!'); return; } 
             currentUsername = found.username; saveSession(); 
+            if (!pwIsHash(found.password)) { const hh = await pwHash(found.username, p); if (pwIsHash(hh)) { found.password = hh; saveData(); } }
+            if (found.role === 'admin' && p === '123') await forcePwChange(found);
             render(); 
         }
 
-        function handleRegister(e) { 
+        async function handleRegister(e) { 
             e.preventDefault(); 
             const name = document.getElementById('reg-name').value.trim(), u = document.getElementById('reg-user').value.trim(), p = document.getElementById('reg-pass').value.trim(); 
             if (db.users.some(x => x.username.toLowerCase() === u.toLowerCase())) { alert('Tên đăng nhập đã tồn tại!'); return; } 
-            db.users.push({ username: u, password: p, role: 'sale', status: 'pending', fullname: name, permissions: { stores: true, master: true, warehouse: true, history: true } }); 
+            db.users.push({ username: u, password: await pwHash(u, p), role: 'sale', status: 'pending', fullname: name, permissions: { stores: true, master: true, warehouse: true, history: true } }); 
             saveData(); 
             alert('Đăng ký thành công! Vui lòng chờ quản trị viên duyệt.'); 
             authMode = 'login'; 
@@ -1605,7 +1627,9 @@
             const id = document.getElementById('edit-store-id').value;
             const s = db.stores.find(x => String(x.id) === String(id));
             if(!s) return;
+            const oldStoreName = s.name;
             s.name = document.getElementById('e-shop').value.trim();
+            if (oldStoreName && s.name && oldStoreName !== s.name) [db.salesHistory, db.checkinHistory, (db.historyArchive || {}).sales, (db.historyArchive || {}).checkin].forEach(l => (l || []).forEach(h => { if (h && h.storeName === oldStoreName) h.storeName = s.name; }));
             s.owner = document.getElementById('e-owner').value.trim();
             s.phone = document.getElementById('e-phone').value.trim();
             s.city = document.getElementById('e-city').value.trim();
@@ -1653,7 +1677,7 @@
                             ${items.map(p => `
                                 <tr data-mrow id="mrow-${p.id}" data-key="${escHtml(keyOf(p))}" class="${kq && !keyOf(p).includes(kq) ? 'hidden' : ''}">
                                     <td class="p-3">${p.img ? `<img src="${p.img}" class="w-12 h-12 object-cover rounded-lg border border-theme-border shadow-sm cursor-pointer hover:opacity-80 transition" onclick="openGlobalPhotoEdit('product_master', '${p.id}')">` : '<div class="w-12 h-12 rounded-lg bg-black/20"></div>'}</td>
-                                    <td class="p-3"><div class="font-bold">${escHtml(p.name)}</div><div class="text-[11px] opacity-60">Mã ${prodCode(p)}</div></td>
+                                    <td class="p-3"><div class="font-bold">${escHtml(p.name)}${p.vat ? ' <span class="ml-1 px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-500 text-[10px] font-bold align-middle">VAT</span>' : ''}</div><div class="text-[11px] opacity-60">Mã ${prodCode(p)}</div></td>
                                     <td class="p-3 font-semibold text-amber-500 whitespace-nowrap">${Number(p.price).toLocaleString()} đ</td>
                                     <td class="p-3 text-center space-x-1 whitespace-nowrap">
                                         <button onclick="editMasterProductPrice(${p.id})" class="px-3 py-1 bg-blue-500/10 border border-blue-500/20 text-blue-400 rounded text-xs font-semibold">Sửa giá</button>
@@ -1678,7 +1702,7 @@
                             <input type="text" id="master-search" value="${escHtml(masterQ)}" oninput="masterSearchInput(this.value)" placeholder="Tìm sản phẩm theo tên hoặc mã..." class="w-full pl-9 pr-3 py-3 rounded-xl bg-theme-input border border-theme-border text-theme-text text-sm outline-none">
                         </div>
                         <div class="flex gap-2 overflow-x-auto pb-1 hide-scrollbar">${chips}</div>
-                        ${isAdmin ? `<button type="button" onclick="harvestVariantsBtn()" class="w-full py-2.5 rounded-xl border border-amber-500/40 bg-amber-500/10 text-amber-500 text-xs font-bold"><i class="fa-solid fa-tags mr-1"></i>Quét & lưu hết biến thể từ sản phẩm trong kho vào ô chọn nhanh</button><button type="button" onclick="replaceAllProductsFromList()" class="w-full py-2.5 rounded-xl border border-rose-500/40 bg-rose-500/10 text-rose-400 text-xs font-bold"><i class="fa-solid fa-file-import mr-1"></i>Thay toàn bộ sản phẩm bằng danh sách Excel (${EXCEL_PRODUCTS.p.length} sản phẩm)</button>` : ''}
+                        ${isAdmin ? `<button type="button" onclick="openDupTool()" class="w-full py-2.5 rounded-xl border border-emerald-500/40 bg-emerald-500/10 text-emerald-500 text-xs font-bold"><i class="fa-solid fa-code-merge mr-1"></i>Quét & gộp sản phẩm trùng (và chuẩn hóa tên cũ)</button><button type="button" onclick="harvestVariantsBtn()" class="w-full py-2.5 rounded-xl border border-amber-500/40 bg-amber-500/10 text-amber-500 text-xs font-bold"><i class="fa-solid fa-tags mr-1"></i>Quét & lưu hết biến thể từ sản phẩm trong kho vào ô chọn nhanh</button><button type="button" onclick="replaceAllProductsFromList()" class="w-full py-2.5 rounded-xl border border-rose-500/40 bg-rose-500/10 text-rose-400 text-xs font-bold"><i class="fa-solid fa-file-import mr-1"></i>Thay toàn bộ sản phẩm bằng danh sách Excel (${EXCEL_PRODUCTS.p.length} sản phẩm)</button>` : ''}
                     </div>
                     ${db.productsMaster.length === 0 ? `<div class="bg-theme-card border border-theme-border rounded-2xl p-8 text-center opacity-60 text-sm">Chưa có sản phẩm nào. Hãy vào mục "Kho Tồn" để nhập hàng mới.</div>` : ''}
                     <div id="master-groups" class="space-y-4">${groups}</div>
@@ -1778,7 +1802,7 @@
                                                 </td>
                                                 <td class="p-3.5 font-semibold opacity-75">${prod.category}</td>
                                                 <td class="p-3.5 font-bold">
-                                                    ${prod.name}
+                                                    ${prod.name}${prod.vat ? ' <span class="px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-500 text-[10px] font-bold">VAT</span>' : ''}
                                                     ${isLow ? `<span class="ml-2 px-2 py-0.5 bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded text-[10px] font-bold"><i class="fa-solid fa-triangle-exclamation mr-1"></i>Sắp hết</span>` : ''}
                                                 </td>
                                                 <td class="p-3.5 font-semibold text-amber-500">${Number(prod.price).toLocaleString()} đ</td>
@@ -2080,6 +2104,9 @@
             const toks = String(raw || '').split(/\s+/).filter(Boolean).map(t => qiSpellTok(t, V)).join(' ').split(/\s+/);
             return qiDedupe(toks).join(' ');
         }
+        // ===== Bản 45: chuẩn hóa chính tả biến thể, tách VAT khỏi tên =====
+        function qiFixTypo(s) { return String(s || '').replace(/(^|[^\p{L}])(tyce|tpye|tyep|tipe|tupe|tyoe|typr)(?![\p{L}])/giu, '$1Type'); }
+        function qiHasVT(s) { return /\(\s*vtc?\s*\)/i.test(String(s || '')) || /(^|[\s\-–,])vtc?(?=$|[\s\-–,)])/i.test(String(s || '')); }
         function qiStripVT(s) {
             return String(s || '').replace(/\(\s*vtc?\s*\)/gi, ' ').replace(/(^|[\s\-–,])vtc?(?=$|[\s\-–,)])/gi, '$1 ').replace(/\s{2,}/g, ' ').trim();
         }
@@ -2094,7 +2121,7 @@
         let QI_EXACT = false;   // true khi nhập từ file Excel/PDF: chữ đã chuẩn, không tự sửa chính tả
         function qiCleanName(raw, noSpell) {
             if (noSpell === undefined) noSpell = QI_EXACT;
-            let s = String(raw || '').replace(/[|¦]/g, ' ').replace(/\bsam\s+sung\b/gi, 'Samsung');
+            const vat = qiHasVT(raw); let s = qiFixTypo(String(raw || '')).replace(/[|¦]/g, ' ').replace(/\bsam\s+sung\b/gi, 'Samsung');
             s = qiStripVT(s);
             if (!noSpell) s = qiSpell(s);
             s = s.replace(/([A-Z]{2})O(\d)/g, '$10$2').replace(/\b\d{1,2}\s*th[aáàảãạ]ng\b.*$/i, ' ');
@@ -2131,7 +2158,7 @@
             s = s.replace(/(^|[^\p{L}])([A-Z]{2,4})\s*[-.]+\s*\.?(\d{1,3})(?![\d])/gu, '$1$2-$3');
             s = qiTidyName(s.replace(/\s[-–~]\s*$/, '').replace(/\s[-–~]\s/g, ' ').replace(/^[-–~\s]+/, ''));
             if (!noSpell) { const tk = s.split(/\s+/).filter(Boolean); if (tk.length > 2 && /^\d{1,3}$/.test(tk[tk.length - 1]) && tk.slice(0, -1).some(x => /[A-Za-z]/.test(x) && /\d/.test(x))) { tk.pop(); s = tk.join(' '); } }
-            return { base: s, variant, color, watt };
+            return { base: s, variant, color, watt, vat };
         }
         function qiWatt(w) { const m = /^\s*(\d{1,3})\s*w?\s*$/i.exec(String(w || '')); return m ? m[1] + 'W' : ''; }
         function qiFixCode(c) {
@@ -2233,11 +2260,11 @@
             qiTailMap();
             let e = QI_ENT.get(p.name);
             if (!e) {
-                const pn = parseProductName(p);
+                const pn = parseProductName({ name: qiFixTypo(p.name), color: p.color });
                 const cn = qiCleanName(pn.base, true);
                 const variant = pn.variant || cn.variant, color = pn.color || cn.color;
                 const baseName = cn.variant ? cn.base : qiStripVT(pn.base);
-                e = { base: cn.base, core: cn.base, watt: cn.watt || '', baseName, variant, color, sigBase: qiSig(cn.base), sigFull: qiSig(pn.base), key: [...qiSig(cn.base).set].sort().join(' ') };
+                e = { base: cn.base, core: cn.base, watt: cn.watt || '', vat: !!p.vat || qiHasVT(p.name), baseName, variant, color, sigBase: qiSig(cn.base), sigFull: qiSig(pn.base), key: [...qiSig(cn.base).set].sort().join(' ') };
                 const au = QI_TAIL && QI_TAIL.byName.get(p.name);
                 if (au && !e.variant) { e.variant = au.variant; e.core = au.core; e.base = au.core; e.sigBase = qiSig(au.core); e.key = [...e.sigBase.set].sort().join(' '); }
                 if (QI_ENT.size > 6000) QI_ENT.clear();
@@ -2259,7 +2286,7 @@
                 }
                 const rp0 = Number(r.price) || 0;
                 const pc0 = rp0 > 0 && byCode.price > 0 && rp0 !== Number(byCode.price) ? { type: 'T1', existing: byCode, sibs: [], codeRow: true } : null;
-                return { matched: byCode, cat: prodCat(byCode), variant: pn.variant, final: byCode.name, exact: byCode, byCode: true, conflict, pc: pc0 };
+                return { matched: byCode, cat: prodCat(byCode), variant: pn.variant, final: byCode.name, exact: byCode, byCode: true, conflict, pc: pc0, vat: r.vat != null ? !!r.vat : (!!byCode.vat || qiHasVT(r.name)) };
             }
             if (r.strict && r.code) {
                 const cn0 = qiCleanName(baseProductName(String(r.name || '').trim()));
@@ -2268,6 +2295,7 @@
             }
             const rawBase = baseProductName(String(r.name || '').trim());
             const cn = qiCleanName(rawBase);
+            const vat = r.vat != null ? !!r.vat : !!cn.vat;
             let cbase = cn.base, autoV = '';
             if (!(r.variant || cn.variant)) { const av = qiAutoVariant(cn.base); if (av) { cbase = av.base; autoV = av.variant; } }
             const rb = qiSig(cbase), rf = qiSig(rawBase);
@@ -2292,14 +2320,17 @@
             const rp = Number(r.price) || 0;
             const pick = list => list.find(p => rp > 0 && Number(p.price) === rp) || list[0] || null;
             let exact = pick(db.productsMaster.filter(p => p.name === final && prodCat(p) === cat));
-            if (!exact && matched) exact = pick(db.productsMaster.filter(p => { const e = qiEntry(p); return e.key === be.key && e.variant === variant && e.color === color && (e.watt || '') === watt && prodCat(p) === cat; }));
+            if (!exact && matched) {
+                const cand = db.productsMaster.filter(p => { const e = qiEntry(p); return e.key === be.key && e.variant === variant && (e.color || '') === (color || '') && prodCat(p) === cat; });
+                exact = pick(cand.filter(p => (qiEntry(p).watt || '') === watt)) || pick(cand.filter(p => { const w = qiEntry(p).watt || ''; return !w || !watt; }));   // Bản 45: kho chưa ghi W (hoặc hóa đơn chưa ghi W) vẫn khớp, giữ nguyên tên trong kho
+            }
             let pc = null, dupName = false, finalName = exact ? exact.name : final;
             const sibs = matched ? db.productsMaster.filter(p => qiEntry(p).key === be.key) : [];
             if (exact && rp > 0 && exact.price > 0 && rp !== Number(exact.price)) {
                 pc = { type: 'T1', existing: exact, sibs };
                 if ((r.pa || 'new') === 'new') { dupName = db.productsMaster.some(p => p.name === final); exact = null; finalName = final; }
             } else if (!exact && matched && !vmis && rp > 0 && matched.price > 0 && rp !== Number(matched.price)) pc = { type: 'T2', existing: matched, sibs };
-            return { matched, cat, variant, final: finalName, exact, score: bs, ent: be, vmis, pc, dupName };
+            return { matched, cat, variant, final: finalName, exact, score: bs, ent: be, vmis, pc, dupName, vat };
         }
 
 
@@ -2717,6 +2748,7 @@
                     </div>
                     <input data-f="colorOther" value="${colorSel === '__other' ? escHtml(r.color) : ''}" onchange="qcChange(${i}, this)" placeholder="Nhập tên màu khác" class="${inp} ${colorSel === '__other' ? '' : 'hidden'}">
                     <input data-f="watt" list="qc-watts" value="${escHtml(r.watt || '')}" onchange="qcChange(${i}, this)" placeholder="Hiệu suất (VD: 60W)" class="${inp}">
+                    <label class="flex items-center gap-2 text-xs font-semibold"><input type="checkbox" data-f="vat" ${resolveRow(r).vat ? 'checked' : ''} onchange="qcChange(${i}, this)" class="w-4 h-4 accent-emerald-500"> Sản phẩm đã gồm VAT (VT) – lưu riêng, không nằm trong tên</label>
                     <select data-f="variant" onchange="qcChange(${i}, this)" class="${inp}" data-wrap="variant"><option value="">Biến thể: giữ nguyên</option>${(r.variant && !CABLE_VARIANTS.includes(r.variant) ? CABLE_VARIANTS.concat([r.variant]) : CABLE_VARIANTS).map(v => `<option ${r.variant === v ? 'selected' : ''}>${escHtml(v)}</option>`).join('')}<option value="__newv">+ Thêm biến thể mới...</option></select>
                     <div class="grid grid-cols-2 gap-2">
                         <div><label class="text-[10px] uppercase font-bold opacity-60">Số lượng nhập</label><input data-f="qty" type="number" inputmode="numeric" min="1" value="${r.qty}" onchange="qcChange(${i}, this)" class="${inp} text-center font-bold"></div>
@@ -2744,6 +2776,7 @@
                 const c = g('cat'); if (c && c !== '__new') r.cat = c;
                 const col = g('color'); if (col === '__other') { r.color = g('colorOther').trim(); if (r.color && !COLORS.some(x => normTxt(x) === normTxt(r.color))) { COLORS.push(r.color); db.settings.customColors = (db.settings.customColors || []).concat([r.color]); saveData(); } } else r.color = col;
                 { const pa = g('pa'); if (pa) r.pa = pa; }
+                { const vc = card.querySelector('[data-f="vat"]'); if (vc) { if (qiHasVT(r.name)) vc.checked = true; r.vat = vc.checked; } }
                 r.variant = g('variant') === '__newv' ? '' : g('variant'); r.qty = parseInt(g('qty')) || 0; r.price = g('price');
             });
         }
@@ -2997,6 +3030,7 @@
                     db.productsMaster.push(target); created++;
                     if (!db.categories.includes(x.cat)) db.categories.push(x.cat);
                 } else { if ((!(target.price > 0) || r.updPrice || (x.pc && r.pa === 'upd')) && Number(r.price) > 0) target.price = Number(r.price); if (codeOk && !x.byCode && !x.pc) target.code = rc; }
+                if (x.vat) target.vat = true;
                 grand += r.qty * (Number(r.price) > 0 ? Number(r.price) : (target.price || 0));
                 const w = db.warehouse.find(z => String(z.productId) === String(target.id));
                 if (w) w.qty += r.qty; else db.warehouse.push({ id: Date.now().toString() + Math.floor(Math.random() * 100000), productId: target.id, qty: r.qty });
@@ -3460,7 +3494,7 @@
                 const seen = new Set(A[ak].map(h => recSig(ak, h))), stay = [], move = [];
                 (db[dk] || []).forEach(h => {
                     const day = dayKeyOf(h.time);
-                    if (onlyBefore && (!day || parseDayKey(day) >= today)) stay.push(h); else move.push(h);
+                    if (onlyBefore && day && parseDayKey(day) >= today) stay.push(h); else move.push(h);
                 });
                 const add = move.filter(h => { const g = recSig(ak, h); if (seen.has(g)) return false; seen.add(g); return true; }).map(slimRec);
                 A[ak] = add.concat(A[ak]); n += move.length; db[dk] = stay;
@@ -3471,9 +3505,9 @@
         function autoArchiveCheck() {
             try {
                 if (!getCurrentUser()) return false;
-                if (isCloudConfigured() && (!cloudOk || pulling)) return false;
+                if (isCloudConfigured() && (!cloudOk || pulling || pushing || pushTimer || cloudState !== 'ok')) return false;
                 const today = parseDayKey(todayVN()); if (!today) return false;
-                const hasOld = [db.salesHistory, db.checkinHistory, db.importHistory].some(l => (l || []).some(h => { const d = dayKeyOf(h && h.time); return d && parseDayKey(d) < today; }));
+                const hasOld = [db.salesHistory, db.checkinHistory, db.importHistory].some(l => (l || []).some(h => { const d = dayKeyOf(h && h.time); return !d || parseDayKey(d) < today; }));
                 if (!hasOld) return false;
                 const n = archiveHistory(true); if (!n) return false;
                 saveData(); return true;
@@ -3487,9 +3521,12 @@
             const t = String(h.time || ''), d = parseDayKey(dayKeyOf(t)), m = t.match(/(\d{1,2}):(\d{2})(?::(\d{2}))?/);
             return d + (m ? ((+m[1]) * 3600 + (+m[2]) * 60 + (+(m[3] || 0))) * 1000 : 0);
         }
+        const rptMine = h => { const u = getCurrentUser(); return !u || u.role === 'admin' || (h && h.username === u.username); };
+        const mineCount = l => (l || []).filter(rptMine).length;
         function histRecs(kind) {
             const A = (db.historyArchive && db.historyArchive[kind]) || [], cur = kind === 'sales' ? (db.salesHistory || []) : (db.checkinHistory || []), out = [];
             cur.forEach((h, idx) => out.push({ h, src: 's', idx, ts: recTs(h) })); A.forEach((h, idx) => out.push({ h, src: 'a', idx, ts: recTs(h) }));
+            const uu = getCurrentUser(); if (uu && uu.role !== 'admin') return out.filter(r => r.h.username === uu.username).sort((a, b) => b.ts - a.ts);
             return out.sort((a, b) => b.ts - a.ts);
         }
         const HDOW = ['Chủ nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
@@ -3704,9 +3741,9 @@
                             <p class="text-xs sm:text-sm opacity-75 mt-1">Lịch sử của ngày hôm nay. Hết ngày (0h giờ Việt Nam) hệ thống <b>tự chuyển</b> sang mục Lưu trữ và bắt đầu lịch sử mới (đang lưu trữ ${nArch} bản ghi).</p>
                         </div>
                         <div class="flex flex-wrap gap-2 w-full">
-                            ${tb('sales', 'fa-cart-shopping', 'Bán hàng hôm nay (' + (db.salesHistory?.length || 0) + ')')}
-                            ${tb('checkin', 'fa-store', 'Check-in hôm nay (' + (db.checkinHistory?.length || 0) + ')')}
-                            ${tb('archive', 'fa-box-archive', 'Lưu trữ (' + (A.sales.length + A.checkin.length) + ')')}
+                            ${tb('sales', 'fa-cart-shopping', 'Bán hàng hôm nay (' + mineCount(db.salesHistory) + ')')}
+                            ${tb('checkin', 'fa-store', 'Check-in hôm nay (' + mineCount(db.checkinHistory) + ')')}
+                            ${tb('archive', 'fa-box-archive', 'Lưu trữ (' + (mineCount(A.sales) + mineCount(A.checkin)) + ')')}
                             ${tb('range', 'fa-chart-column', 'Tổng lịch sử')}
                         </div>
                     </div>
@@ -3722,16 +3759,6 @@
 
             return `
                 <div class="space-y-6 max-w-4xl mx-auto text-theme-text">
-                    <div class="bg-theme-card border border-theme-border p-6 rounded-3xl shadow-xl space-y-3">
-                        <h3 class="font-bold text-base flex items-center space-x-2 border-b border-theme-border pb-3">
-                            <i class="fa-solid fa-file-excel text-emerald-500"></i><span>Sao lưu dữ liệu ra Excel</span>
-                        </h3>
-                        <p class="text-xs opacity-75">Tải file Excel gồm: lịch sử bán hàng, check-in, nhập kho, cửa hàng, sản phẩm và tồn kho (không kèm ảnh). Nên sao lưu cuối mỗi ngày trước khi xóa bộ nhớ đệm.</p>
-                        <button onclick="exportBackupExcel()" class="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs transition shadow"><i class="fa-solid fa-download mr-1"></i> Tải file sao lưu Excel</button>
-                        <button onclick="exportBackupAppend()" class="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs transition shadow"><i class="fa-solid fa-layer-group mr-1"></i> Cộng dồn vào file Excel cũ (1 file duy nhất)</button>
-                        <p class="text-[11px] opacity-75 text-center">${lastBackupText()}</p>
-                    </div>
-
                     <div class="bg-theme-card border border-theme-border p-6 rounded-3xl shadow-xl space-y-3">
                         <h3 class="font-bold text-base flex items-center space-x-2 border-b border-theme-border pb-3">
                             <i class="fa-solid fa-cloud text-sky-400"></i><span>Đồng bộ dữ liệu giữa các thiết bị</span>
@@ -3844,18 +3871,18 @@
             render();
         }
 
-        function handleUpdatePassword3Rows() {
+        async function handleUpdatePassword3Rows() {
             const user = getCurrentUser();
             const oldPass = document.getElementById('set-old-pass').value.trim();
             const newPass = document.getElementById('set-new-pass').value.trim();
             const confirmPass = document.getElementById('set-confirm-pass').value.trim();
 
             if(!oldPass || !newPass || !confirmPass) { alert('Vui lòng điền đầy đủ cả 3 dòng mật khẩu!'); return; }
-            if(oldPass !== user.password) { alert('Mật khẩu cũ không chính xác!'); return; }
+            if(!(await pwCheck(user, oldPass))) { alert('Mật khẩu cũ không chính xác!'); return; }
             if(newPass !== confirmPass) { alert('Mật khẩu mới và xác thực mật khẩu mới không trùng khớp!'); return; }
             if(newPass === oldPass) { alert('Mật khẩu mới phải khác mật khẩu cũ!'); return; }
 
-            user.password = newPass;
+            user.password = await pwHash(user.username, newPass);
             saveData();
             alert('Đổi mật khẩu thành công!');
             ['set-old-pass','set-new-pass','set-confirm-pass'].forEach(id => document.getElementById(id).value = '');
@@ -4012,9 +4039,9 @@
             return '<div style="margin-top:2px;color:#a7f3d0">📈 ' + keys.map((k, i) => { const p = i ? kpiPct(by[k].n, by[keys[i - 1]].n) : null; return kpiLabel(k) + ': <b>' + rpFmt(by[k].n) + '</b>' + (p && p.v != null ? ' (' + p.t + ')' : ''); }).join(' → ') + '</div>';
         }
         function kpiReportBlocks() {
-            const mk = kpiNowKey(), save = [kpiCity, kpiDistrict]; kpiCity = 'all'; kpiDistrict = 'all';
-            const rows = kpiRows(mk); [kpiCity, kpiDistrict] = save;
-            return rpSection('📊 KPI khách hàng ' + kpiLabel(mk) + ' (' + rows.length + ' khách)', rows.map((r, i) => rpCard('<div style="display:flex;justify-content:space-between;gap:6px"><b style="color:#fcd34d">' + (i + 1) + '. ' + escHtml(r.s.name) + '</b><b style="color:' + (r.status === 'Vượt KPI' ? '#34d399' : r.status === 'Đạt KPI' ? '#60a5fa' : r.status === 'Cần thúc đẩy' ? '#fbbf24' : '#94a3b8') + '">' + r.status + '</b></div><div style="opacity:.85">' + escHtml(kpiTrade(r.s) || '-') + ' • ' + escHtml(kpiArea(r.s) || '-') + '</div><div>' + r.cur.c + ' đơn • <b>' + rpFmt(r.cur.n) + ' đ</b> • Δ đơn ' + r.dOrd.t + ' • Δ doanh thu ' + r.dRev.t + (r.target ? ' • Mục tiêu ' + rpFmt(r.target) : '') + '</div>')), 'Chưa có khách hàng.');
+            const mk = kpiMonthSel || kpiNowKey();
+            const rows = kpiRows(mk);
+            return rpSection('📊 KPI khách hàng ' + kpiLabel(mk) + (kpiCity !== 'all' ? ' • ' + kpiCity : '') + (kpiDistrict !== 'all' ? ' • ' + kpiDistrict : '') + ' (' + rows.length + ' khách)', rows.map((r, i) => rpCard('<div style="display:flex;justify-content:space-between;gap:6px"><b style="color:#fcd34d">' + (i + 1) + '. ' + escHtml(r.s.name) + '</b><b style="color:' + (r.status === 'Vượt KPI' ? '#34d399' : r.status === 'Đạt KPI' ? '#60a5fa' : r.status === 'Cần thúc đẩy' ? '#fbbf24' : '#94a3b8') + '">' + r.status + '</b></div><div style="opacity:.85">' + escHtml(kpiTrade(r.s) || '-') + ' • ' + escHtml(kpiArea(r.s) || '-') + '</div><div>' + r.cur.c + ' đơn • <b>' + rpFmt(r.cur.n) + ' đ</b> • Δ đơn ' + r.dOrd.t + ' • Δ doanh thu ' + r.dRev.t + (r.target ? ' • Mục tiêu ' + rpFmt(r.target) : '') + '</div>')), 'Chưa có khách hàng.');
         }
         // ---- So sánh doanh thu các tháng của 1 khách
         let revStoreId = null;
@@ -4086,7 +4113,7 @@
                                             <tr>
                                                 <td class="p-3.5 font-bold">${u.fullname}</td>
                                                 <td class="p-3.5 text-amber-500 font-mono">@${u.username}</td>
-                                                <td class="p-3.5 font-mono text-emerald-400 font-bold bg-theme-input px-2 rounded">${u.password}</td>
+                                                <td class="p-3.5 font-mono text-emerald-400 font-bold bg-theme-input px-2 rounded">•••••• <span class="text-[10px] opacity-60">(đã mã hóa)</span></td>
                                                 <td class="p-3.5 text-center"><input type="checkbox" ${p.stores?'checked':''} onchange="toggleUserPerm('${u.username}', 'stores', this.checked)" class="w-4 h-4 text-amber-500 rounded cursor-pointer"></td>
                                                 <td class="p-3.5 text-center"><input type="checkbox" ${p.master?'checked':''} onchange="toggleUserPerm('${u.username}', 'master', this.checked)" class="w-4 h-4 text-amber-500 rounded cursor-pointer"></td>
                                                 <td class="p-3.5 text-center"><input type="checkbox" ${p.warehouse?'checked':''} onchange="toggleUserPerm('${u.username}', 'warehouse', this.checked)" class="w-4 h-4 text-amber-500 rounded cursor-pointer"></td>
@@ -4159,7 +4186,7 @@
                 document.getElementById('admin-user-modal-title').innerText = "Thêm tài khoản Sale mới";
                 document.getElementById('modal-edit-username').value = "";
                 document.getElementById('modal-username').value = "";
-                document.getElementById('modal-password').value = "";
+                document.getElementById('modal-password').value = ""; document.getElementById('modal-password').placeholder = 'Mật khẩu tài khoản';
                 document.getElementById('modal-fullname').value = "";
                 document.getElementById('modal-username').disabled = false;
             } else {
@@ -4168,7 +4195,7 @@
                 if(u) {
                     document.getElementById('modal-edit-username').value = u.username;
                     document.getElementById('modal-username').value = u.username;
-                    document.getElementById('modal-password').value = u.password;
+                    document.getElementById('modal-password').value = ''; document.getElementById('modal-password').placeholder = 'Để trống = giữ nguyên mật khẩu cũ';
                     document.getElementById('modal-fullname').value = u.fullname;
                     document.getElementById('modal-username').disabled = true;
                 }
@@ -4179,25 +4206,26 @@
             document.getElementById('admin-user-modal').classList.add('hidden');
         }
 
-        function saveAdminUserAccount() {
+        async function saveAdminUserAccount() {
             const editUser = document.getElementById('modal-edit-username').value;
             const username = document.getElementById('modal-username').value.trim();
             const password = document.getElementById('modal-password').value.trim();
             const fullname = document.getElementById('modal-fullname').value.trim();
 
-            if(!username || !password || !fullname) { alert('Vui lòng điền đủ thông tin tài khoản!'); return; }
+            if(!username || (!password && !editUser) || !fullname) { alert('Vui lòng điền đủ thông tin tài khoản!'); return; }
+            const pwStored = password ? await pwHash(editUser || username, password) : '';
 
             if(!editUser) {
                 if(db.users.some(x => x.username.toLowerCase() === username.toLowerCase())) { alert('Tên tài khoản đã tồn tại!'); return; }
                 db.users.push({
-                    username, password, role: 'sale', status: 'approved', fullname,
+                    username, password: pwStored, role: 'sale', status: 'approved', fullname,
                     permissions: { stores: true, master: true, warehouse: true, history: true }
                 });
                 alert('Thêm tài khoản sale thành công!');
             } else {
                 let u = db.users.find(x => x.username === editUser);
                 if(u) {
-                    u.password = password;
+                    if (pwStored) u.password = pwStored;
                     u.fullname = fullname;
                     alert('Cập nhật tài khoản thành công!');
                 }
@@ -4385,7 +4413,7 @@
             return out;
         }
         function buildAllReportBlocks() {
-            const sales = allSales(), checks = allCheckins(), stores = db.stores || [];
+            const sales = allSales().filter(rptMine), checks = allCheckins().filter(rptMine), stores = db.stores || [];
             const blocks = [];
             let g = 0, n = 0; const days = {}, perStore = {};
             sales.forEach(h => {
@@ -4418,9 +4446,9 @@
 
         function buildReportBlocks() {
             const todayStr = new Date().toDateString();
-            const sales = (db.salesHistory || []).filter(h => isTodayTime(h.time));
-            const checkins = (db.checkinHistory || []).filter(h => isTodayTime(h.time));
-            const imports = (db.importHistory || []).filter(i => !dayKeyOf(i.time) || isTodayTime(i.time));
+            const sales = (db.salesHistory || []).filter(h => isTodayTime(h.time) && rptMine(h));
+            const checkins = (db.checkinHistory || []).filter(h => isTodayTime(h.time) && rptMine(h));
+            const imports = (db.importHistory || []).filter(i => isTodayTime(i.time));
             let revenue = 0, outQty = 0;
             const byStore = {};
             sales.forEach(h => {
@@ -4664,6 +4692,91 @@
             }
         }
 
+
+        // ===== Bản 45: quét & gộp sản phẩm trùng =====
+        let dupState = [];
+        function dupFixName(n) { return qiFixTypo(qiStripVT(n)).replace(/\s{2,}/g, ' ').trim(); }
+        function dupStock(p) { return db.warehouse.filter(w => String(w.productId) === String(p.id)).reduce((a, w) => a + (Number(w.qty) || 0), 0); }
+        function dupScan() {
+            const by = new Map();
+            db.productsMaster.forEach(p => { const e = qiEntry(p); if (!e.key) return; const k = prodCat(p) + '|' + e.key + '|' + (e.variant || '') + '|' + (e.color || ''); if (!by.has(k)) by.set(k, []); by.get(k).push({ p, e }); });
+            const out = [];
+            by.forEach(list => {
+                if (list.length < 2) return;
+                const ws = [...new Set(list.map(x => x.e.watt).filter(Boolean))], cl = {};
+                list.forEach(x => { const w = x.e.watt || (ws.length === 1 ? ws[0] : ''); (cl[w] = cl[w] || []).push(x.p); });
+                Object.values(cl).filter(a => a.length > 1).forEach(a => out.push(a));
+            });
+            return out;
+        }
+        function dupBestKeep(arr) {
+            return arr.slice().sort((a, b) => (dupStock(b) - dupStock(a)) || ((qiHasVT(a.name) || qiFixTypo(a.name) !== a.name ? 1 : 0) - (qiHasVT(b.name) || qiFixTypo(b.name) !== b.name ? 1 : 0)) || (Number(b.price) > 0) - (Number(a.price) > 0))[0];
+        }
+        function dupRenameList() { return db.productsMaster.filter(p => { const n = dupFixName(p.name); return (n !== p.name || (qiHasVT(p.name) && !p.vat)) && n; }); }
+        function openDupTool() {
+            if (getCurrentUser().role !== 'admin') { alert('Chỉ Admin được dùng chức năng này.'); return; }
+            dupState = dupScan().map(a => { const keep = dupBestKeep(a); return { ids: a.map(p => p.id), keep: keep.id, on: new Set(a.map(p => Number(p.price) || 0)).size === 1 }; });
+            let m = document.getElementById('dup-modal');
+            if (!m) { m = document.createElement('div'); m.id = 'dup-modal'; m.className = 'fixed inset-0 z-50 bg-black/70 flex items-end sm:items-center justify-center p-0 sm:p-4'; document.body.appendChild(m); }
+            m.classList.remove('hidden'); dupRender();
+        }
+        function dupClose() { const m = document.getElementById('dup-modal'); if (m) m.classList.add('hidden'); }
+        function dupRender() {
+            const m = document.getElementById('dup-modal'); if (!m) return;
+            const ren = dupRenameList();
+            m.innerHTML = `<div class="bg-theme-card border border-theme-border rounded-t-3xl sm:rounded-3xl w-full max-w-lg max-h-[92vh] flex flex-col">
+                <div class="p-4 border-b border-theme-border flex items-center justify-between"><div class="font-bold text-sm"><i class="fa-solid fa-code-merge text-emerald-500 mr-2"></i>Gộp sản phẩm trùng</div><button onclick="dupClose()" class="px-3 py-1 rounded-lg bg-theme-input text-xs font-bold">Đóng</button></div>
+                <div class="p-4 overflow-y-auto space-y-3 text-xs">
+                    <div class="opacity-80">Gộp = cộng dồn tồn kho về 1 sản phẩm giữ lại, xóa các bản trùng. Hệ thống tự lưu bản sao lưu trước khi gộp (có nút khôi phục). Tick nhóm nào bạn muốn gộp; nhóm khác giá sẽ KHÔNG được tick sẵn.</div>
+                    ${dupState.length ? dupState.map((g, i) => { const ps = g.ids.map(id => db.productsMaster.find(p => String(p.id) === String(id))).filter(Boolean); const diff = new Set(ps.map(p => Number(p.price) || 0)).size > 1;
+                        return `<div class="p-3 rounded-2xl border ${g.on ? 'border-emerald-500/60' : 'border-theme-border'} bg-theme-input/40 space-y-1.5">
+                            <label class="flex items-center gap-2 font-bold"><input type="checkbox" ${g.on ? 'checked' : ''} onchange="dupState[${i}].on=this.checked;dupRender()" class="w-4 h-4 accent-emerald-500"> Nhóm ${i + 1} (${ps.length} sản phẩm)</label>
+                            ${ps.map(p => `<label class="flex items-start gap-2"><input type="radio" name="dk${i}" ${String(g.keep) === String(p.id) ? 'checked' : ''} onchange="dupState[${i}].keep='${p.id}'" class="mt-0.5 accent-emerald-500"><span>${escHtml(p.name)}${p.vat ? ' [VAT]' : ''}<br><span class="opacity-70">Mã ${escHtml(String(prodCode(p)))} • Tồn ${dupStock(p)} • ${Number(p.price || 0).toLocaleString()} đ</span></span></label>`).join('')}
+                            ${diff ? '<div class="text-amber-500 font-semibold">⚠ Khác giá bán – kiểm tra kỹ trước khi gộp (chấm tròn = sản phẩm giữ lại).</div>' : ''}
+                        </div>`; }).join('') : '<div class="p-4 text-center opacity-70">Không tìm thấy sản phẩm trùng.</div>'}
+                    <label class="flex items-start gap-2 p-3 rounded-2xl border border-theme-border"><input type="checkbox" id="dup-ren" ${ren.length ? 'checked' : ''} class="mt-0.5 w-4 h-4 accent-emerald-500"><span><b>Chuẩn hóa tên cũ (${ren.length} sản phẩm)</b><br><span class="opacity-70">Bỏ chữ "(VT)" khỏi tên → ghi vào ô VAT riêng; sửa "Tyce"→"Type".</span></span></label>
+                </div>
+                <div class="p-4 border-t border-theme-border flex gap-2"><button onclick="dupRestore()" class="px-3 py-3 rounded-xl bg-theme-input border border-theme-border text-xs font-bold">Khôi phục lần gộp trước</button><button onclick="dupRun()" class="flex-1 py-3 rounded-xl bg-emerald-500 text-slate-950 text-xs font-bold">Thực hiện gộp</button></div>
+            </div>`;
+        }
+        function dupRun() {
+            const groups = dupState.filter(g => g.on), doRen = document.getElementById('dup-ren') && document.getElementById('dup-ren').checked;
+            if (!groups.length && !(doRen && dupRenameList().length)) { alert('Chưa chọn nhóm nào để gộp.'); return; }
+            if (!confirm('Gộp ' + groups.length + ' nhóm' + (doRen ? ' và chuẩn hóa tên cũ' : '') + '?\n\nHệ thống sẽ tự sao lưu trước. Có thể khôi phục lại.')) return;
+            let bkNote = '';
+            try { localStorage.setItem('hoangde_merge_backup', JSON.stringify({ time: vnNowStr(), productsMaster: db.productsMaster, warehouse: db.warehouse, returnHistory: db.returnHistory || [] })); }
+            catch (e) { try { localStorage.setItem('hoangde_merge_backup', JSON.stringify({ time: vnNowStr(), noImg: true, productsMaster: db.productsMaster.map(p => ({ ...p, img: '' })), warehouse: db.warehouse, returnHistory: db.returnHistory || [] })); bkNote = ' (bản sao lưu không kèm ảnh do bộ nhớ đầy)'; } catch (e2) { if (!confirm('Không lưu được bản sao lưu. Vẫn gộp?')) return; bkNote = ' (KHÔNG có bản sao lưu)'; } }
+            let merged = 0, moved = 0;
+            groups.forEach(g => {
+                const keep = db.productsMaster.find(p => String(p.id) === String(g.keep)); if (!keep) return;
+                g.ids.filter(id => String(id) !== String(keep.id)).forEach(id => {
+                    const o = db.productsMaster.find(p => String(p.id) === String(id)); if (!o) return;
+                    const q = dupStock(o); moved += q;
+                    let w = db.warehouse.find(z => String(z.productId) === String(keep.id));
+                    if (!w) { w = { id: Date.now().toString() + Math.floor(Math.random() * 100000), productId: keep.id, qty: 0 }; db.warehouse.push(w); }
+                    w.qty = (Number(w.qty) || 0) + q;
+                    db.warehouse = db.warehouse.filter(z => String(z.productId) !== String(o.id));
+                    (db.returnHistory || []).forEach(h => (h.items || []).forEach(it => { if (String(it.productId) === String(o.id)) it.productId = keep.id; }));
+                    if (!(Number(keep.price) > 0) && Number(o.price) > 0) keep.price = o.price;
+                    if (!keep.img && o.img) keep.img = o.img;
+                    if (o.vat || qiHasVT(o.name)) keep.vat = true;
+                    db.productsMaster = db.productsMaster.filter(p => String(p.id) !== String(o.id)); merged++;
+                });
+            });
+            let ren = 0;
+            if (doRen) dupRenameList().forEach(p => { const n = dupFixName(p.name); if (qiHasVT(p.name)) p.vat = true; if (n !== p.name && !db.productsMaster.some(x => x !== p && x.name === n)) { p.name = n; ren++; } });
+            saveData(); dupClose(); render();
+            alert('Đã gộp ' + merged + ' sản phẩm trùng (cộng dồn ' + moved + ' cái tồn kho), chuẩn hóa tên ' + ren + ' sản phẩm.' + bkNote);
+        }
+        function dupRestore() {
+            let b = null; try { b = JSON.parse(localStorage.getItem('hoangde_merge_backup') || 'null'); } catch (e) { }
+            if (!b) { alert('Chưa có bản sao lưu nào.'); return; }
+            if (!confirm('Khôi phục kho về thời điểm ' + b.time + '?\nCác thay đổi kho sau thời điểm đó sẽ bị mất.')) return;
+            if (b.noImg) { const imgs = new Map(db.productsMaster.map(p => [String(p.id), p.img])); b.productsMaster.forEach(p => { if (!p.img && imgs.get(String(p.id))) p.img = imgs.get(String(p.id)); }); }
+            db.productsMaster = b.productsMaster; db.warehouse = b.warehouse; db.returnHistory = b.returnHistory || db.returnHistory;
+            saveData(); dupClose(); render(); alert('Đã khôi phục.');
+        }
+
         // ===== Bản 42: tiện ích nhóm / mã / biến thể =====
         const CABLE_VARIANTS = ['USB - micro', 'USB - Type C', 'USB sang Lightning', 'C to C', 'Type C - Lightning'];
         let importFilter = { q: '', cat: '' };
@@ -4858,7 +4971,7 @@
         function openCustomAddProductModal(toWarehouse) {
             document.getElementById('import-stock-modal').classList.add('hidden');
             document.getElementById('add-product-modal').classList.remove('hidden');
-            ['p-name','p-price','p-qty'].forEach(i => document.getElementById(i).value = '');
+            ['p-name','p-price','p-qty'].forEach(i => document.getElementById(i).value = ''); document.getElementById('p-vat').checked = false;
             uploadedProductImg = '';
             manualVariant = ''; manualColor = '';
             document.getElementById('product-img-preview-box').classList.add('hidden');
@@ -4947,9 +5060,10 @@
             if (isNaN(qty) || qty <= 0) { alert("Số lượng nhập kho phải lớn hơn 0!"); return; }
             if (!uploadedProductImg) { alert("Vui lòng tải lên hoặc chụp ảnh sản phẩm!"); return; }
 
+            let vatFlag = document.getElementById('p-vat').checked; if (qiHasVT(name)) { vatFlag = true; name = qiStripVT(name); } name = qiFixTypo(name);
             { const v = (manualVariant && isCableCat(selectedCategory)) ? manualVariant : ''; if (v || manualColor) name = composeName(baseProductName(name), v, manualColor); }
             const newId = newProductId();
-            db.productsMaster.push({ id: newId, code: newProductCode(), category: selectedCategory, name, price, img: uploadedProductImg, color: manualColor || '' });
+            db.productsMaster.push({ id: newId, code: newProductCode(), category: selectedCategory, name, price, img: uploadedProductImg, color: manualColor || '', vat: vatFlag || undefined });
             db.warehouse.push({ id: Date.now().toString(), productId: newId, qty: qty });
             
             if(!db.importHistory) db.importHistory = [];
