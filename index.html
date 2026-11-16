@@ -1341,7 +1341,7 @@
                         </div>
                         <div>
                             <h1 class="font-black text-xs sm:text-sm uppercase tracking-wider">PHỤ KIỆN HOÀNG ĐẾ</h1>
-                            <p class="text-[11px] sm:text-xs opacity-75">Nhân sự: <span class="font-bold text-amber-500">${user.fullname}</span> (${db.settings?.deviceMode === 'pc' ? 'Chế độ PC' : 'Chế độ Mobile'} • Bản 47)</p>
+                            <p class="text-[11px] sm:text-xs opacity-75">Nhân sự: <span class="font-bold text-amber-500">${user.fullname}</span> (${db.settings?.deviceMode === 'pc' ? 'Chế độ PC' : 'Chế độ Mobile'} • Bản 48)</p>
                         </div>
                     </div>
                     <div class="flex space-x-2 w-full sm:w-auto justify-end">
@@ -4725,31 +4725,42 @@
             return { why: typo.length ? 'gõ sai chính tả (' + typo.join(', ') + ')' : 'tên dài/ngắn khác nhau (+' + extra + ' từ)' };
         }
         function dupWattOk(a, b) { return !a || !b || a === b; }
+        // Bản 48: "chữ ký biến thể" = biến thể + màu + mọi phần trong ngoặc (trừ VT và số W). Khác chữ ký = khác mã → KHÔNG BAO GIỜ gộp
+        function dupVarSig(p, e) {
+            const n = s => normTxt(qiFixTypo(s)).replace(/\s+/g, ' ').trim();
+            const parts = (qiFixTypo(p.name).match(/\(([^()]*)\)/g) || []).map(x => n(x.slice(1, -1))).filter(x => x && !/^vtc?$/.test(x) && !/^\d+([.,]\d+)?\s*w$/.test(x));
+            if (e.variant) parts.push(n(e.variant)); if (e.color) parts.push(n(e.color));
+            return [...new Set(parts)].sort().join('|');
+        }
         function dupScan() {
             const P = db.productsMaster, ents = P.map(p => ({ p, e: qiEntry(p), cat: prodCat(p) })).filter(x => x.e.key);
             const par = new Map(); ents.forEach(x => par.set(String(x.p.id), String(x.p.id)));
             const find = i => { while (par.get(i) !== i) { par.set(i, par.get(par.get(i))); i = par.get(i); } return i; };
             const uni = (a, b) => { a = find(String(a)); b = find(String(b)); if (a !== b) par.set(a, b); };
             const near = new Map();
-            // (1) chắc chắn: cùng khóa tên + biến thể + màu, W giống hoặc một bên chưa ghi
+            ents.forEach(x => { x.sig = dupVarSig(x.p, x.e); });
+            // (1) chắc chắn: cùng tên + cùng biến thể/màu + cùng W
             const by = new Map();
-            ents.forEach(x => { const k = x.cat + '|' + x.e.key + '|' + (x.e.variant || '') + '|' + (x.e.color || ''); if (!by.has(k)) by.set(k, []); by.get(k).push(x); });
+            ents.forEach(x => { const k = x.cat + '|' + x.e.key + '|' + x.sig; if (!by.has(k)) by.set(k, []); by.get(k).push(x); });
             by.forEach(list => {
                 if (list.length < 2) return;
-                const ws = [...new Set(list.map(x => x.e.watt).filter(Boolean))], cl = {};
-                list.forEach(x => { const w = x.e.watt || (ws.length === 1 ? ws[0] : ''); (cl[w] = cl[w] || []).push(x); });
-                Object.values(cl).forEach(a => { for (let i = 1; i < a.length; i++) uni(a[0].p.id, a[i].p.id); });
+                const cw = {}; list.forEach(x => { if (x.e.watt) (cw[x.e.watt] = cw[x.e.watt] || []).push(x); });
+                Object.values(cw).forEach(a => { for (let i = 1; i < a.length; i++) uni(a[0].p.id, a[i].p.id); });
+                const noW = list.filter(x => !x.e.watt);
+                for (let i = 1; i < noW.length; i++) uni(noW[0].p.id, noW[i].p.id);
+                // một bên chưa ghi W, chỉ có đúng 1 loại W → gần giống (không tick sẵn)
+                const ws = Object.keys(cw);
+                if (noW.length && ws.length === 1) { uni(noW[0].p.id, cw[ws[0]][0].p.id); near.set(find(String(noW[0].p.id)), 'một bên chưa ghi công suất (' + ws[0] + ')'); }
             });
-            // (2) gần giống: cùng nhóm hàng/biến thể/màu, cùng mã số
+            // (2) gần giống (sai chính tả / thừa chữ): bắt buộc cùng biến thể + màu, cùng mã số
             const bk = new Map();
-            ents.forEach(x => { const hs = [...x.e.sigBase.hard]; const keys = hs.length ? hs : ['~' + ([...x.e.sigBase.set][0] || '')]; keys.forEach(h => { const k = x.cat + '|' + (x.e.color || '') + '|' + h; if (!bk.has(k)) bk.set(k, []); bk.get(k).push(x); }); });
+            ents.forEach(x => { const hs = [...x.e.sigBase.hard]; const keys = hs.length ? hs : ['~' + ([...x.e.sigBase.set][0] || '')]; keys.forEach(h => { const k = x.cat + '|' + x.sig + '|' + h; if (!bk.has(k)) bk.set(k, []); bk.get(k).push(x); }); });
             bk.forEach(list => {
                 if (list.length < 2 || list.length > 80) return;
                 for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) {
-                    const a = list[i], b = list[j]; if (find(String(a.p.id)) === find(String(b.p.id)) || !dupWattOk(a.e.watt, b.e.watt)) continue;
-                    const va = a.e.variant || '', vb = b.e.variant || ''; if (va && vb && va !== vb) continue;
-                    let r = dupNear(a.e, b.e); if (!r && va !== vb && a.e.key === b.e.key) r = { why: 'một bên thiếu biến thể (' + (va || vb) + ')' };
-                    if (r && va !== vb && !/biến thể/.test(r.why)) r.why += ', một bên thiếu biến thể';
+                    const a = list[i], b = list[j]; if (a.sig !== b.sig || find(String(a.p.id)) === find(String(b.p.id))) continue;
+                    if ((a.e.watt || '') !== (b.e.watt || '')) continue;
+                    const r = dupNear(a.e, b.e);
                     if (r) { uni(a.p.id, b.p.id); near.set(find(String(a.p.id)), r.why); }
                 }
             });
