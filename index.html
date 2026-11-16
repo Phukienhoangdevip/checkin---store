@@ -1341,7 +1341,7 @@
                         </div>
                         <div>
                             <h1 class="font-black text-xs sm:text-sm uppercase tracking-wider">PHỤ KIỆN HOÀNG ĐẾ</h1>
-                            <p class="text-[11px] sm:text-xs opacity-75">Nhân sự: <span class="font-bold text-amber-500">${user.fullname}</span> (${db.settings?.deviceMode === 'pc' ? 'Chế độ PC' : 'Chế độ Mobile'} • Bản 48)</p>
+                            <p class="text-[11px] sm:text-xs opacity-75">Nhân sự: <span class="font-bold text-amber-500">${user.fullname}</span> (${db.settings?.deviceMode === 'pc' ? 'Chế độ PC' : 'Chế độ Mobile'} • Bản 49)</p>
                         </div>
                     </div>
                     <div class="flex space-x-2 w-full sm:w-auto justify-end">
@@ -3039,7 +3039,7 @@
                 grand += r.qty * (Number(r.price) > 0 ? Number(r.price) : (target.price || 0));
                 const w = db.warehouse.find(z => String(z.productId) === String(target.id));
                 if (w) w.qty += r.qty; else db.warehouse.push({ id: Date.now().toString() + Math.floor(Math.random() * 100000), productId: target.id, qty: r.qty });
-                db.importHistory.unshift({ time: vnNowStr(), productName: target.name, qty: r.qty, amount: r.qty * (Number(r.price) > 0 ? Number(r.price) : (target.price || 0)) });
+                db.importHistory.unshift({ time: vnNowStr(), productName: target.name, qty: r.qty, price: (Number(r.price) > 0 ? Number(r.price) : (Number(target.price) || 0)), amount: r.qty * (Number(r.price) > 0 ? Number(r.price) : (target.price || 0)), username: currentUsername });
                 done.push(`${prodCode(target)} – ${target.name} x${r.qty}`);
             });
             saveData();
@@ -3628,16 +3628,70 @@
             render();
         }
         function histRangeTitle(R) { return histFmtDay(R.from) + ' → ' + histFmtDay(R.to); }
+        function histRangePicker() {
+            const chip = (v, l) => `<button type="button" onclick="histSet('range','${v}')" class="px-3 py-2 rounded-xl text-xs font-bold border ${histRange === v ? 'bg-amber-500 text-slate-950 border-amber-500 shadow' : 'bg-theme-input border-theme-border'}">${l}</button>`;
+            return `<div class="flex flex-wrap gap-2">${chip('today', 'Hôm nay')}${chip('month', 'Tháng này')}${chip('last', 'Tháng trước')}${chip('3m', '3 tháng gần đây')}${chip('custom', 'Tùy chỉnh')}</div>
+                    ${histRange === 'custom' ? `<div class="grid grid-cols-2 gap-2">
+                        <div><label class="block text-[10px] font-semibold uppercase mb-1 opacity-70">Từ ngày (gõ hoặc chọn lịch)</label><div class="flex gap-1"><input type="text" inputmode="numeric" maxlength="10" placeholder="dd/mm/yyyy" value="${isoShow(histFrom)}" oninput="dpMask(this)" onchange="histTyped('from', this.value)" class="flex-1 min-w-0 px-3 py-2.5 rounded-xl bg-theme-input border border-theme-border text-xs font-semibold"><button type="button" onclick="dpOpen('from')" title="Mở bảng chọn ngày" class="px-3 rounded-xl bg-amber-500 text-slate-950"><i class="fa-solid fa-calendar-days"></i></button></div></div>
+                        <div><label class="block text-[10px] font-semibold uppercase mb-1 opacity-70">Đến ngày (gõ hoặc chọn lịch)</label><div class="flex gap-1"><input type="text" inputmode="numeric" maxlength="10" placeholder="dd/mm/yyyy" value="${isoShow(histTo)}" oninput="dpMask(this)" onchange="histTyped('to', this.value)" class="flex-1 min-w-0 px-3 py-2.5 rounded-xl bg-theme-input border border-theme-border text-xs font-semibold"><button type="button" onclick="dpOpen('to')" title="Mở bảng chọn ngày" class="px-3 rounded-xl bg-amber-500 text-slate-950"><i class="fa-solid fa-calendar-days"></i></button></div></div></div>` : ''}`;
+        }
+        // ===== Bản 49: lịch sử nhập hàng (ai đăng nhập tài khoản nào xem nhập hàng của tài khoản đó; Admin xem tất cả) =====
+        let impSearch = '';
+        function impMine(i) { const u = getCurrentUser(); return !!u && (u.role === 'admin' || (i && i.username === u.username)); }
+        function impUnit(i) { const q = Number(i.qty) || 0; if (Number(i.price) > 0) return Number(i.price); if (Number(i.amount) > 0 && q) return Math.round(Number(i.amount) / q); return 0; }
+        function impTotal(i) { return Number(i.amount) > 0 ? Number(i.amount) : impUnit(i) * (Number(i.qty) || 0); }
+        function impRangeData() {
+            const [from, to] = histBounds(), q = normTxt(impSearch.trim());
+            const mine = allImports().filter(impMine), undated = mine.filter(i => !dayKeyOf(i.time)).length;
+            const list = mine.filter(i => { const d = dayKeyOf(i.time); if (!d) return false; const t = parseDayKey(d); return t >= from && t <= to && (!q || normTxt(i.productName).includes(q)); }).sort((a, b) => recTs(b) - recTs(a));
+            const byDay = {}, days = [];
+            list.forEach(i => { const k = dayKeyOf(i.time); if (!byDay[k]) { byDay[k] = { items: [], qty: 0, money: 0 }; days.push(k); } const d = byDay[k]; d.items.push(i); d.qty += Number(i.qty) || 0; d.money += impTotal(i); });
+            return { from, to, list, byDay, days, undated, qty: list.reduce((a, i) => a + (Number(i.qty) || 0), 0), money: list.reduce((a, i) => a + impTotal(i), 0) };
+        }
+        function impHtml() {
+            const R = impRangeData(), admin = getCurrentUser().role === 'admin', money = v => v > 0 ? kpiFmt(v) + ' đ' : '—';
+            const box = (l, v, c) => `<div class="p-3 rounded-xl bg-theme-input border border-theme-border text-center"><div class="text-[10px] opacity-70">${l}</div><div class="font-bold text-sm ${c || ''}">${v}</div></div>`;
+            const row = i => `<div class="px-3 py-2.5 space-y-1">
+                    <div class="flex justify-between gap-2"><span class="font-bold break-words">${escHtml(i.productName || '')}</span><span class="font-bold text-emerald-500 whitespace-nowrap">+${Number(i.qty) || 0} cái</span></div>
+                    <div class="flex justify-between gap-2 opacity-80"><span><i class="fa-regular fa-clock mr-1"></i>${escHtml(i.time)}${admin && i.username ? ' • ' + escHtml(i.username) : ''}</span><span class="whitespace-nowrap">${money(impUnit(i))} × ${Number(i.qty) || 0} = <b class="text-amber-500">${money(impTotal(i))}</b></span></div>
+                </div>`;
+            return `
+                <div class="bg-theme-card border border-theme-border p-4 sm:p-5 rounded-2xl shadow-sm space-y-3">
+                    <div class="font-bold text-sm"><i class="fa-solid fa-truck-ramp-box text-emerald-500 mr-2"></i>Lịch sử nhập hàng</div>
+                    ${histRangePicker()}
+                    <div class="flex gap-2"><input type="text" value="${escHtml(impSearch)}" placeholder="Tìm theo tên sản phẩm..." onchange="impSearch=this.value;render()" onkeydown="if(event.key==='Enter'){impSearch=this.value;render()}" class="flex-1 min-w-0 px-3 py-2.5 rounded-xl bg-theme-input border border-theme-border text-xs">${impSearch ? `<button type="button" onclick="impSearch='';render()" class="px-3 rounded-xl bg-theme-input border border-theme-border text-xs font-bold">Xóa</button>` : ''}</div>
+                    <p class="text-xs opacity-75">Khoảng ngày (giờ Việt Nam): <b class="text-amber-500">${histRangeTitle(R)}</b> • gồm cả kho lưu trữ${admin ? ' • Admin xem nhập hàng của mọi tài khoản' : ' • chỉ hiện hàng do tài khoản của bạn nhập'}</p>
+                    <div class="grid grid-cols-3 gap-2">${box('Số lần nhập', R.list.length)}${box('Tổng số cái', R.qty, 'text-emerald-500')}${box('Tổng tiền nhập', money(R.money), 'text-amber-500')}</div>
+                    <button type="button" onclick="impExportExcel()" class="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs shadow"><i class="fa-solid fa-file-excel mr-1"></i> Xuất Excel lịch sử nhập hàng</button>
+                </div>
+                ${R.days.length ? R.days.map(k => { const d = R.byDay[k]; return `<div class="bg-theme-card border border-theme-border rounded-2xl shadow-sm overflow-hidden">
+                    <div class="p-3 bg-black/20 border-b border-theme-border flex justify-between gap-2 text-xs"><span class="font-bold">${histDayLabel(k)}</span><span class="whitespace-nowrap">${d.items.length} lần • ${d.qty} cái • <b class="text-amber-500">${money(d.money)}</b></span></div>
+                    <div class="divide-y divide-theme-border text-xs">${d.items.map(row).join('')}</div></div>`; }).join('') : '<div class="bg-theme-card border border-theme-border rounded-2xl p-6 text-center text-xs opacity-70">Không có lần nhập hàng nào trong khoảng ngày này.</div>'}
+                ${admin && R.undated ? `<p class="text-[11px] opacity-60 text-center">Có ${R.undated} bản ghi nhập hàng cũ không ghi ngày nên không hiện theo ngày (xem trong Lưu trữ / file Excel sao lưu).</p>` : ''}
+                <p class="text-[11px] opacity-60 text-center">Đơn giá "—" là các lần nhập cũ chưa lưu giá. Từ bản này mỗi lần nhập đều lưu đơn giá và người nhập.</p>`;
+        }
+        async function impExportExcel() {
+            if (typeof ExcelJS === 'undefined') { alert('Chưa tải được thư viện Excel, vui lòng kiểm tra mạng rồi thử lại.'); return; }
+            const R = impRangeData(); if (!R.list.length) { alert('Khoảng ngày này chưa có lần nhập hàng để xuất.'); return; }
+            try {
+                const wb = new ExcelJS.Workbook(), thin = { style: 'thin', color: { argb: 'FFBFBFBF' } }, border = { top: thin, left: thin, bottom: thin, right: thin };
+                const ws = wb.addWorksheet('Lịch sử nhập hàng'), cols = ['STT', 'Ngày giờ', 'Sản phẩm', 'Số lượng', 'Đơn giá (đ)', 'Thành tiền (đ)', 'Người nhập'];
+                [6, 22, 48, 11, 15, 17, 14].forEach((w, i) => { ws.getColumn(i + 1).width = w; });
+                ws.mergeCells(1, 1, 1, cols.length); const t = ws.getCell(1, 1); t.value = 'LỊCH SỬ NHẬP HÀNG ' + histRangeTitle(R) + (impSearch ? ' • lọc: ' + impSearch : ''); t.font = { name: 'Arial', size: 14, bold: true, color: { argb: 'FFFFFFFF' } }; t.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F3864' } }; t.alignment = { horizontal: 'center', vertical: 'middle' }; ws.getRow(1).height = 28;
+                const hr = ws.addRow(cols); hr.eachCell(c => { c.font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FFFFFFFF' } }; c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2F5597' } }; c.border = border; c.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true }; });
+                R.list.slice().sort((a, b) => recTs(a) - recTs(b)).forEach((i, n) => { const r = ws.addRow([n + 1, i.time, i.productName, Number(i.qty) || 0, impUnit(i) || null, impTotal(i) || null, i.username || '']); r.eachCell({ includeEmpty: true }, (c, col) => { c.font = { name: 'Arial', size: 10 }; c.border = border; if (col >= 4 && col <= 6) c.numFmt = '#,##0'; }); });
+                const tr = ws.addRow(['', 'TỔNG CỘNG', R.list.length + ' lần nhập', R.qty, null, R.money, '']); tr.eachCell({ includeEmpty: true }, (c, col) => { c.font = { name: 'Arial', size: 11, bold: true }; c.border = border; if (col >= 4) c.numFmt = '#,##0'; });
+                const buf = await wb.xlsx.writeBuffer();
+                kpiSaveBlob(new Blob([buf], { type: XLSX_MIME }), 'Lich-Su-Nhap-Hang-' + histIso(R.from) + '_' + histIso(R.to) + '.xlsx');
+            } catch (e) { console.error(e); alert('Lỗi xuất Excel: ' + e.message); }
+        }
         function histRangeHtml() {
-            const R = histRangeData(), chip = (v, l) => `<button type="button" onclick="histSet('range','${v}')" class="px-3 py-2 rounded-xl text-xs font-bold border ${histRange === v ? 'bg-amber-500 text-slate-950 border-amber-500 shadow' : 'bg-theme-input border-theme-border'}">${l}</button>`;
+            const R = histRangeData();
             const box = (l, v, c) => `<div class="p-3 rounded-xl bg-theme-input border border-theme-border text-center"><div class="text-[10px] opacity-70">${l}</div><div class="font-bold text-sm ${c || ''}">${v}</div></div>`;
             return `
                 <div class="bg-theme-card border border-theme-border p-4 sm:p-5 rounded-2xl shadow-sm space-y-3">
                     <div class="font-bold text-sm"><i class="fa-solid fa-calendar-days text-amber-500 mr-2"></i>Xem tổng lịch sử theo khoảng ngày</div>
-                    <div class="flex flex-wrap gap-2">${chip('today', 'Hôm nay')}${chip('month', 'Tháng này')}${chip('last', 'Tháng trước')}${chip('3m', '3 tháng gần đây')}${chip('custom', 'Tùy chỉnh')}</div>
-                    ${histRange === 'custom' ? `<div class="grid grid-cols-2 gap-2">
-                        <div><label class="block text-[10px] font-semibold uppercase mb-1 opacity-70">Từ ngày (gõ hoặc chọn lịch)</label><div class="flex gap-1"><input type="text" inputmode="numeric" maxlength="10" placeholder="dd/mm/yyyy" value="${isoShow(histFrom)}" oninput="dpMask(this)" onchange="histTyped('from', this.value)" class="flex-1 min-w-0 px-3 py-2.5 rounded-xl bg-theme-input border border-theme-border text-xs font-semibold"><button type="button" onclick="dpOpen('from')" title="Mở bảng chọn ngày" class="px-3 rounded-xl bg-amber-500 text-slate-950"><i class="fa-solid fa-calendar-days"></i></button></div></div>
-                        <div><label class="block text-[10px] font-semibold uppercase mb-1 opacity-70">Đến ngày (gõ hoặc chọn lịch)</label><div class="flex gap-1"><input type="text" inputmode="numeric" maxlength="10" placeholder="dd/mm/yyyy" value="${isoShow(histTo)}" oninput="dpMask(this)" onchange="histTyped('to', this.value)" class="flex-1 min-w-0 px-3 py-2.5 rounded-xl bg-theme-input border border-theme-border text-xs font-semibold"><button type="button" onclick="dpOpen('to')" title="Mở bảng chọn ngày" class="px-3 rounded-xl bg-amber-500 text-slate-950"><i class="fa-solid fa-calendar-days"></i></button></div></div></div>` : ''}
+                    ${histRangePicker()}
                     <p class="text-xs opacity-75">Khoảng ngày đang xem (giờ Việt Nam): <b class="text-amber-500">${histRangeTitle(R)}</b> • gồm cả lịch sử trong kho lưu trữ</p>
                     <div class="grid grid-cols-2 sm:grid-cols-5 gap-2">${box('Số đơn', R.sales.length)}${box('Cửa hàng mua', R.stores.length)}${box('Doanh thu Gross', kpiFmt(R.g))}${box('Doanh thu Net', kpiFmt(R.n), 'text-amber-500')}${box('Lượt check-in', R.checks.length, 'text-sky-400')}</div>
                     <div class="flex gap-2">
@@ -3696,6 +3750,7 @@
             const A = archiveOf(), nArch = A.sales.length + A.checkin.length + A.imports.length;
             let bodyHtml = '';
             if (tab === 'range') bodyHtml = histRangeHtml();
+            else if (tab === 'imports') bodyHtml = impHtml();
             else {
                 const isArch = tab === 'archive', kind = isArch ? histArchKind : (tab === 'checkin' ? 'checkin' : 'sales'), recs = histRecs(kind).filter(r => isArch ? r.src === 'a' : r.src === 's'), groups = histGroups(recs), shown = groups.slice(0, histDaysShown);
                 const more = groups.length > shown.length ? `<button onclick="histDaysShown+=7; render();" class="w-full py-3 rounded-xl bg-theme-input border border-theme-border text-xs font-bold">Xem thêm 7 ngày cũ hơn (còn ${groups.length - shown.length} ngày)</button>` : '';
@@ -3749,6 +3804,7 @@
                             ${tb('sales', 'fa-cart-shopping', 'Bán hàng hôm nay (' + mineCount(db.salesHistory) + ')')}
                             ${tb('checkin', 'fa-store', 'Check-in hôm nay (' + mineCount(db.checkinHistory) + ')')}
                             ${tb('archive', 'fa-box-archive', 'Lưu trữ (' + (mineCount(A.sales) + mineCount(A.checkin)) + ')')}
+                            ${tb('imports', 'fa-truck-ramp-box', 'Nhập hàng')}
                             ${tb('range', 'fa-chart-column', 'Tổng lịch sử')}
                         </div>
                     </div>
@@ -5056,7 +5112,7 @@
             let w = db.warehouse.find(x => String(x.productId) === String(target.id));
             if (w) w.qty += q; else db.warehouse.push({ id: Date.now().toString() + Math.floor(Math.random() * 1000), productId: target.id, qty: q });
             if (!db.importHistory) db.importHistory = [];
-            db.importHistory.unshift({ time: vnNowStr(), productName: target.name, qty: q });
+            db.importHistory.unshift({ time: vnNowStr(), productName: target.name, qty: q, price: Number(target.price) || 0, amount: q * (Number(target.price) || 0), username: currentUsername });
             saveData();
             closeImportQty();
             document.getElementById('import-stock-modal').classList.add('hidden');
@@ -5163,7 +5219,7 @@
             db.warehouse.push({ id: Date.now().toString(), productId: newId, qty: qty });
             
             if(!db.importHistory) db.importHistory = [];
-            db.importHistory.unshift({ time: vnNowStr(), productName: name, qty: qty });
+            db.importHistory.unshift({ time: vnNowStr(), productName: name, qty: qty, price: Number(price) || 0, amount: qty * (Number(price) || 0), username: currentUsername });
 
             saveData();
             alert('Nhập hàng và thêm sản phẩm thành công!');
