@@ -1341,7 +1341,7 @@
                         </div>
                         <div>
                             <h1 class="font-black text-xs sm:text-sm uppercase tracking-wider">PHỤ KIỆN HOÀNG ĐẾ</h1>
-                            <p class="text-[11px] sm:text-xs opacity-75">Nhân sự: <span class="font-bold text-amber-500">${user.fullname}</span> (${db.settings?.deviceMode === 'pc' ? 'Chế độ PC' : 'Chế độ Mobile'} • Bản 49)</p>
+                            <p class="text-[11px] sm:text-xs opacity-75">Nhân sự: <span class="font-bold text-amber-500">${user.fullname}</span> (${db.settings?.deviceMode === 'pc' ? 'Chế độ PC' : 'Chế độ Mobile'} • Bản 50)</p>
                         </div>
                     </div>
                     <div class="flex space-x-2 w-full sm:w-auto justify-end">
@@ -1702,7 +1702,7 @@
                             <input type="text" id="master-search" value="${escHtml(masterQ)}" oninput="masterSearchInput(this.value)" placeholder="Tìm sản phẩm theo tên hoặc mã..." class="w-full pl-9 pr-3 py-3 rounded-xl bg-theme-input border border-theme-border text-theme-text text-sm outline-none">
                         </div>
                         <div class="flex gap-2 overflow-x-auto pb-1 hide-scrollbar">${chips}</div>
-                        ${isAdmin ? `<button type="button" onclick="openDupTool()" class="w-full py-2.5 rounded-xl border border-emerald-500/40 bg-emerald-500/10 text-emerald-500 text-xs font-bold"><i class="fa-solid fa-code-merge mr-1"></i>Quét & gộp sản phẩm trùng (và chuẩn hóa tên cũ)</button><button type="button" onclick="harvestVariantsBtn()" class="w-full py-2.5 rounded-xl border border-amber-500/40 bg-amber-500/10 text-amber-500 text-xs font-bold"><i class="fa-solid fa-tags mr-1"></i>Quét & lưu hết biến thể từ sản phẩm trong kho vào ô chọn nhanh</button><button type="button" onclick="replaceAllProductsFromList()" class="w-full py-2.5 rounded-xl border border-rose-500/40 bg-rose-500/10 text-rose-400 text-xs font-bold"><i class="fa-solid fa-file-import mr-1"></i>Thay toàn bộ sản phẩm bằng danh sách Excel (${EXCEL_PRODUCTS.p.length} sản phẩm)</button>` : ''}
+                        ${isAdmin ? `<button type="button" onclick="openCleanTool()" class="w-full py-2.5 rounded-xl border border-rose-500/40 bg-rose-500/10 text-rose-500 text-xs font-bold"><i class="fa-solid fa-broom mr-1"></i>Dọn sản phẩm chưa từng nhập / chưa từng bán</button><button type="button" onclick="openDupTool()" class="w-full py-2.5 rounded-xl border border-emerald-500/40 bg-emerald-500/10 text-emerald-500 text-xs font-bold"><i class="fa-solid fa-code-merge mr-1"></i>Quét & gộp sản phẩm trùng (và chuẩn hóa tên cũ)</button><button type="button" onclick="harvestVariantsBtn()" class="w-full py-2.5 rounded-xl border border-amber-500/40 bg-amber-500/10 text-amber-500 text-xs font-bold"><i class="fa-solid fa-tags mr-1"></i>Quét & lưu hết biến thể từ sản phẩm trong kho vào ô chọn nhanh</button><button type="button" onclick="replaceAllProductsFromList()" class="w-full py-2.5 rounded-xl border border-rose-500/40 bg-rose-500/10 text-rose-400 text-xs font-bold"><i class="fa-solid fa-file-import mr-1"></i>Thay toàn bộ sản phẩm bằng danh sách Excel (${EXCEL_PRODUCTS.p.length} sản phẩm)</button>` : ''}
                     </div>
                     ${db.productsMaster.length === 0 ? `<div class="bg-theme-card border border-theme-border rounded-2xl p-8 text-center opacity-60 text-sm">Chưa có sản phẩm nào. Hãy vào mục "Kho Tồn" để nhập hàng mới.</div>` : ''}
                     <div id="master-groups" class="space-y-4">${groups}</div>
@@ -4753,6 +4753,81 @@
             }
         }
 
+
+        // ===== Bản 50: dọn sản phẩm không dùng (chỉ xóa sản phẩm tồn 0, CHƯA TỪNG nhập, CHƯA TỪNG bán; không đụng lịch sử) =====
+        let cleanState = { cand: [], keep: {}, sel: new Set() };
+        function cleanScan() {
+            const sales = allSales(), imps = allImports(), now = Date.now();
+            const soldText = normTxt(sales.map(h => String(h.note || '') + ' ' + (h.items || []).map(i => (i && i.name) || '').join(' ')).join('\n'));
+            const impNames = new Set(imps.map(i => normTxt(String(i.productName || '')).trim()));
+            const busy = new Set(); (db.returnHistory || []).forEach(h => (h.items || []).forEach(it => busy.add(String(it.productId))));
+            Object.keys(orderCart || {}).forEach(k => { if (orderCart[k] > 0) busy.add(String(k)); });
+            const keep = { stock: 0, imp: 0, sold: 0, other: 0, recent: 0 }, cand = [];
+            db.productsMaster.forEach(p => {
+                const names = [p.name, ...(p.aliases || [])].filter(Boolean).map(n => normTxt(String(n)).trim()).filter(Boolean);
+                let why = '';
+                if (dupStock(p) > 0) why = 'stock';
+                else if (names.some(n => impNames.has(n))) why = 'imp';
+                else if (names.some(n => soldText.includes(n))) why = 'sold';
+                else if (busy.has(String(p.id))) why = 'other';
+                else { const t = Number(p.id); if (t > 1e12 && now - t < 7 * 864e5) why = 'recent'; }
+                if (why) keep[why]++; else cand.push(p);
+            });
+            return { cand, keep };
+        }
+        function openCleanTool() {
+            if (getCurrentUser().role !== 'admin') { alert('Chỉ Admin được dùng chức năng này.'); return; }
+            const r = cleanScan(); cleanState = { cand: r.cand, keep: r.keep, sel: new Set(r.cand.map(p => String(p.id))) };
+            let m = document.getElementById('clean-modal');
+            if (!m) { m = document.createElement('div'); m.id = 'clean-modal'; m.className = 'fixed inset-0 z-50 bg-black/70 flex items-end sm:items-center justify-center p-0 sm:p-4'; document.body.appendChild(m); }
+            m.classList.remove('hidden'); cleanRender();
+        }
+        function cleanClose() { const m = document.getElementById('clean-modal'); if (m) m.classList.add('hidden'); }
+        function cleanSelAll(on) { cleanState.sel = new Set(on ? cleanState.cand.map(p => String(p.id)) : []); cleanRender(); }
+        function cleanToggle(id, on) { if (on) cleanState.sel.add(String(id)); else cleanState.sel.delete(String(id)); cleanRender(); }
+        function cleanRender() {
+            const m = document.getElementById('clean-modal'); if (!m) return;
+            const K = cleanState.keep, C = cleanState.cand, n = cleanState.sel.size;
+            const kb = (l, v) => `<div class="p-2 rounded-xl bg-theme-input border border-theme-border text-center"><div class="text-[10px] opacity-70">${l}</div><div class="font-bold text-sm text-emerald-500">${v}</div></div>`;
+            m.innerHTML = `<div class="bg-theme-card border border-theme-border rounded-t-3xl sm:rounded-3xl w-full max-w-lg max-h-[92vh] flex flex-col">
+                <div class="p-4 border-b border-theme-border flex items-center justify-between"><div class="font-bold text-sm"><i class="fa-solid fa-broom text-rose-500 mr-2"></i>Dọn sản phẩm không dùng</div><button onclick="cleanClose()" class="px-3 py-1 rounded-lg bg-theme-input text-xs font-bold">Đóng</button></div>
+                <div class="p-4 overflow-y-auto space-y-3 text-xs">
+                    <div class="opacity-80">Chỉ liệt kê sản phẩm <b>tồn 0</b>, <b>chưa từng nhập hàng</b> và <b>chưa từng bán</b> (đối chiếu toàn bộ lịch sử nhập file PDF/Excel, nhập tay, mọi đơn đã bán, trả hàng và kho lưu trữ). Lịch sử đơn hàng, nhập hàng <b>không bị thay đổi</b>.</div>
+                    <div class="font-bold">Được GIỮ LẠI tự động:</div>
+                    <div class="grid grid-cols-3 gap-2">${kb('Còn tồn kho', K.stock)}${kb('Đã từng nhập', K.imp)}${kb('Đã từng bán', K.sold)}${kb('Có trả hàng / đang trong giỏ', K.other)}${kb('Mới tạo < 7 ngày', K.recent)}${kb('Tổng giữ lại', K.stock + K.imp + K.sold + K.other + K.recent)}</div>
+                    <div class="flex items-center justify-between gap-2"><div class="font-bold">Có thể xóa: ${C.length} sản phẩm</div>${C.length ? `<div class="flex gap-2"><button onclick="cleanSelAll(true)" class="px-2.5 py-1.5 rounded-lg bg-rose-500/15 text-rose-500 font-bold">Chọn hết</button><button onclick="cleanSelAll(false)" class="px-2.5 py-1.5 rounded-lg bg-theme-input font-bold">Bỏ chọn</button></div>` : ''}</div>
+                    ${C.length ? `<div class="rounded-2xl border border-theme-border divide-y divide-theme-border">${C.map(p => `<label class="flex items-start gap-2 p-2.5"><input type="checkbox" ${cleanState.sel.has(String(p.id)) ? 'checked' : ''} onchange="cleanToggle('${p.id}',this.checked)" class="mt-0.5 w-4 h-4 accent-rose-500"><span>${escHtml(p.name)}<br><span class="opacity-60">Mã ${escHtml(String(prodCode(p)))} • ${escHtml(prodCat(p) || '')} • ${Number(p.price || 0).toLocaleString()} đ</span></span></label>`).join('')}</div>` : '<div class="p-4 text-center opacity-70">Không có sản phẩm nào cần dọn. Kho đã gọn.</div>'}
+                    <div class="text-[11px] opacity-60">Lưu ý: app chỉ biết lịch sử đang có trong app (gồm kho lưu trữ). Hãy xem lại danh sách trước khi xóa; có nút khôi phục.</div>
+                </div>
+                <div class="p-4 border-t border-theme-border flex gap-2"><button onclick="cleanRestore()" class="px-3 py-3 rounded-xl bg-theme-input border border-theme-border text-xs font-bold">Khôi phục lần dọn trước</button><button onclick="cleanRun()" ${n ? '' : 'disabled'} class="flex-1 py-3 rounded-xl ${n ? 'bg-rose-500 text-white' : 'bg-theme-input opacity-50'} text-xs font-bold">Xóa ${n} sản phẩm đã chọn</button></div>
+            </div>`;
+        }
+        function cleanRun() {
+            const ids = new Set(cleanState.sel); if (!ids.size) return;
+            // kiểm tra lại ngay trước khi xóa (phòng dữ liệu vừa đồng bộ thay đổi)
+            const safe = new Set(cleanScan().cand.map(p => String(p.id)));
+            const del = db.productsMaster.filter(p => ids.has(String(p.id)) && safe.has(String(p.id)));
+            if (!del.length) { alert('Không còn sản phẩm nào đủ điều kiện xóa.'); cleanClose(); return; }
+            if (!confirm('Xóa ' + del.length + ' sản phẩm chưa từng nhập / chưa từng bán?\n\nLịch sử đơn hàng và nhập hàng giữ nguyên. Có thể khôi phục lại.')) return;
+            const dIds = new Set(del.map(p => String(p.id)));
+            const wh = db.warehouse.filter(w => dIds.has(String(w.productId)));
+            try { localStorage.setItem('hoangde_clean_backup', JSON.stringify({ time: vnNowStr(), prods: del, wh })); }
+            catch (e) { try { localStorage.setItem('hoangde_clean_backup', JSON.stringify({ time: vnNowStr(), prods: del.map(p => ({ ...p, img: '' })), wh })); } catch (e2) { if (!confirm('Không lưu được bản sao lưu. Vẫn xóa?')) return; } }
+            db.productsMaster = db.productsMaster.filter(p => !dIds.has(String(p.id)));
+            db.warehouse = db.warehouse.filter(w => !dIds.has(String(w.productId)));
+            saveData(); cleanClose(); render();
+            alert('Đã xóa ' + del.length + ' sản phẩm không dùng.');
+        }
+        function cleanRestore() {
+            let b = null; try { b = JSON.parse(localStorage.getItem('hoangde_clean_backup') || 'null'); } catch (e) { }
+            if (!b || !b.prods || !b.prods.length) { alert('Chưa có lần dọn nào để khôi phục.'); return; }
+            const have = new Set(db.productsMaster.map(p => String(p.id))), back = b.prods.filter(p => !have.has(String(p.id)));
+            if (!back.length) { alert('Các sản phẩm của lần dọn ' + b.time + ' đều đã có trong kho.'); return; }
+            if (!confirm('Khôi phục ' + back.length + ' sản phẩm đã xóa lúc ' + b.time + '?\n(Chỉ thêm lại sản phẩm đã xóa, không ảnh hưởng dữ liệu khác.)')) return;
+            const ids = new Set(back.map(p => String(p.id)));
+            db.productsMaster.push(...back); db.warehouse.push(...(b.wh || []).filter(w => ids.has(String(w.productId)) && !db.warehouse.some(x => String(x.productId) === String(w.productId))));
+            saveData(); cleanClose(); render(); alert('Đã khôi phục ' + back.length + ' sản phẩm.');
+        }
 
         // ===== Bản 47: quét & gộp sản phẩm trùng thông minh =====
         let dupState = [];
