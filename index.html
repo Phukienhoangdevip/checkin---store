@@ -807,6 +807,9 @@
         const isDirty = () => { try { return localStorage.getItem('hoangde_dirty') === '1'; } catch (e) { return false; } };
         const setDirty = v => { try { v ? localStorage.setItem('hoangde_dirty', '1') : localStorage.removeItem('hoangde_dirty'); } catch (e) {} };
 
+        // Bản 53: điện thoại/máy tính bảng luôn ở Chế độ Điện thoại (bắt buộc GPS); chế độ chỉ nhớ trên từng máy, không lấy từ đồng bộ
+        function isMobileDevice() { const ua = navigator.userAgent || ''; return /iPhone|iPad|iPod|Android|Mobile/i.test(ua) || (/Macintosh/.test(ua) && (navigator.maxTouchPoints || 0) > 1); }
+        function isPcMode() { return !isMobileDevice() && !!db && !!db.settings && db.settings.deviceMode === 'pc'; }
         function normalizeDb() {
             if (!db.users || !db.users.length) db.users = [{ username: 'admin', password: '123', role: 'admin', status: 'approved', fullname: 'Quản trị viên (Hoàng Đế)', permissions: { stores: true, master: true, warehouse: true, history: true } }];
             ['stores', 'productsMaster', 'warehouse', 'checkinHistory', 'importHistory', 'routes', 'returnHistory'].forEach(k => { if (!Array.isArray(db[k])) db[k] = []; });
@@ -815,7 +818,9 @@
             if (!db.settings) db.settings = { checkinRadius: 50, requiredMinutes: 5, deviceMode: 'mobile' };
             if (!db.categories || !db.categories.length) db.categories = ['Cáp sạc', 'Củ sạc', 'Tai nghe', 'Kính cường lực', 'Ốp lưng'];
             try { loadCustomLists(); } catch (e) {}
-            let dm = 'mobile'; try { dm = localStorage.getItem('hoangde_device_mode') || (db.settings.deviceMode || 'mobile'); } catch (e) {}
+            let dm = 'mobile'; try { dm = localStorage.getItem('hoangde_device_mode') || 'mobile'; } catch (e) {}
+            if (isMobileDevice()) dm = 'mobile';
+            try { localStorage.setItem('hoangde_device_mode', dm); } catch (e) {}
             db.settings.deviceMode = dm;
             { let mx = 0; db.productsMaster.forEach(p => { const m = /^SP(\d+)$/.exec(p.code || ''); if (m) mx = Math.max(mx, parseInt(m[1])); });
               db.productsMaster.forEach(p => { if (!p.code) p.code = 'SP' + String(++mx).padStart(4, '0'); }); }
@@ -1342,7 +1347,7 @@
                         </div>
                         <div>
                             <h1 class="font-black text-xs sm:text-sm uppercase tracking-wider">PHỤ KIỆN HOÀNG ĐẾ</h1>
-                            <p class="text-[11px] sm:text-xs opacity-75">Nhân sự: <span class="font-bold text-amber-500">${user.fullname}</span> (${db.settings?.deviceMode === 'pc' ? 'Chế độ PC' : 'Chế độ Mobile'} • Bản 52)</p>
+                            <p class="text-[11px] sm:text-xs opacity-75">Nhân sự: <span class="font-bold text-amber-500">${user.fullname}</span> (${isPcMode() ? 'Chế độ PC' : 'Chế độ Mobile'} • Bản 53)</p>
                         </div>
                     </div>
                     <div class="flex space-x-2 w-full sm:w-auto justify-end">
@@ -1471,7 +1476,7 @@
                         ${filteredStores.length === 0 ? `<div class="bg-theme-card border border-theme-border p-10 text-center rounded-2xl opacity-75 text-sm">Không tìm thấy điểm bán nào trên hệ thống.</div>` : ''}
                         ${filteredStores.map((s, index) => {
                             const distance = s.calculatedDistance;
-                            const canCheckin = db.settings?.deviceMode === 'pc' || Math.max(0, distance - Math.min(currentGpsAccuracy || 0, 30)) <= (db.settings?.checkinRadius || 50);
+                            const canCheckin = isPcMode() || (storeHasCoords(s) && Math.max(0, distance - Math.min(currentGpsAccuracy || 0, 30)) <= (db.settings?.checkinRadius || 50));
                             const googleMapUrl = `https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lng}&travelmode=driving`;
                             
                             const isTodayVisited = s.lastVisitDate === todayStr && s.visited === true;
@@ -3910,6 +3915,7 @@
         }
 
         function setDeviceMode(mode) {
+            if (mode === 'pc' && isMobileDevice()) { alert('Điện thoại / máy tính bảng luôn dùng Chế độ Điện thoại (bắt buộc GPS khi check-in). Chế độ Máy tính chỉ dùng trên máy tính.'); return; }
             if(!db.settings) db.settings = {};
             db.settings.deviceMode = mode;
             try { localStorage.setItem('hoangde_device_mode', mode); } catch (e) {}
@@ -4717,22 +4723,29 @@
                 if (token !== reportToken) return;
                 const pages = paginateReport(reportMode === 'care' ? careReportBlocks() : reportMode === 'all' ? buildAllReportBlocks() : reportMode === 'range' ? buildRangeReportBlocks() : buildReportBlocks());
                 const scale = reportMode === 'day' ? 3 : 2;
-                const out = [], d = new Date(), tag = `${d.getDate()}-${d.getMonth() + 1}-${d.getFullYear()}`;
+                const out = [], failed = [], d = new Date(), tag = `${d.getDate()}-${d.getMonth() + 1}-${d.getFullYear()}`;
+                (reportImages || []).forEach(im => { try { if (String(im.dataUrl).startsWith('blob:')) URL.revokeObjectURL(im.dataUrl); } catch (e) {} });
                 const prefix = reportMode === 'care' ? 'Cham-Soc-Khach-Hang' : reportMode === 'all' ? 'Bao-Cao-Toan-Bo-Lich-Su' : reportMode === 'range' ? 'Bao-Cao-Lich-Su' : 'Bao-Cao';
                 for (let i = 0; i < pages.length; i++) {
                     if (token !== reportToken) return;
                     prog.innerText = `Đang tạo ảnh ${i + 1}/${pages.length}...`;
-                    try {
-                        const canvas = await html2canvas(pages[i], { scale, backgroundColor: '#0b1120', useCORS: true, logging: false });
-                        const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.92));
-                        if (!blob) continue;
-                        out.push({ blob, dataUrl: canvas.toDataURL('image/jpeg', 0.9), file: new File([blob], `${prefix}-${tag}-Trang-${i + 1}.jpg`, { type: 'image/jpeg' }) });
-                    } catch (e) { console.warn('Không tạo được ảnh trang ' + (i + 1), e); }
-                    await new Promise(r => setTimeout(r, 0));
+                    let blob = null;
+                    for (const sc of [scale, 2, 1.5]) {          // Bản 53: lỗi bộ nhớ thì tự tạo lại ở độ nét thấp hơn
+                        if (blob || sc > scale) continue;
+                        let canvas = null;
+                        try {
+                            canvas = await html2canvas(pages[i], { scale: sc, backgroundColor: '#0b1120', useCORS: true, logging: false });
+                            blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.9));
+                        } catch (e) { console.warn('Không tạo được ảnh trang ' + (i + 1) + ' (scale ' + sc + ')', e); }
+                        if (canvas) { canvas.width = 0; canvas.height = 0; canvas = null; }   // giải phóng bộ nhớ đồ họa (iPhone)
+                        await new Promise(r => setTimeout(r, 60));
+                    }
+                    if (!blob) { failed.push(i + 1); continue; }
+                    out.push({ blob, dataUrl: URL.createObjectURL(blob), file: new File([blob], `${prefix}-${tag}-Trang-${i + 1}.jpg`, { type: 'image/jpeg' }) });
                 }
                 if (token !== reportToken) return;
                 reportImages = out;
-                prog.innerText = `✔ Đã tạo xong ${out.length} ảnh – bấm Tải ảnh hoặc Chia sẻ bên dưới.`;
+                prog.innerText = failed.length ? `⚠ Đã tạo ${out.length}/${pages.length} ảnh – KHÔNG tạo được trang ${failed.join(', ')}. Hãy đóng bớt ứng dụng khác rồi bấm tạo lại báo cáo.` : `✔ Đã tạo đủ ${out.length}/${pages.length} ảnh – bấm Tải ảnh hoặc Chia sẻ bên dưới.`;
             }, 400);
         }
 
@@ -4819,7 +4832,7 @@
             if (!reportImages.length) { alert('Ảnh báo cáo đang được tạo, vui lòng đợi vài giây rồi bấm lại.'); return; }
             const files = reportImages.map(i => i.file);
             if (navigator.canShare && navigator.canShare({ files })) {
-                navigator.share({ files, title: 'Báo cáo Phụ Kiện Hoàng Đế', text: 'Báo cáo doanh thu và thị trường trong ngày' })
+                navigator.share({ files })
                     .catch(err => { if (!(err && err.name === 'AbortError')) showImagesViewer(reportImages); })
                     .finally(() => openBackupModal('report'));
             } else {
@@ -5715,7 +5728,7 @@
 
         function getRealGPSAndReverseGeocode() {
             const gpsText = document.getElementById('s-gps-text');
-            if (db.settings?.deviceMode === 'pc') {
+            if (isPcMode()) {
                 newStoreLat = 20.4356; newStoreLng = 106.3275; gpsCaptured = true;
                 if (gpsText) gpsText.innerText = `[${newStoreLat.toFixed(6)}, ${newStoreLng.toFixed(6)}] (PC Demo)`;
                 reverseGeocode(newStoreLat, newStoreLng);
@@ -5794,7 +5807,7 @@
             if(!cv.industry) { alert('Vui lòng chọn Ngành hàng (hoặc nhập tay nếu chọn "Tự nhập")!'); return; }
             if(!cv.relation) { alert('Vui lòng chọn Tình trạng khách hàng (Cũ / Mới / Winback)!'); return; }
             if(!storePhotoData) { alert('Vui lòng chụp ảnh cửa hàng trước khi lưu!'); return; }
-            if (db.settings?.deviceMode !== 'pc' && !gpsCaptured) {
+            if (!isPcMode() && !gpsCaptured) {
                 alert('Chưa lấy được GPS thực tế! Hãy bật định vị và bấm nút "Lấy GPS thiết bị" trước khi lưu, nếu không cửa hàng sẽ bị sai tọa độ.');
                 return;
             }
@@ -5823,15 +5836,19 @@
             render();
         }
 
+        function storeHasCoords(st) { return st && st.lat !== '' && st.lat != null && st.lng !== '' && st.lng != null && isFinite(Number(st.lat)) && isFinite(Number(st.lng)) && !(Number(st.lat) === 0 && Number(st.lng) === 0); }
+        const GPS_MAX_ACC = 100;
         async function openCheckinModal(id) {
             const store = db.stores.find(s => String(s.id) === String(id));
             if (!store) return;
             const radius = db.settings?.checkinRadius || 50;
-            if (db.settings?.deviceMode !== 'pc') {
+            if (!isPcMode()) {
                 await getFreshPosition();
                 if (!hasRealGPS) { alert('Chưa có GPS! Hãy bật định vị trên điện thoại rồi thử lại.'); return; }
+                if (!storeHasCoords(store)) { alert('Cửa hàng "' + store.name + '" chưa có tọa độ GPS nên không thể check-in. Hãy vào Sửa cửa hàng và cập nhật vị trí khi đứng tại cửa hàng.'); return; }
+                if ((currentGpsAccuracy || 0) > GPS_MAX_ACC) { lastGpsTime = 0; alert('Tín hiệu GPS đang yếu (sai số ~' + Math.round(currentGpsAccuracy) + 'm). Hãy ra chỗ thoáng, đợi vài giây rồi bấm Check-in lại.'); return; }
                 const raw = calculateDistance(currentLivePos.lat, currentLivePos.lng, store.lat, store.lng);
-                if (effectiveDistance(store) > radius) {
+                if (!(effectiveDistance(store) <= radius)) {
                     alert(`Quá xa (${Math.round(raw)}m, sai số GPS ~${Math.round(currentGpsAccuracy || 0)}m)! Tiến lại gần cửa hàng hơn để check-in.`);
                     render(); return;
                 }
@@ -5886,9 +5903,12 @@
             if (!s) return;
             const radius = db.settings?.checkinRadius || 50;
             const reqMins = db.settings?.requiredMinutes || 5;
-            if (db.settings?.deviceMode !== 'pc') {
+            if (!isPcMode()) {
                 await getFreshPosition();
-                if (effectiveDistance(s) > radius) {
+                if (!hasRealGPS) { alert('Chưa có GPS! Hãy bật định vị trên điện thoại rồi thử lại.'); return; }
+                if (!storeHasCoords(s)) { alert('Cửa hàng chưa có tọa độ GPS nên không thể check-out.'); return; }
+                if ((currentGpsAccuracy || 0) > GPS_MAX_ACC) { lastGpsTime = 0; alert('Tín hiệu GPS đang yếu (sai số ~' + Math.round(currentGpsAccuracy) + 'm). Hãy đợi vài giây rồi thử lại.'); return; }
+                if (!(effectiveDistance(s) <= radius)) {
                     const raw = calculateDistance(currentLivePos.lat, currentLivePos.lng, s.lat, s.lng);
                     alert(`Không thể Check-out! Bạn đang cách cửa hàng ~${Math.round(raw)}m (cho phép ${radius}m).`);
                     return;
@@ -5897,7 +5917,7 @@
             let rawElapsedSec = Math.floor((Date.now() - s.checkinTime) / 1000);
             if (rawElapsedSec < 0 || rawElapsedSec > 86400) rawElapsedSec = reqMins * 60;
             const elapsedMinutes = Math.floor(rawElapsedSec / 60);
-            if (elapsedMinutes < reqMins && db.settings?.deviceMode !== 'pc') {
+            if (elapsedMinutes < reqMins && !isPcMode()) {
                 alert(`Chưa đủ thời gian tối thiểu (${reqMins} phút). Vui lòng đợi thêm.`);
                 return;
             }
@@ -5920,7 +5940,7 @@
         }
 
         function startGPSWatch() {
-            if (!navigator.geolocation || gpsWatchId !== null || db.settings?.deviceMode === 'pc') return;
+            if (!navigator.geolocation || gpsWatchId !== null || isPcMode()) return;
             gpsWatchId = navigator.geolocation.watchPosition(p => {
                 currentLivePos = { lat: p.coords.latitude, lng: p.coords.longitude };
                 currentGpsAccuracy = p.coords.accuracy;
@@ -5937,7 +5957,7 @@
 
         function getFreshPosition() {
             return new Promise(resolve => {
-                if (db.settings?.deviceMode === 'pc' || !navigator.geolocation) { resolve(null); return; }
+                if (isPcMode() || !navigator.geolocation) { resolve(null); return; }
                 if (hasRealGPS && Date.now() - lastGpsTime < 20000) { resolve(true); return; }
                 navigator.geolocation.getCurrentPosition(p => {
                     currentLivePos = { lat: p.coords.latitude, lng: p.coords.longitude };
@@ -7000,7 +7020,7 @@
         }
 
         async function mapLocateMe() {
-            if (db.settings?.deviceMode !== 'pc') await getFreshPosition();
+            if (!isPcMode()) await getFreshPosition();
             if (!mapMeOk()) { alert('Chưa lấy được vị trí. Hãy bật định vị (GPS) cho trình duyệt rồi thử lại.'); return; }
             if (leafMap) { leafMap.setView([currentLivePos.lat, currentLivePos.lng], 16); mapUpdateMe(); }
         }
@@ -7099,7 +7119,7 @@
                 nodes = [{ lat: Number(startStore.lat), lng: Number(startStore.lng), store: startStore }].concat(rest.map(s => ({ lat: Number(s.lat), lng: Number(s.lng), store: s })));
             } else {
                 mapState.start = 'me';
-                if (db.settings?.deviceMode !== 'pc') await getFreshPosition();
+                if (!isPcMode()) await getFreshPosition();
                 if (!mapMeOk()) { alert('Chưa lấy được vị trí của bạn. Hãy bật định vị (GPS) trên điện thoại, hoặc chọn "Điểm xuất phát" là một cửa hàng.'); return; }
                 nodes = [{ lat: currentLivePos.lat, lng: currentLivePos.lng }].concat(sel.map(s => ({ lat: Number(s.lat), lng: Number(s.lng), store: s })));
             }
