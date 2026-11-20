@@ -312,14 +312,14 @@
             </div>
             <div id="rp-span-bar" class="hidden px-1 space-y-2">
                 <div class="grid grid-cols-2 gap-2 text-[11px] font-semibold">
-                    <label>Từ ngày<input id="rp-from" type="date" class="w-full mt-1 px-3 py-2 rounded-xl bg-theme-input border border-theme-border text-theme-text text-sm"></label>
-                    <label>Đến ngày<input id="rp-to" type="date" class="w-full mt-1 px-3 py-2 rounded-xl bg-theme-input border border-theme-border text-theme-text text-sm"></label>
+                    <label>Từ ngày<input id="rp-from" type="date" onchange="rpDateChanged()" class="w-full mt-1 px-3 py-2 rounded-xl bg-theme-input border border-theme-border text-theme-text text-sm"></label>
+                    <label>Đến ngày<input id="rp-to" type="date" onchange="rpDateChanged()" class="w-full mt-1 px-3 py-2 rounded-xl bg-theme-input border border-theme-border text-theme-text text-sm"></label>
                 </div>
                 <div class="grid grid-cols-2 gap-2">
-                    <button onclick="rpSpanApply()" class="py-2.5 rounded-xl bg-amber-500 text-slate-950 text-xs font-bold"><i class="fa-solid fa-rotate mr-1"></i>Tạo báo cáo JPG</button>
+                    <button onclick="rpSpanApply()" class="py-2.5 rounded-xl bg-amber-500 text-slate-950 text-xs font-bold"><i class="fa-solid fa-check mr-1"></i>Xác nhận ngày & cập nhật</button>
                     <button onclick="spanExportExcel()" class="py-2.5 rounded-xl bg-emerald-600 text-white text-xs font-bold"><i class="fa-solid fa-file-excel mr-1"></i>Xuất Excel báo cáo</button>
                 </div>
-                <p class="text-[10px] opacity-70">Chọn 1 ngày (Từ = Đến) để xuất 1 ngày; chọn khoảng ngày để xuất toàn bộ từ ngày bắt đầu đến ngày kết thúc.</p>
+                <p class="text-[10px] opacity-70">Chọn ngày xong báo cáo tự cập nhật (hoặc bấm Xác nhận). Chọn 1 ngày (Từ = Đến) để xuất 1 ngày; chọn khoảng ngày để xuất toàn bộ từ ngày bắt đầu đến ngày kết thúc. Báo cáo trong ngày vẫn giữ mẫu cũ.</p>
             </div>
             <p id="rp-progress" class="text-[11px] text-center font-semibold text-amber-500"></p>
             <p class="text-[11px] opacity-75 text-center">Báo cáo được tự chia thành nhiều ảnh vừa màn hình điện thoại. Bấm Chia sẻ để gửi tất cả các ảnh.</p>
@@ -1358,7 +1358,7 @@
                         </div>
                         <div>
                             <h1 class="font-black text-xs sm:text-sm uppercase tracking-wider">PHỤ KIỆN HOÀNG ĐẾ</h1>
-                            <p class="text-[11px] sm:text-xs opacity-75">Nhân sự: <span class="font-bold text-amber-500">${user.fullname}</span> (${isPcMode() ? 'Chế độ PC' : 'Chế độ Mobile'} • Bản 55)</p>
+                            <p class="text-[11px] sm:text-xs opacity-75">Nhân sự: <span class="font-bold text-amber-500">${user.fullname}</span> (${isPcMode() ? 'Chế độ PC' : 'Chế độ Mobile'} • Bản 56)</p>
                         </div>
                     </div>
                     <div class="flex space-x-2 w-full sm:w-auto justify-end">
@@ -3885,7 +3885,18 @@
             rpSection('📦 Tổng nhập kho  |  Tổng tồn hiện tại  |  Đã bán', items, 'Chưa có dữ liệu kho.').forEach(b => blocks.push(b));
             return blocks;
         }
-        function rpSpanApply() { rpFrom = document.getElementById('rp-from').value || invTodayIso(); rpTo = document.getElementById('rp-to').value || rpFrom; openReportModal('span'); }
+        function rpSpanApply() {
+            const f = document.getElementById('rp-from').value, t = document.getElementById('rp-to').value;
+            if (!f || !t) { alert('Hãy chọn đủ Từ ngày và Đến ngày.'); return; }
+            if (f > t) { alert('"Từ ngày" phải trước hoặc bằng "Đến ngày".'); return; }
+            if (t > invTodayIso()) { alert('Không chọn ngày trong tương lai.'); return; }
+            rpFrom = f; rpTo = t; openReportModal('span');
+        }
+        let rpDateTimer = null;
+        function rpDateChanged() {   // chọn ngày xong tự cập nhật báo cáo
+            clearTimeout(rpDateTimer);
+            rpDateTimer = setTimeout(() => { const f = document.getElementById('rp-from').value, t = document.getElementById('rp-to').value; if (f && t && f <= t && t <= invTodayIso() && (f !== rpFrom || t !== rpTo)) rpSpanApply(); }, 600);
+        }
         async function spanExportExcel() {
             if (typeof ExcelJS === 'undefined') { alert('Chưa tải được thư viện Excel, kiểm tra mạng rồi thử lại.'); return; }
             const f = document.getElementById('rp-from'), t = document.getElementById('rp-to'); if (f && f.value) rpFrom = f.value; if (t && t.value) rpTo = t.value;
@@ -5156,7 +5167,7 @@
             const token = ++reportToken;
             reportImages = [];
             document.getElementById('report-modal').classList.remove('hidden');
-            document.getElementById('report-title').innerHTML = '<i class="fa-solid fa-file-invoice-dollar text-amber-500 mr-2"></i>' + (reportMode === 'care' ? 'Chăm Sóc Khách Hàng' : reportMode === 'span' ? 'Báo Cáo Tổng Hợp Theo Ngày' : reportMode === 'range' ? 'Báo Cáo Tổng Lịch Sử Theo Khoảng Ngày' : 'Báo Cáo Doanh Thu & Thị Trường Trong Ngày');
+            document.getElementById('report-title').innerHTML = '<i class="fa-solid fa-file-invoice-dollar text-amber-500 mr-2"></i>' + (reportMode === 'care' ? 'Chăm Sóc Khách Hàng' : reportMode === 'span' ? 'Báo Cáo Tổng Hợp Theo Khoảng Ngày' : reportMode === 'range' ? 'Báo Cáo Tổng Lịch Sử Theo Khoảng Ngày' : 'Báo Cáo Doanh Thu & Thị Trường Trong Ngày');
             const act = 'flex-1 py-2.5 rounded-xl text-xs font-bold border bg-amber-500 text-slate-950 border-amber-500', off = 'flex-1 py-2.5 rounded-xl text-xs font-bold border bg-theme-input border-theme-border';
             document.getElementById('rp-tab-day').className = reportMode === 'day' ? act : off;
             document.getElementById('rp-tab-all').className = reportMode === 'span' ? act : off;
