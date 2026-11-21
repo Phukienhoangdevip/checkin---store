@@ -828,6 +828,7 @@
             if (!db.salesHistory) db.salesHistory = db.history || [];
             archiveOf();
             try { dedupHistoryVsArchive(); } catch (e) {}
+            setTimeout(() => { try { actSnap(); } catch (e) {} }, 0);
             if (!db.settings) db.settings = { checkinRadius: 50, requiredMinutes: 5, deviceMode: 'mobile' };
             if (!db.categories || !db.categories.length) db.categories = ['Cáp sạc', 'Củ sạc', 'Tai nghe', 'Kính cường lực', 'Ốp lưng'];
             try { loadCustomLists(); } catch (e) {}
@@ -1031,6 +1032,7 @@
             db.historyArchive = data.historyArchive || { sales: [], checkin: [], imports: [] };
             if (data.settings) db.settings = data.settings;
             if (data.categories && data.categories.length) db.categories = data.categories;
+            ['pendingSales', 'warranties', 'stockLog', 'careLog', 'returnTrash', 'activityLog'].forEach(k => { if (Array.isArray(data[k])) db[k] = data[k]; });   // Bản 65: các mục mới cũng lấy từ máy chủ
             normalizeDb();
             cloudVersion = data.version || 0;
             try { localStorage.setItem('hoangde_cloud_version', String(cloudVersion)); } catch (e) {}
@@ -1140,6 +1142,7 @@
             try { if (currentUsername) localStorage.setItem('hoangde_current_username_cloud', currentUsername); else localStorage.removeItem('hoangde_current_username_cloud'); } catch (e) {}
         }
         function saveData() {
+            try { actDiff(); } catch (e) { console.warn('actDiff', e); }
             saveSession();
             localCacheWrite();
             schedulePush();
@@ -1360,7 +1363,7 @@
                         </div>
                         <div>
                             <h1 class="font-black text-xs sm:text-sm uppercase tracking-wider">PHỤ KIỆN HOÀNG ĐẾ</h1>
-                            <p class="text-[11px] sm:text-xs opacity-75">Nhân sự: <span class="font-bold text-amber-500">${user.fullname}</span> (${isPcMode() ? 'Chế độ PC' : 'Chế độ Mobile'} • Bản 64)</p>
+                            <p class="text-[11px] sm:text-xs opacity-75">Nhân sự: <span class="font-bold text-amber-500">${user.fullname}</span> (${isPcMode() ? 'Chế độ PC' : 'Chế độ Mobile'} • Bản 65)</p>
                         </div>
                     </div>
                     <div class="flex space-x-2 w-full sm:w-auto justify-end">
@@ -3688,9 +3691,82 @@
         // chỉ các thay đổi KHÔNG nằm trong lịch sử nhập / bán / trả mới tính vào cột Điều chỉnh (gộp, sửa đơn, xóa phiếu trả đã tự cân trong các cột khác)
         const STOCK_ADJ_TYPES = ['reset', 'delete', 'manual', 'warranty_out'];
         const STOCK_LOG_LABEL = { warranty_out: 'Trả bảo hành cho khách', return: 'Trả kho', return_undo: 'Xóa phiếu trả kho (cộng lại)', merge_in: 'Gộp sản phẩm (nhận)', merge_out: 'Gộp sản phẩm (chuyển đi)', reset: 'Đặt lại kho', delete: 'Xóa sản phẩm', edit_sale: 'Sửa hóa đơn', restore: 'Khôi phục' };
+        // ===== Bản 65: Nhật ký hoạt động – mọi thay đổi đều hiện trên chuông =====
+        let ACT_SNAP = null;
+        function actSnapshot() {
+            const S = {};
+            S.sales = new Map(allSales().map(h => [saleKeyOf(h), { n: saleNet(h), note: h.note || '', pay: saleIsCK(h) ? 'Chuyển khoản' : 'Tiền mặt', sup: !!h.supplement, u: h.username, store: h.storeName, time: h.time }]));
+            S.chk = new Map(allCheckins().map(h => [recSig('checkin', h), h]));
+            S.imp = new Map(allImports().map(h => [recSig('imports', h), h]));
+            S.war = new Map(warrantyList().map(w => [String(w.id), { st: w.status, w }]));
+            S.ret = new Map((db.returnHistory || []).map(h => [String(h.id || h.time), { sig: [h.byName, h.receiverName, h.receiverPhone].join('|'), h }]));
+            S.prod = new Map((db.productsMaster || []).map(p => [String(p.id), { name: p.name, price: Number(p.price) || 0 }]));
+            S.store = new Map((db.stores || []).map(s => [String(s.id), { name: s.name, noOwner: storeNoOwner(s) }]));
+            S.pend = new Map((db.pendingSales || []).map(p => [p.id, p]));
+            S.users = new Map((db.users || []).map(u => [u.username, u.status]));
+            S.slog = new Set((db.stockLog || []).map(l => l.id));
+            return S;
+        }
+        function actSnap() { try { ACT_SNAP = actSnapshot(); } catch (e) { ACT_SNAP = null; } }
+        const actMoney = v => (Number(v) || 0).toLocaleString('vi-VN') + 'đ';
+        function actDiff() {
+            if (!ACT_SNAP) { actSnap(); return; }
+            let N; try { N = actSnapshot(); } catch (e) { return; }
+            const O = ACT_SNAP, u = getCurrentUser() || {}, ev = [], now = Date.now(), t = vnNowStr();
+            const add = (icon, text, owner, cat) => ev.push({ id: newRecId(), ts: now, time: t, by: u.username || '', byName: u.fullname || u.username || '', icon, text, owner: owner || u.username || '', cat: cat || 'other' });
+            // đơn hàng
+            N.sales.forEach((v, k) => { const o = O.sales.get(k); if (!o) add(v.sup ? '📝' : '🛒', `${v.sup ? 'Đơn bổ sung' : 'Bán đơn'}: ${v.store} – ${actMoney(v.n)} (${v.pay})`, v.u, 'sale'); else if (o.note !== v.note || o.n !== v.n || o.pay !== v.pay) add('✏️', `Sửa hóa đơn ${v.store} (${v.time}): ${actMoney(o.n)} → ${actMoney(v.n)}${o.pay !== v.pay ? ', ' + o.pay + ' → ' + v.pay : ''}`, v.u, 'sale'); });
+            O.sales.forEach((v, k) => { if (!N.sales.has(k)) add('🗑', `Xóa đơn ${v.store} (${v.time}) – ${actMoney(v.n)}`, v.u, 'sale'); });
+            // check-in
+            N.chk.forEach((h, k) => { if (!O.chk.has(k)) add('📍', `Check-in: ${h.storeName}`, h.username, 'checkin'); });
+            // nhập kho (gộp)
+            const ni = [...N.imp.keys()].filter(k => !O.imp.has(k)).map(k => N.imp.get(k)), ri = [...O.imp.keys()].filter(k => !N.imp.has(k));
+            if (ni.length) add('📦', `Nhập kho ${ni.length} dòng • ${ni.reduce((a, h) => a + (Number(h.qty) || 0), 0)} cái: ${ni.slice(0, 3).map(h => h.productName + ' ×' + h.qty).join(', ')}${ni.length > 3 ? '…' : ''}`, '', 'stock');
+            if (ri.length) add('🧹', `Xóa ${ri.length} dòng lịch sử nhập kho`, '', 'stock');
+            // bảo hành
+            N.war.forEach((v, k) => { const o = O.war.get(k), w = v.w;
+                if (!o) add(w.kind === 'out' ? '↩️' : '🛠', w.kind === 'out' ? `Trả bảo hành trực tiếp: ${w.storeName} – ${w.outProduct || w.product} × ${w.outQty || w.qty}${w.deducted ? ' (đã trừ kho)' : ''}` : `Nhận bảo hành: ${w.storeName} – ${w.product} × ${w.qty} (hẹn trả ${tsToVN(w.dueTs)})`, w.by, 'warranty');
+                else if (o.st !== 'returned' && v.st === 'returned') add('↩️', `Trả bảo hành: ${w.storeName} – ${w.outProduct || w.product} × ${w.outQty || w.qty}${w.deducted ? ' (đã trừ kho)' : ''}`, w.by, 'warranty'); });
+            O.war.forEach((v, k) => { if (!N.war.has(k)) add('🗑', `Xóa phiếu bảo hành: ${v.w.storeName} – ${v.w.product}`, v.w.by, 'warranty'); });
+            // trả kho
+            N.ret.forEach((v, k) => { const o = O.ret.get(k), h = v.h, q = (h.items || []).reduce((a, i) => a + (Number(i.q) || 0), 0);
+                if (!o) add('🔁', `${h.restored ? 'Khôi phục' : 'Trả hàng về kho'}: ${q} cái – người nhận ${h.receiverName || ''}`, h.username, 'stock');
+                else if (o.sig !== v.sig) add('✏️', `Sửa phiếu trả kho ${h.time}: người trả ${h.byName || ''}, người nhận ${h.receiverName || ''}`, h.username, 'stock'); });
+            O.ret.forEach((v, k) => { if (!N.ret.has(k)) add('🗑', `Xóa phiếu trả kho ${v.h.time}`, v.h.username, 'stock'); });
+            // sản phẩm
+            const np = [...N.prod.keys()].filter(k => !O.prod.has(k)), dp = [...O.prod.keys()].filter(k => !N.prod.has(k));
+            if (np.length) add('➕', np.length > 3 ? `Thêm ${np.length} sản phẩm mới` : 'Thêm sản phẩm: ' + np.map(k => N.prod.get(k).name).join(', '), '', 'product');
+            if (dp.length) add('➖', dp.length > 3 ? `Xóa / gộp ${dp.length} sản phẩm` : 'Xóa / gộp sản phẩm: ' + dp.map(k => O.prod.get(k).name).join(', '), '', 'product');
+            let rn = 0, pc = 0; N.prod.forEach((v, k) => { const o = O.prod.get(k); if (!o) return; if (o.name !== v.name) { rn++; if (rn <= 3) add('✏️', `Đổi tên sản phẩm: ${o.name} → ${v.name}`, '', 'product'); } if (o.price !== v.price) { pc++; if (pc <= 3) add('💲', `Đổi giá ${v.name}: ${actMoney(o.price)} → ${actMoney(v.price)}`, '', 'product'); } });
+            if (rn > 3) add('✏️', `… và đổi tên thêm ${rn - 3} sản phẩm`, '', 'product'); if (pc > 3) add('💲', `… và đổi giá thêm ${pc - 3} sản phẩm`, '', 'product');
+            // điều chỉnh kho khác (gộp, xóa, đặt lại, khôi phục)
+            const sl = (db.stockLog || []).filter(l => !O.slog.has(l.id) && !['warranty_out', 'return', 'return_undo', 'edit_sale'].includes(l.type));
+            if (sl.length) add('⚖️', `Điều chỉnh kho (${sl.length}): ` + sl.slice(0, 3).map(l => (STOCK_LOG_LABEL[l.type] || l.type) + ' ' + l.productName + ' ' + (l.delta > 0 ? '+' : '') + l.delta).join('; ') + (sl.length > 3 ? '…' : ''), '', 'stock');
+            // cửa hàng
+            N.store.forEach((v, k) => { const o = O.store.get(k); if (!o) add('🏪', `Tạo điểm bán mới: ${v.name}`, '', 'store'); else { if (o.name !== v.name) add('✏️', `Đổi tên cửa hàng: ${o.name} → ${v.name}`, '', 'store'); if (o.noOwner !== v.noOwner) add(v.noOwner ? '🙅' : '🤝', `${v.name}: ${v.noOwner ? 'đánh dấu chưa gặp chủ' : 'đã gặp chủ'}`, '', 'store'); } });
+            O.store.forEach((v, k) => { if (!N.store.has(k)) add('🗑', `Xóa cửa hàng: ${v.name}`, '', 'store'); });
+            // duyệt
+            N.pend.forEach((p, k) => { const o = O.pend.get(k); if (!o) add('⏳', `${p.byName} gửi ${p.type === 'offline' ? 'đơn bổ sung' : 'yêu cầu sửa hóa đơn'} – ${p.data.storeName} (chờ duyệt)`, p.by, 'approve'); else if (o.status !== 'rejected' && p.status === 'rejected') add('⛔', `Admin từ chối yêu cầu của ${p.byName} – ${p.data.storeName}${p.rejectReason ? ': ' + p.rejectReason : ''}`, p.by, 'approve'); });
+            O.pend.forEach((p, k) => { if (!N.pend.has(k) && p.status === 'pending') add('✅', `Yêu cầu của ${p.byName} (${p.data.storeName}) đã được xử lý`, p.by, 'approve'); });
+            N.users.forEach((st, k) => { const o = O.users.get(k); if (o == null) add('👤', `Thêm tài khoản: ${k}`, k, 'user'); else if (o !== st) add('👤', `Tài khoản ${k}: ${o} → ${st}`, k, 'user'); });
+            ACT_SNAP = N;
+            if (ev.length) db.activityLog = ev.concat(db.activityLog || []).slice(0, 400);
+        }
+        const actSeenTs = () => { try { return Number(localStorage.getItem('hoangde_act_seen')) || 0; } catch (e) { return 0; } };
+        function actVisible() { const u = getCurrentUser(); if (!u) return []; const L = db.activityLog || []; return u.role === 'admin' ? L : L.filter(e => e.owner === u.username || e.by === u.username); }
         // ===== Bản 55: Chuông thông báo, Bảo hành, Báo cáo theo khoảng ngày, Bảng trả kho =====
-        const APP_VER = 55;
+        const APP_VER = 65;
         const APP_NOTES = {
+            65: ['Chuông thông báo hiện MỌI thay đổi: bán đơn, sửa / xóa hóa đơn, đơn bổ sung, nhận / trả bảo hành, nhập kho, trả kho, đổi tên / giá sản phẩm, gộp / xóa sản phẩm, cửa hàng mới, duyệt yêu cầu…', 'Đồng bộ đủ bảo hành, nhật ký, yêu cầu duyệt giữa điện thoại và máy tính'],
+            64: ['Bảo hành chia 2 mục: Nhận hàng / Trả hàng (trả có trừ tồn kho), phiếu trả bảo hành JPG'],
+            63: ['Phiếu yêu cầu bảo hành JPG có chụp ảnh, chia sẻ Zalo; thẻ Báo cáo đưa lên trên KPI'],
+            62: ['Thiết kế lại file Excel sao lưu: tiêu đề, màu phân loại, bảng điều khiển Tổng quan, Top 5'],
+            61: ['Khôi phục phiếu trả kho đã xóa (từ file Excel / thùng rác)'],
+            60: ['Sửa lỗi tổng nhập bị đếm gấp đôi, công cụ dọn bản ghi nhập trùng'],
+            59: ['Đối chiếu kho: cột Lệch, xem chi tiết, nhật ký thay đổi kho, xóa phiếu trả test'],
+            58: ['Sửa sản phẩm đầy đủ (tên, phân loại, mã, giá, VAT); thống kê bán ra nhận đúng tên'],
+            57: ['Đếm "chưa gặp chủ" từ mục quan tâm và ghi chú'],
+            56: ['Báo cáo khoảng ngày có nút xác nhận, tự cập nhật khi chọn ngày'],
             55: ['Nhận hàng bảo hành ngay tại điểm bán, có hẹn ngày trả và nhắc trên chuông', 'Chuông thông báo: bảo hành sắp/quá hạn, đơn chờ duyệt, bản cập nhật mới', 'Báo cáo theo khoảng ngày (thay "Toàn bộ lịch sử"), có ô chuyển khoản / tiền mặt, thống kê bán chạy, nhập – tồn – bán, xuất Excel', 'Lịch sử trả kho dạng bảng từng dòng, Admin sửa tên người trả / người nhận, xuất Excel'],
             54: ['Sửa hóa đơn (Admin duyệt) và đơn bổ sung bán offline'],
             53: ['Sửa lỗi check-in 50m và báo cáo JPG thiếu ảnh cuối']
@@ -3911,13 +3987,24 @@
             const open = warrantyList().filter(w => w.status !== 'returned' && (admin || w.by === u.username) && wState(w) === 'ok');
             if (open.length) out.push({ lv: 'info', icon: 'fa-box-open', title: open.length + ' phiếu bảo hành đang giữ (chưa đến hạn)', text: open.slice(0, 3).map(w => w.storeName + ' – ' + w.product).join(' • ') + (open.length > 3 ? ' …' : ''), act: `bellClose();openWarranty('${open[0].storeId}')` });
             out.push({ lv: bellSeenVer() < APP_VER ? 'new' : 'info', icon: 'fa-rocket', title: 'Bản cập nhật ' + APP_VER, text: (APP_NOTES[APP_VER] || []).map(x => '• ' + x).join('\n'), act: '' });
+            Object.keys(APP_NOTES).map(Number).filter(v => v < APP_VER).sort((a, b) => b - a).slice(0, 6).forEach(v => out.push({ lv: 'info', icon: 'fa-clock-rotate-left', title: 'Bản ' + v, text: APP_NOTES[v].map(x => '• ' + x).join('\n'), act: '' }));
             return out;
         }
-        function bellCount() { return bellItems().filter(i => i.lv === 'red' || i.lv === 'amber' || i.lv === 'new').length; }
+        function bellCount() { const seen = actSeenTs(), me = (getCurrentUser() || {}).username; return bellItems().filter(i => i.lv === 'red' || i.lv === 'amber' || i.lv === 'new').length + actVisible().filter(e => e.ts > seen).length; }
         function bellBtnHtml() { const n = bellCount(); return `<button onclick="bellOpen()" class="relative px-3 py-2 bg-theme-input hover:opacity-80 rounded-xl text-xs border border-theme-border" title="Thông báo"><i class="fa-solid fa-bell ${n ? 'text-amber-500' : ''}"></i>${n ? `<span class="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-rose-600 text-white text-[10px] font-bold flex items-center justify-center">${n}</span>` : ''}</button>`; }
-        function bellOpen() { bellShown = true; bellRender(); try { localStorage.setItem('hoangde_seen_ver', String(APP_VER)); } catch (e) { } }
+        let bellSeenBefore = 0, bellFilter = 'all';
+        function bellOpen() { bellShown = true; bellSeenBefore = actSeenTs(); bellRender(); try { localStorage.setItem('hoangde_seen_ver', String(APP_VER)); localStorage.setItem('hoangde_act_seen', String(Date.now())); } catch (e) { } }
         let bellShown = false;
         function bellClose() { bellShown = false; const m = document.getElementById('bell-modal'); if (m) m.classList.add('hidden'); render(); }
+        function bellActHtml() {
+            const all = actVisible(), cats = { all: 'Tất cả', sale: 'Bán hàng', warranty: 'Bảo hành', stock: 'Kho', product: 'Sản phẩm', store: 'Cửa hàng', approve: 'Duyệt' };
+            const L = all.filter(e => bellFilter === 'all' || e.cat === bellFilter).slice(0, 80), seen = bellSeenBefore, me = (getCurrentUser() || {}).username;
+            const nNew = all.filter(e => e.ts > seen).length;
+            return `<div class="font-bold opacity-80">Hoạt động & thay đổi gần đây${nNew ? ` <span class="px-1.5 rounded bg-rose-600 text-white text-[10px]">${nNew} mới</span>` : ''}</div>
+                <div class="flex flex-wrap gap-1">${Object.keys(cats).map(k => `<button onclick="bellFilter='${k}';bellRender()" class="px-2 py-1 rounded-lg text-[10px] font-bold border ${bellFilter === k ? 'bg-amber-500 text-slate-950 border-amber-500' : 'bg-theme-input border-theme-border'}">${cats[k]}</button>`).join('')}</div>
+                ${L.length ? `<div class="rounded-xl border border-theme-border divide-y divide-theme-border">${L.map(e => `<div class="p-2.5 ${e.ts > seen ? 'bg-sky-500/10' : ''}"><div>${e.icon} ${escHtml(e.text)}</div><div class="opacity-60 text-[10px] mt-0.5">${escHtml(e.time)}${e.byName ? ' • ' + escHtml(e.byName) : ''}</div></div>`).join('')}</div>` : '<div class="opacity-60">Chưa có hoạt động nào.</div>'}
+                ${all.length > 80 ? `<div class="opacity-60 text-[10px]">Hiện 80 / ${all.length} hoạt động gần nhất.</div>` : ''}`;
+        }
         function bellRender() {
             if (!bellShown) return;
             let m = document.getElementById('bell-modal');
@@ -3926,7 +4013,7 @@
             const items = bellItems(), col = { red: 'border-rose-500/60 bg-rose-500/10', amber: 'border-amber-500/60 bg-amber-500/10', new: 'border-sky-500/60 bg-sky-500/10', info: 'border-theme-border bg-theme-input/40' };
             m.innerHTML = `<div class="bg-theme-card border border-theme-border rounded-2xl w-full max-w-sm max-h-[85vh] flex flex-col mt-12 text-theme-text shadow-2xl">
                 <div class="p-3 border-b border-theme-border flex justify-between items-center"><b class="text-sm"><i class="fa-solid fa-bell text-amber-500 mr-2"></i>Thông báo</b><button onclick="bellClose()" class="px-3 py-1 rounded-lg bg-theme-input text-xs font-bold">Đóng</button></div>
-                <div class="p-3 overflow-y-auto space-y-2 text-xs">${items.map(i => `<div ${i.act ? `onclick="${i.act}"` : ''} class="p-3 rounded-xl border ${col[i.lv]} ${i.act ? 'cursor-pointer' : ''}"><div class="font-bold"><i class="fa-solid ${i.icon} mr-1"></i>${escHtml(i.title)}${i.lv === 'new' ? ' <span class="px-1.5 rounded bg-sky-500 text-slate-950 text-[10px]">MỚI</span>' : ''}</div><div class="opacity-80 whitespace-pre-line mt-0.5">${escHtml(i.text)}</div></div>`).join('')}</div></div>`;
+                <div class="p-3 overflow-y-auto space-y-2 text-xs">${bellActHtml()}<div class="font-bold opacity-80 pt-1">Cảnh báo & cập nhật ứng dụng</div>${items.map(i => `<div ${i.act ? `onclick="${i.act}"` : ''} class="p-3 rounded-xl border ${col[i.lv]} ${i.act ? 'cursor-pointer' : ''}"><div class="font-bold"><i class="fa-solid ${i.icon} mr-1"></i>${escHtml(i.title)}${i.lv === 'new' ? ' <span class="px-1.5 rounded bg-sky-500 text-slate-950 text-[10px]">MỚI</span>' : ''}</div><div class="opacity-80 whitespace-pre-line mt-0.5">${escHtml(i.text)}</div></div>`).join('')}</div></div>`;
         }
         // ---------- BẢNG TRẢ KHO ----------
         function rtRows(list) { const out = []; (list || []).forEach((h, gi) => (h.items && h.items.length ? h.items : [{ name: '', q: 0 }]).forEach((it, k) => out.push({ h, gi, k, n: (h.items || []).length || 1, it }))); return out; }
