@@ -827,6 +827,7 @@
             ['stores', 'productsMaster', 'warehouse', 'checkinHistory', 'importHistory', 'routes', 'returnHistory'].forEach(k => { if (!Array.isArray(db[k])) db[k] = []; });
             if (!db.salesHistory) db.salesHistory = db.history || [];
             archiveOf();
+            try { dedupHistoryVsArchive(); } catch (e) {}
             if (!db.settings) db.settings = { checkinRadius: 50, requiredMinutes: 5, deviceMode: 'mobile' };
             if (!db.categories || !db.categories.length) db.categories = ['Cáp sạc', 'Củ sạc', 'Tai nghe', 'Kính cường lực', 'Ốp lưng'];
             try { loadCustomLists(); } catch (e) {}
@@ -1359,7 +1360,7 @@
                         </div>
                         <div>
                             <h1 class="font-black text-xs sm:text-sm uppercase tracking-wider">PHỤ KIỆN HOÀNG ĐẾ</h1>
-                            <p class="text-[11px] sm:text-xs opacity-75">Nhân sự: <span class="font-bold text-amber-500">${user.fullname}</span> (${isPcMode() ? 'Chế độ PC' : 'Chế độ Mobile'} • Bản 59)</p>
+                            <p class="text-[11px] sm:text-xs opacity-75">Nhân sự: <span class="font-bold text-amber-500">${user.fullname}</span> (${isPcMode() ? 'Chế độ PC' : 'Chế độ Mobile'} • Bản 62)</p>
                         </div>
                     </div>
                     <div class="flex space-x-2 w-full sm:w-auto justify-end">
@@ -3788,10 +3789,11 @@
         function rtRows(list) { const out = []; (list || []).forEach((h, gi) => (h.items && h.items.length ? h.items : [{ name: '', q: 0 }]).forEach((it, k) => out.push({ h, gi, k, n: (h.items || []).length || 1, it }))); return out; }
         function returnHistoryHtml() {
             const list = db.returnHistory || [];
-            if (!list.length) return '';
+            if (!list.length) return isAdminU() ? `<div class="bg-theme-card border border-theme-border rounded-2xl shadow-sm p-4 text-xs space-y-2"><b class="text-sm"><i class="fa-solid fa-rotate-left text-rose-400 mr-2"></i>Lịch sử trả hàng về kho (0)</b><button onclick="openRtRestore()" class="w-full py-2.5 rounded-xl bg-sky-500 text-slate-950 font-bold"><i class="fa-solid fa-trash-arrow-up mr-1"></i>Khôi phục phiếu trả kho đã xóa</button></div>` : '';
             const admin = isAdminU(), rows = rtRows(list), tot = rows.reduce((a, r) => a + (Number(r.it.q) || 0), 0), td = 'p-2.5 border border-theme-border align-top';
             return `<details class="bg-theme-card border border-theme-border rounded-2xl shadow-sm p-4 text-xs"><summary class="cursor-pointer font-bold text-sm"><i class="fa-solid fa-rotate-left text-rose-400 mr-2"></i>Lịch sử trả hàng về kho (${list.length} lần • ${tot} cái)</summary>
                 <button onclick="rtExportExcel()" class="mt-3 w-full py-2.5 rounded-xl bg-emerald-600 text-white font-bold"><i class="fa-solid fa-file-excel mr-1"></i>Xuất Excel lịch sử trả kho</button>
+ ${admin ? `<button onclick="openRtRestore()" class="mt-2 w-full py-2.5 rounded-xl bg-sky-500 text-slate-950 font-bold"><i class="fa-solid fa-trash-arrow-up mr-1"></i>Khôi phục phiếu trả kho đã xóa</button>` : ''}
                 ${admin ? `<button onclick="rtBulkDelete()" class="mt-2 w-full py-2.5 rounded-xl bg-rose-500/15 border border-rose-500/40 text-rose-400 font-bold"><i class="fa-solid fa-trash-can mr-1"></i>Xóa các phiếu đã tick (phiếu test)</button>` : ''}
                 <div class="mt-3 overflow-x-auto"><table class="w-full min-w-[720px] border-collapse">
                     <thead><tr class="bg-amber-500/20 text-amber-500 font-bold">${admin ? `<th class="${td}">✓</th>` : ''}<th class="${td}">Thời gian</th><th class="${td}">Người trả</th><th class="${td}">Người nhận ở kho</th><th class="${td}">SĐT</th><th class="${td}">Sản phẩm</th><th class="${td} text-right">SL</th><th class="${td}">Ghi chú</th>${admin ? `<th class="${td}">Admin</th>` : ''}</tr></thead>
@@ -3805,9 +3807,86 @@
             if (!idx.length) { alert('Hãy tick chọn các phiếu trả kho cần xóa.'); return; }
             const list = db.returnHistory || [], qty = idx.reduce((s, i) => s + ((list[i] || {}).items || []).reduce((a, it) => a + (Number(it.q) || 0), 0), 0);
             if (!confirm('Xóa ' + idx.length + ' phiếu trả kho (' + qty + ' cái)?')) return;
-            const back = confirm('Cộng lại ' + qty + ' cái này vào tồn kho?\n\nOK = cộng lại (dùng khi đó là phiếu test, hàng thực tế vẫn còn trong kho)\nHủy = chỉ xóa phiếu, không đổi tồn kho');
-            idx.forEach(i => { const h = list[i]; if (!h) return; if (back) (h.items || []).forEach(it => { let w = db.warehouse.find(x => String(x.productId) === String(it.productId)); if (!w) { w = { id: newRecId(), productId: it.productId, qty: 0 }; db.warehouse.push(w); } w.qty = (Number(w.qty) || 0) + (Number(it.q) || 0); stockLog('return_undo', it.productId, Number(it.q) || 0, 'Xóa phiếu trả kho test ' + h.time); }); list.splice(i, 1); });
+            const back = confirm('Các phiếu này là TEST hay hàng THẬT đã trả về kho?\n\nOK = TEST → cộng lại ' + qty + ' cái vào tồn kho\nHủy = hàng THẬT → giữ nguyên tồn kho (chỉ xóa phiếu)\n\nPhiếu xóa sẽ vào thùng rác, khôi phục được.');
+            idx.forEach(i => { const h = list[i]; if (!h) return; rtTrash(h, back); if (back) (h.items || []).forEach(it => { let w = db.warehouse.find(x => String(x.productId) === String(it.productId)); if (!w) { w = { id: newRecId(), productId: it.productId, qty: 0 }; db.warehouse.push(w); } w.qty = (Number(w.qty) || 0) + (Number(it.q) || 0); stockLog('return_undo', it.productId, Number(it.q) || 0, 'Xóa phiếu trả kho test ' + h.time); }); list.splice(i, 1); });
             saveData(); render(); alert('Đã xóa ' + idx.length + ' phiếu' + (back ? ' và cộng lại ' + qty + ' cái vào kho.' : '.'));
+        }
+
+        // ===== Bản 61: Khôi phục phiếu trả kho đã xóa =====
+        // Nguồn: (1) thùng rác (phiếu xóa từ Bản 61), (2) bản sao lưu trên máy, (3) file Excel sao lưu / file xuất trả kho
+        function rtTrash(h, addedBack) { (db.returnTrash = db.returnTrash || []).unshift({ rec: JSON.parse(JSON.stringify(h)), deletedAt: vnNowStr(), deletedBy: (getCurrentUser() || {}).username || '', addedBack: !!addedBack }); if (db.returnTrash.length > 300) db.returnTrash.length = 300; }
+        const rtKey = h => [String(h.time || '').trim(), normTxt(String(h.receiverName || '')).trim(), (h.items || []).map(i => normTxt(String(i.name || '')).trim() + 'x' + (Number(i.q) || 0)).sort().join(',')].join('|');
+        let rtRestoreState = { cands: [], note: '' };
+        function rtExisting() { return new Set((db.returnHistory || []).map(rtKey)); }
+        function rtLocalCands() {
+            const have = rtExisting(), out = [], seen = new Set();
+            const push = (rec, src, extra) => { const k = rtKey(rec); if (have.has(k) || seen.has(k)) return; seen.add(k); out.push(Object.assign({ rec, src, on: true }, extra || {})); };
+            (db.returnTrash || []).forEach((t, i) => push(t.rec, 'Thùng rác (xóa lúc ' + t.deletedAt + (t.addedBack ? ', đã cộng lại kho' : '') + ')', { trashIdx: i, addedBack: t.addedBack }));
+            ['hoangde_merge_backup', 'hoangde_safe_fallback_db', 'hoangde_impdup_backup'].forEach(k => { try { const b = JSON.parse(localStorage.getItem(k) || 'null'); (b && Array.isArray(b.returnHistory) ? b.returnHistory : []).forEach(r => push(r, 'Bản sao lưu trên máy' + (b.time ? ' (' + b.time + ')' : ''))); } catch (e) { } });
+            return out;
+        }
+        function openRtRestore() {
+            if (!isAdminU()) { alert('Chỉ Admin được khôi phục.'); return; }
+            rtRestoreState = { cands: rtLocalCands(), note: '' }; rtRestoreRender();
+        }
+        function rtRestoreRender() {
+            let m = document.getElementById('rtr-modal');
+            if (!m) { m = document.createElement('div'); m.id = 'rtr-modal'; m.className = 'fixed inset-0 z-[70] bg-black/70 flex items-end sm:items-center justify-center p-0 sm:p-4'; document.body.appendChild(m); }
+            m.classList.remove('hidden');
+            const C = rtRestoreState.cands, n = C.filter(c => c.on).length;
+            m.innerHTML = `<div class="bg-theme-card border border-theme-border rounded-t-3xl sm:rounded-3xl w-full max-w-lg max-h-[92vh] flex flex-col text-theme-text">
+                <div class="p-4 border-b border-theme-border flex justify-between items-center"><b class="text-sm"><i class="fa-solid fa-trash-arrow-up text-sky-400 mr-2"></i>Khôi phục phiếu trả kho</b><button onclick="document.getElementById('rtr-modal').classList.add('hidden')" class="px-3 py-1 rounded-lg bg-theme-input text-xs font-bold">Đóng</button></div>
+                <div class="p-4 overflow-y-auto space-y-3 text-xs">
+                    <div class="opacity-80">Khôi phục lại <b>lịch sử</b> trả kho. <b>Tồn kho giữ nguyên</b> (riêng phiếu trong thùng rác đã "cộng lại kho" lúc xóa thì sẽ trừ lại cho đúng).</div>
+                    <label class="block w-full py-3 rounded-xl border-2 border-dashed border-sky-500/50 text-center font-bold text-sky-400 cursor-pointer"><i class="fa-solid fa-file-excel mr-1"></i>Chọn file Excel sao lưu (có sheet "Trả hàng về kho" / "Trả kho")<input type="file" accept=".xlsx" class="hidden" onchange="rtRestoreFromFile(this.files[0])"></label>
+                    ${rtRestoreState.note ? `<div class="p-2 rounded-lg bg-theme-input">${escHtml(rtRestoreState.note)}</div>` : ''}
+                    <div class="font-bold">Tìm thấy ${C.length} phiếu có thể khôi phục</div>
+                    ${C.length ? C.map((c, i) => `<label class="flex items-start gap-2 p-2.5 rounded-xl border ${c.on ? 'border-sky-500/60' : 'border-theme-border'}"><input type="checkbox" ${c.on ? 'checked' : ''} onchange="rtRestoreState.cands[${i}].on=this.checked;rtRestoreRender()" class="mt-0.5 w-4 h-4 accent-sky-500"><span><b>${escHtml(c.rec.time || '')}</b> • nhận: ${escHtml(c.rec.receiverName || '')} • trả: ${escHtml(c.rec.byName || c.rec.username || '')}<br>${escHtml((c.rec.items || []).map(it => it.name + ' x' + it.q).join(' • '))}<br><span class="opacity-60">${escHtml(c.src)}</span></span></label>`).join('') : '<div class="opacity-60">Chưa tìm thấy phiếu nào trên máy. Hãy chọn file Excel sao lưu xuất TRƯỚC lúc xóa phiếu.</div>'}
+                </div>
+                <div class="p-4 border-t border-theme-border"><button onclick="rtRestoreRun()" ${n ? '' : 'disabled'} class="w-full py-3 rounded-xl ${n ? 'bg-sky-500 text-slate-950' : 'bg-theme-input opacity-50'} text-xs font-bold">Khôi phục ${n} phiếu</button></div>
+            </div>`;
+        }
+        async function rtRestoreFromFile(file) {
+            if (!file) return;
+            if (typeof JSZip === 'undefined') { alert('Chưa tải được thư viện đọc file. Kiểm tra mạng rồi thử lại.'); return; }
+            try {
+                const zip = await JSZip.loadAsync(await file.arrayBuffer()), B = await xbBook(zip);
+                const sh = B.sheets.find(x => /trả hàng về kho|trả kho/i.test(x.name)); if (!sh) { rtRestoreState.note = 'File "' + file.name + '" không có sheet trả kho.'; rtRestoreRender(); return; }
+                const rows = xbReadRows(await zip.file(sh.path).async('string'), B.sst);
+                const hr = rows.find(r => Object.values(r.vals).some(v => String(v).trim() === 'Thời gian')); if (!hr) { rtRestoreState.note = 'Không tìm thấy dòng tiêu đề trong sheet ' + sh.name; rtRestoreRender(); return; }
+                const col = {}; Object.keys(hr.vals).forEach(c => col[String(hr.vals[c]).trim()] = c);
+                const g = (r, k) => col[k] ? String(r.vals[col[k]] == null ? '' : r.vals[col[k]]).trim() : '';
+                const RES = prodResolver(), recs = []; let cur = null;
+                rows.filter(r => r.r > hr.r).forEach(r => {
+                    const t = g(r, 'Thời gian');
+                    if (/^(TỔNG|Tổng)/.test(g(r, 'Thời gian') + g(r, 'Người trả')) || /TỔNG CỘNG/.test(Object.values(r.vals).join(' '))) return;
+                    if (t && dayKeyOf(t)) { cur = { id: newRecId(), time: t, byName: g(r, 'Người trả'), username: '', receiverName: g(r, 'Người nhận ở kho'), receiverPhone: g(r, 'SĐT người nhận'), note: g(r, 'Ghi chú'), items: [], restored: true }; recs.push(cur); }
+                    if (!cur) return;
+                    const sp = g(r, 'Sản phẩm trả');
+                    if (sp) sp.split(/;\s*/).forEach(x => { const m = /^(.*)\s+x(\d+)\s*$/.exec(x.trim()); if (m) cur.items.push({ name: m[1].trim(), q: +m[2] }); });
+                    const one = g(r, 'Sản phẩm'), q = parseInt(g(r, 'SL')) || 0; if (one && q) cur.items.push({ name: one, q });
+                });
+                recs.forEach(rc => rc.items.forEach(it => { const p = RES(it.name); if (p) { it.productId = p.id; it.name = p.name; } else it.productId = ''; }));
+                const have = rtExisting(), seen = new Set(rtRestoreState.cands.map(c => rtKey(c.rec))); let add = 0;
+                recs.filter(rc => rc.items.length).forEach(rc => { const k = rtKey(rc); if (have.has(k) || seen.has(k)) return; seen.add(k); rtRestoreState.cands.push({ rec: rc, src: 'File ' + file.name, on: true }); add++; });
+                rtRestoreState.note = 'Đọc file "' + file.name + '": ' + recs.length + ' phiếu, ' + add + ' phiếu chưa có trong app.';
+            } catch (e) { console.error(e); rtRestoreState.note = 'Không đọc được file: ' + e.message; }
+            rtRestoreRender();
+        }
+        function rtRestoreRun() {
+            const sel = rtRestoreState.cands.filter(c => c.on); if (!sel.length) return;
+            if (!confirm('Khôi phục ' + sel.length + ' phiếu trả kho vào lịch sử?\nTồn kho giữ nguyên.')) return;
+            const trashIdx = new Set();
+            sel.forEach(c => {
+                const r = JSON.parse(JSON.stringify(c.rec)); r.restored = true; r.restoredAt = vnNowStr();
+                (db.returnHistory = db.returnHistory || []).push(r);
+                if (c.addedBack) (r.items || []).forEach(it => { const w = db.warehouse.find(x => String(x.productId) === String(it.productId)); if (w) { w.qty = Math.max(0, (Number(w.qty) || 0) - (Number(it.q) || 0)); stockLog('restore', it.productId, -(Number(it.q) || 0), 'Khôi phục phiếu trả kho ' + r.time); } });
+                if (c.trashIdx != null) trashIdx.add(c.trashIdx);
+            });
+            db.returnTrash = (db.returnTrash || []).filter((_, i) => !trashIdx.has(i));
+            db.returnHistory.sort((a, b) => (recTs(b) || 0) - (recTs(a) || 0));
+            saveData(); document.getElementById('rtr-modal').classList.add('hidden'); render();
+            alert('Đã khôi phục ' + sel.length + ' phiếu trả kho. Mở Báo cáo → Đối chiếu kho để kiểm tra lại.');
         }
         function rtEdit(i) {
             if (!isAdminU()) { alert('Chỉ Admin được sửa lịch sử trả kho.'); return; }
@@ -3962,6 +4041,7 @@
                 <div class="p-4 border-b border-theme-border flex justify-between items-center gap-2"><b class="text-sm"><i class="fa-solid fa-scale-unbalanced text-rose-400 mr-2"></i>Đối chiếu kho • ${escHtml(D.label)}</b><button onclick="document.getElementById('recon-modal').classList.add('hidden')" class="px-3 py-1 rounded-lg bg-theme-input text-xs font-bold">Đóng</button></div>
                 <div class="p-4 overflow-y-auto space-y-3 text-xs">
                     <div class="opacity-80">Lệch = Tồn hiện tại − (Nhập − Bán − Trả kho ± Điều chỉnh) trong kỳ. Dùng đúng khi kho đã về 0 trước ngày bắt đầu và ngày kết thúc là hôm nay. Bấm vào tên sản phẩm để xem từng giao dịch.</div>
+                    ${isAdminU() ? `<button onclick="openImpDup()" class="w-full py-2.5 rounded-xl bg-rose-500 text-white font-bold"><i class="fa-solid fa-clone mr-1"></i>Dọn bản ghi nhập trùng (không đổi tồn kho)</button>` : ''}
                     <label class="flex items-center gap-2 font-semibold"><input type="checkbox" ${reconOnlyLech ? 'checked' : ''} onchange="reconOnlyLech=this.checked;openRecon()" class="accent-rose-500"> Chỉ hiện dòng lệch (${D.inv.filter(x => x.lech).length}/${D.inv.length})</label>
                     <div class="overflow-x-auto"><table class="w-full min-w-[560px] border-collapse"><thead><tr class="bg-amber-500/20 text-amber-500 font-bold"><th class="${td} text-left">Sản phẩm</th><th class="${td}">Nhập</th><th class="${td}">Bán</th><th class="${td}">Trả kho</th><th class="${td}">Điều chỉnh</th><th class="${td}">Tồn</th><th class="${td}">Lệch</th></tr></thead>
                     <tbody>${list.length ? list.map((x, i) => `<tr class="${x.lech ? 'bg-rose-500/10' : ''}"><td class="${td}"><button onclick="reconDetail(${D.inv.indexOf(x)})" class="text-left font-semibold text-sky-400 underline">${escHtml(x.n)}</button></td><td class="${td} text-right">${x.imp}</td><td class="${td} text-right">${x.sold}</td><td class="${td} text-right">${x.ret}</td><td class="${td} text-right">${x.adj}</td><td class="${td} text-right">${x.stock}</td><td class="${td} text-right font-bold ${x.lech ? 'text-rose-400' : 'text-emerald-400'}">${x.lech ? (x.lech > 0 ? '+' : '') + x.lech : '✓'}</td></tr>`).join('') : `<tr><td class="${td} text-center opacity-70" colspan="7">Không có dòng lệch – kho khớp.</td></tr>`}</tbody></table></div>
@@ -3984,6 +4064,65 @@
                 ${ev.map(e => { run += e.q; return `<tr><td class="${td} whitespace-nowrap">${escHtml(e.t)}</td><td class="${td}">${escHtml(e.k)}</td><td class="${td} text-right font-bold ${e.q < 0 ? 'text-rose-400' : 'text-emerald-400'}">${e.q > 0 ? '+' : ''}${e.q}</td><td class="${td} text-right">${run}</td><td class="${td}">${escHtml(e.d)}</td></tr>`; }).join('') || `<tr><td colspan="5" class="${td} text-center opacity-60">Không có giao dịch nào trong kỳ.</td></tr>`}
                 </tbody></table></div></div>`;
             document.getElementById('recon-detail').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        // ===== Bản 60: Dọn bản ghi nhập trùng (chỉ xóa LỊCH SỬ, không đụng tồn kho) =====
+        let impDupState = [];
+        function impDupScan() {
+            const recs = [];
+            ((db.historyArchive && db.historyArchive.imports) || []).forEach(r => recs.push({ r, src: 'a' }));
+            (db.importHistory || []).forEach(r => recs.push({ r, src: 'h' }));
+            const by = new Map();
+            recs.forEach(x => { const k = normTxt(String(x.r.productName || '')).trim() + '|' + (Number(x.r.qty) || 0) + '|' + (dayKeyOf(x.r.time) || '?'); if (!by.has(k)) by.set(k, []); by.get(k).push(x); });
+            const out = [];
+            by.forEach(list => {
+                if (list.length < 2) return;
+                list.sort((a, b) => (recTs(a.r) || 0) - (recTs(b.r) || 0));
+                const sameTime = new Set(list.map(x => x.r.time)).size === 1;
+                out.push({ list, sure: sameTime, del: new Set(list.slice(1).map((_, i) => i + 1)), on: sameTime });
+            });
+            return out.sort((a, b) => (b.sure - a.sure) || (recTs(b.list[0].r) || 0) - (recTs(a.list[0].r) || 0));
+        }
+        function openImpDup() {
+            if (!isAdminU()) { alert('Chỉ Admin được dùng chức năng này.'); return; }
+            impDupState = impDupScan();
+            let m = document.getElementById('impdup-modal');
+            if (!m) { m = document.createElement('div'); m.id = 'impdup-modal'; m.className = 'fixed inset-0 z-[70] bg-black/70 flex items-end sm:items-center justify-center p-0 sm:p-4'; document.body.appendChild(m); }
+            m.classList.remove('hidden'); impDupRender();
+        }
+        function impDupRender() {
+            const m = document.getElementById('impdup-modal'); if (!m) return;
+            const G = impDupState, nDel = G.filter(g => g.on).reduce((a, g) => a + g.del.size, 0);
+            m.innerHTML = `<div class="bg-theme-card border border-theme-border rounded-t-3xl sm:rounded-3xl w-full max-w-lg max-h-[92vh] flex flex-col text-theme-text">
+                <div class="p-4 border-b border-theme-border flex justify-between items-center"><b class="text-sm"><i class="fa-solid fa-clone text-rose-400 mr-2"></i>Dọn bản ghi nhập trùng</b><button onclick="document.getElementById('impdup-modal').classList.add('hidden')" class="px-3 py-1 rounded-lg bg-theme-input text-xs font-bold">Đóng</button></div>
+                <div class="p-4 overflow-y-auto space-y-3 text-xs">
+                    <div class="opacity-80">Chỉ xóa <b>dòng lịch sử nhập</b> bị trùng để báo cáo "Tổng nhập" đúng. <b>Tồn kho KHÔNG thay đổi.</b> Có sao lưu, khôi phục được.</div>
+                    <div class="flex flex-wrap gap-2"><span class="px-2 py-1 rounded bg-rose-500/15 text-rose-400 font-bold">Trùng hoàn toàn (cùng giờ) – tick sẵn</span><span class="px-2 py-1 rounded bg-amber-500/15 text-amber-500 font-bold">Cùng ngày, khác giờ – có thể nhập file 2 lần, tự xem</span></div>
+                    ${G.length ? G.map((g, gi) => `<div class="p-3 rounded-xl border ${g.on ? (g.sure ? 'border-rose-500/60' : 'border-amber-500/60') : 'border-theme-border'} space-y-1.5">
+                        <label class="flex items-center gap-2 font-bold"><input type="checkbox" ${g.on ? 'checked' : ''} onchange="impDupState[${gi}].on=this.checked;impDupRender()" class="w-4 h-4 accent-rose-500"> ${escHtml(g.list[0].r.productName)} × ${Number(g.list[0].r.qty) || 0} <span class="font-normal ${g.sure ? 'text-rose-400' : 'text-amber-500'}">(${g.list.length} dòng${g.sure ? ', trùng hoàn toàn' : ', khác giờ'})</span></label>
+                        ${g.list.map((x, i) => `<label class="flex items-center gap-2 pl-6 ${g.del.has(i) ? 'text-rose-400 line-through' : ''}"><input type="checkbox" ${g.del.has(i) ? 'checked' : ''} onchange="impDupToggle(${gi},${i},this.checked)" class="accent-rose-500"> ${escHtml(x.r.time)} • ${x.src === 'a' ? 'lưu trữ' : 'hôm nay'}${x.r.username ? ' • ' + escHtml(x.r.username) : ''} ${i === 0 ? '<span class="text-emerald-400 no-underline">(giữ)</span>' : ''}</label>`).join('')}
+                    </div>`).join('') : '<div class="p-4 text-center opacity-70">Không có bản ghi nhập trùng.</div>'}
+                </div>
+                <div class="p-4 border-t border-theme-border flex gap-2"><button onclick="impDupRestore()" class="px-3 py-3 rounded-xl bg-theme-input border border-theme-border text-xs font-bold">Khôi phục lần dọn trước</button><button onclick="impDupRun()" ${nDel ? '' : 'disabled'} class="flex-1 py-3 rounded-xl ${nDel ? 'bg-rose-500 text-white' : 'bg-theme-input opacity-50'} text-xs font-bold">Xóa ${nDel} dòng lịch sử trùng</button></div>
+            </div>`;
+        }
+        function impDupToggle(gi, i, on) { const g = impDupState[gi]; if (!g) return; if (on) g.del.add(i); else g.del.delete(i); if (g.del.size >= g.list.length) { g.del.delete(i); alert('Phải giữ lại ít nhất 1 dòng.'); } impDupRender(); }
+        function impDupRun() {
+            const kill = new Set(); impDupState.filter(g => g.on).forEach(g => g.del.forEach(i => kill.add(g.list[i].r)));
+            if (!kill.size) return;
+            if (!confirm('Xóa ' + kill.size + ' dòng lịch sử nhập trùng?\nTồn kho giữ nguyên.')) return;
+            try { localStorage.setItem('hoangde_impdup_backup', JSON.stringify({ time: vnNowStr(), arch: (db.historyArchive && db.historyArchive.imports) || [], hist: db.importHistory || [] })); } catch (e) { if (!confirm('Không lưu được bản sao lưu. Vẫn xóa?')) return; }
+            if (db.historyArchive && db.historyArchive.imports) db.historyArchive.imports = db.historyArchive.imports.filter(r => !kill.has(r));
+            db.importHistory = (db.importHistory || []).filter(r => !kill.has(r));
+            saveData(); document.getElementById('impdup-modal').classList.add('hidden'); render();
+            if (document.getElementById('recon-modal') && !document.getElementById('recon-modal').classList.contains('hidden')) openRecon();
+            alert('Đã xóa ' + kill.size + ' dòng nhập trùng. Tồn kho không đổi.');
+        }
+        function impDupRestore() {
+            let b = null; try { b = JSON.parse(localStorage.getItem('hoangde_impdup_backup') || 'null'); } catch (e) { }
+            if (!b) { alert('Chưa có lần dọn nào để khôi phục.'); return; }
+            if (!confirm('Khôi phục lịch sử nhập về lúc ' + b.time + '?')) return;
+            archiveOf().imports = b.arch || []; db.importHistory = b.hist || []; saveData(); document.getElementById('impdup-modal').classList.add('hidden'); render(); alert('Đã khôi phục.');
         }
         function rpSpanApply() {
             const f = document.getElementById('rp-from').value, t = document.getElementById('rp-to').value;
@@ -4027,8 +4166,10 @@
         }
         function deleteReturnRecord(i) {
             const h = (db.returnHistory || [])[i]; if (!h) return;
-            if (!confirm('Xóa bản ghi trả hàng này?')) return;
-            if (confirm('Có cộng lại số lượng đã trả vào kho không?\nOK = cộng lại, Hủy = chỉ xóa bản ghi.')) {
+            if (!confirm('Xóa bản ghi trả hàng này?\n(Phiếu sẽ vào thùng rác, khôi phục được)')) return;
+            const back = confirm('Phiếu này là TEST hay hàng THẬT đã trả về kho?\n\nOK = TEST → cộng lại số lượng vào tồn kho\nHủy = hàng THẬT → giữ nguyên tồn kho (chỉ xóa phiếu)');
+            rtTrash(h, back);
+            if (back) {
                 (h.items || []).forEach(it => { const w = db.warehouse.find(x => String(x.productId) === String(it.productId)); if (w) { w.qty += it.q; stockLog('return_undo', it.productId, it.q, 'Xóa phiếu trả kho ' + h.time); } });
             }
             db.returnHistory.splice(i, 1); saveData(); render();
@@ -4046,9 +4187,26 @@
             ['sales', 'checkin', 'imports'].forEach(k => { if (!Array.isArray(db.historyArchive[k])) db.historyArchive[k] = []; });
             return db.historyArchive;
         }
-        function allSales() { const a = (db.historyArchive && db.historyArchive.sales) || []; return a.length ? a.concat(db.salesHistory || []) : (db.salesHistory || []); }
-        function allCheckins() { const a = (db.historyArchive && db.historyArchive.checkin) || []; return a.length ? a.concat(db.checkinHistory || []) : (db.checkinHistory || []); }
-        function allImports() { const a = (db.historyArchive && db.historyArchive.imports) || []; return a.length ? a.concat(db.importHistory || []) : (db.importHistory || []); }
+        // Bản 60: bản ghi đã có trong kho lưu trữ thì KHÔNG tính thêm lần nữa ở lịch sử hôm nay (chống đếm gấp đôi)
+        function histMerged(ak, dk) {
+            const a = (db.historyArchive && db.historyArchive[ak]) || [], h = db[dk] || [];
+            if (!a.length) return h; if (!h.length) return a;
+            const seen = new Set(a.map(x => recSig(ak, x)));
+            return a.concat(h.filter(x => !seen.has(recSig(ak, x))));
+        }
+        function allSales() { return histMerged('sales', 'salesHistory'); }
+        function allCheckins() { return histMerged('checkin', 'checkinHistory'); }
+        function allImports() { return histMerged('imports', 'importHistory'); }
+        // Dọn dữ liệu: bỏ khỏi lịch sử hôm nay những bản ghi đã nằm trong kho lưu trữ (xảy ra khi đồng bộ giữa các máy)
+        function dedupHistoryVsArchive() {
+            const A = db.historyArchive; if (!A) return 0; let n = 0;
+            [['sales', 'salesHistory'], ['checkin', 'checkinHistory'], ['imports', 'importHistory']].forEach(([ak, dk]) => {
+                if (!Array.isArray(A[ak]) || !A[ak].length || !Array.isArray(db[dk])) return;
+                const seen = new Set(A[ak].map(x => recSig(ak, x))), before = db[dk].length;
+                db[dk] = db[dk].filter(x => !seen.has(recSig(ak, x))); n += before - db[dk].length;
+            });
+            return n;
+        }
         const slimRec = h => { const o = Object.assign({}, h); const pc = (Array.isArray(o.photos) ? o.photos.length : 0) || (o.photo ? 1 : 0); delete o.photos; delete o.photo; if (pc) o.photoCount = pc; return o; };
         const recSig = (k, h) => k === 'imports' ? (h.id ? 'id:' + h.id : [h.time, h.productName, h.qty].join('|')) : [h.time, h.storeName, h.username, h.note].join('|');
         // onlyBefore = true: chỉ lưu trữ các ngày trước hôm nay; false: toàn bộ lịch sử hiện có
@@ -4222,6 +4380,7 @@
                     <p class="text-xs opacity-75">Khoảng ngày (giờ Việt Nam): <b class="text-amber-500">${histRangeTitle(R)}</b> • gồm cả kho lưu trữ${admin ? ' • Admin xem nhập hàng của mọi tài khoản' : ' • chỉ hiện hàng do tài khoản của bạn nhập'}</p>
                     <div class="grid grid-cols-3 gap-2">${box('Số lần nhập', R.list.length)}${box('Tổng số cái', R.qty, 'text-emerald-500')}${box('Tổng tiền nhập', money(R.money), 'text-amber-500')}</div>
                     <button type="button" onclick="impExportExcel()" class="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs shadow"><i class="fa-solid fa-file-excel mr-1"></i> Xuất Excel lịch sử nhập hàng</button>
+                    ${admin ? `<button type="button" onclick="openImpDup()" class="w-full py-2.5 rounded-xl bg-rose-500/15 border border-rose-500/40 text-rose-400 font-bold text-xs"><i class="fa-solid fa-clone mr-1"></i> Dọn bản ghi nhập trùng</button>` : ''}
                 </div>
                 ${R.days.length ? R.days.map(k => { const d = R.byDay[k]; return `<div class="bg-theme-card border border-theme-border rounded-2xl shadow-sm overflow-hidden">
                     <div class="p-3 bg-black/20 border-b border-theme-border flex justify-between gap-2 text-xs"><span class="font-bold">${histDayLabel(k)}</span><span class="whitespace-nowrap">${d.items.length} lần • ${d.qty} cái • <b class="text-amber-500">${money(d.money)}</b></span></div>
@@ -6900,19 +7059,6 @@
             const cells = row.cells || row.values.map(v => ({ v, s: row.s }));
             return `<row r="${r}"${row.h ? ` ht="${row.h}" customHeight="1"` : ''}>` + cells.map((c, i) => xbCell(xbCol(i + 1) + r, c.v, c.s)).join('') + '</row>';
         }
-        function xbSheetXml(opt) {
-            const rows = opt.rows || [];
-            return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<worksheet xmlns="${XB_NS}" xmlns:r="${XB_RNS}">`
-                + `<dimension ref="A1:${xbCol(Math.max(1, opt.ncol || 1))}${Math.max(1, rows.length)}"/>`
-                + `<sheetViews><sheetView workbookViewId="0">${opt.freeze ? `<pane ySplit="${opt.freeze}" topLeftCell="A${opt.freeze + 1}" activePane="bottomLeft" state="frozen"/>` : ''}</sheetView></sheetViews>`
-                + '<sheetFormatPr defaultRowHeight="15"/>'
-                + (opt.widths && opt.widths.length ? '<cols>' + opt.widths.map((w, i) => `<col min="${i + 1}" max="${i + 1}" width="${w}" customWidth="1"/>`).join('') + '</cols>' : '')
-                + '<sheetData>' + rows.map((row, i) => xbRowXml(i + 1, row)).join('') + '</sheetData>'
-                + (opt.merges && opt.merges.length ? `<mergeCells count="${opt.merges.length}">` + opt.merges.map(m => `<mergeCell ref="${m}"/>`).join('') + '</mergeCells>' : '')
-                + '<pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/>'
-                + (opt.drawingRid ? `<drawing r:id="${opt.drawingRid}"/>` : '')
-                + '</worksheet>';
-        }
         function xbSkeleton() {
             const z = new JSZip();
             z.file('[Content_Types].xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="jpeg" ContentType="image/jpeg"/><Default Extension="png" ContentType="image/png"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>');
@@ -6951,31 +7097,6 @@
                 out.push({ r, vals });
             });
             return out;
-        }
-        function xbStylesAppend(xml) {
-            const add = (tag, child, items) => {
-                const re = new RegExp('<' + tag + '\\b([^>]*)>([\\s\\S]*?)</' + tag + '>');
-                const m = re.exec(xml); let base;
-                if (!m) { const sre = new RegExp('<' + tag + '\\b[^>]*/>'); xml = xml.replace(sre, '<' + tag + ` count="${items.length}">` + items.join('') + '</' + tag + '>'); return 0; }
-                const cnt = (m[2].match(new RegExp('<' + child + '\\b', 'g')) || []).length; base = cnt;
-                const attrs = m[1].replace(/\scount="\d+"/, '') + ` count="${cnt + items.length}"`;
-                xml = xml.replace(re, '<' + tag + attrs + '>' + m[2] + items.join('') + '</' + tag + '>');
-                return base;
-            };
-            const f0 = add('fonts', 'font', ['<font><sz val="11"/><name val="Arial"/></font>', '<font><b/><sz val="11"/><name val="Arial"/></font>', '<font><b/><sz val="18"/><name val="Times New Roman"/></font>', '<font><b/><sz val="12"/><name val="Times New Roman"/></font>']);
-            const fl0 = add('fills', 'fill', ['<fill><patternFill patternType="solid"><fgColor rgb="FFFBBF24"/><bgColor indexed="64"/></patternFill></fill>', '<fill><patternFill patternType="solid"><fgColor rgb="FFFFFF00"/><bgColor indexed="64"/></patternFill></fill>']);
-            const b0 = add('borders', 'border', ['<border><left style="thin"><color rgb="FF000000"/></left><right style="thin"><color rgb="FF000000"/></right><top style="thin"><color rgb="FF000000"/></top><bottom style="thin"><color rgb="FF000000"/></bottom><diagonal/></border>']);
-            const al = (h, wrap) => `<alignment horizontal="${h}" vertical="center"${wrap ? ' wrapText="1"' : ''}/>`;
-            const x0 = add('cellXfs', 'xf', [
-                `<xf numFmtId="0" fontId="${f0}" fillId="0" borderId="${b0}" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1">${al('left', 1)}</xf>`,               // body
-                `<xf numFmtId="3" fontId="${f0}" fillId="0" borderId="${b0}" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1">${al('right')}</xf>`, // num
-                `<xf numFmtId="0" fontId="${f0 + 1}" fillId="${fl0}" borderId="${b0}" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1">${al('center', 1)}</xf>`, // head
-                `<xf numFmtId="0" fontId="${f0 + 2}" fillId="${fl0 + 1}" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1">${al('center')}</xf>`, // title
-                `<xf numFmtId="0" fontId="${f0 + 3}" fillId="0" borderId="${b0}" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1">${al('center', 1)}</xf>`, // mbody (thị trường)
-                `<xf numFmtId="3" fontId="${f0 + 3}" fillId="0" borderId="${b0}" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1">${al('right')}</xf>`, // mnum
-                `<xf numFmtId="0" fontId="${f0 + 1}" fillId="0" borderId="${b0}" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1">${al('center', 1)}</xf>` // bold
-            ]);
-            return { xml, S: { body: x0, num: x0 + 1, head: x0 + 2, title: x0 + 3, mbody: x0 + 4, mnum: x0 + 5, bold: x0 + 6 } };
         }
         async function xbAddSheet(zip, B, name, xml, ct) {
             let n = 1; while (zip.file(`xl/worksheets/sheet${n}.xml`)) n++;
@@ -7017,75 +7138,223 @@
         const bkInMonth = (t, mk) => kpiMonthKeyOf(t) === mk;
         const bkSaleKey = (t, u, s) => [t, u, s].map(x => String(x == null ? '' : x).trim()).join('|');
         // Định nghĩa các sheet lịch sử (chỉ thêm dòng)
+        // ===== Bản 62: Thiết kế lại file Excel sao lưu (bảng màu, tiêu đề, phân loại màu, tổng hợp) =====
+        const XC = { NAVY: 'FF1F3864', BLUE: 'FF2F5597', SLATE: 'FF334155', GOLD: 'FFF59E0B', GOLDL: 'FFFEF3C7', GOLDM: 'FFFDE68A', ZEBRA: 'FFF8FAFC', WHITE: 'FFFFFFFF', GREENL: 'FFD1FAE5', GREEN: 'FF065F46', REDL: 'FFFEE2E2', RED: 'FF991B1B', BLUEL: 'FFDBEAFE', BLUED: 'FF1E40AF', GRAYL: 'FFF3F4F6', GRAY: 'FF6B7280', PURPLEL: 'FFEDE9FE', PURPLE: 'FF5B21B6', TEXT: 'FF1F2937', LINE: 'FFCBD5E1' };
+        function xbStyleBuilder(xml) {
+            const inner = (tag) => { const m = new RegExp('<' + tag + '\\b[^>]*>([\\s\\S]*?)</' + tag + '>').exec(xml); return m ? m[1] : ''; };
+            const cnt = (tag, child) => (inner(tag).match(new RegExp('<' + child + '\\b', 'g')) || []).length;
+            const base = { font: cnt('fonts', 'font'), fill: cnt('fills', 'fill'), border: cnt('borders', 'border'), xf: cnt('cellXfs', 'xf') };
+            let nfMax = 163; (xml.match(/<numFmt\b[^>]*>/g) || []).forEach(t => { const m = /numFmtId="(\d+)"/.exec(t); if (m) nfMax = Math.max(nfMax, +m[1]); });
+            const fonts = [], fills = [], borders = [], xfs = [], nfs = [], memo = {};
+            const put = (arr, s, b) => { let i = arr.indexOf(s); if (i < 0) { arr.push(s); i = arr.length - 1; } return b + i; };
+            const side = (n, st, c) => `<${n} style="${st}"><color rgb="${c}"/></${n}>`;
+            const BORDERS = { thin: side('left', 'thin', XC.LINE) + side('right', 'thin', XC.LINE) + side('top', 'thin', XC.LINE) + side('bottom', 'thin', XC.LINE), total: side('left', 'thin', XC.LINE) + side('right', 'thin', XC.LINE) + side('top', 'medium', XC.NAVY) + side('bottom', 'medium', XC.NAVY), head: side('left', 'thin', XC.WHITE) + side('right', 'thin', XC.WHITE) + side('top', 'thin', XC.NAVY) + side('bottom', 'medium', XC.NAVY) };
+            return {
+                x(sp) {
+                    const key = JSON.stringify(sp); if (memo[key] != null) return memo[key];
+                    const f = sp.font || {};
+                    const fi = put(fonts, `<font>${f.b ? '<b/>' : ''}${f.i ? '<i/>' : ''}<sz val="${f.sz || 10}"/><color rgb="${f.color || XC.TEXT}"/><name val="${f.name || 'Arial'}"/></font>`, base.font);
+                    const fl = sp.fill ? put(fills, `<fill><patternFill patternType="solid"><fgColor rgb="${sp.fill}"/><bgColor indexed="64"/></patternFill></fill>`, base.fill) : 0;
+                    const bd = sp.border === false ? 0 : put(borders, `<border>${BORDERS[sp.border || 'thin']}<diagonal/></border>`, base.border);
+                    let nf = 0; if (sp.nf != null) { if (typeof sp.nf === 'number') nf = sp.nf; else { let o = nfs.find(n => n.code === sp.nf); if (!o) { o = { id: ++nfMax, code: sp.nf }; nfs.push(o); } nf = o.id; } }
+                    const a = sp.al || {};
+                    const i = put(xfs, `<xf numFmtId="${nf}" fontId="${fi}" fillId="${fl}" borderId="${bd}" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="${a.h || 'general'}" vertical="${a.v || 'center'}"${a.wrap ? ' wrapText="1"' : ''}/></xf>`, base.xf);
+                    memo[key] = i; return i;
+                },
+                finish() {
+                    let out = xml;
+                    const app = (tag, items) => {
+                        if (!items.length) return;
+                        const re = new RegExp('<' + tag + '\\b([^>]*)>([\\s\\S]*?)</' + tag + '>'), m = re.exec(out);
+                        if (m) { const c = (Number((/count="(\d+)"/.exec(m[1]) || [])[1]) || 0); out = out.replace(re, '<' + tag + m[1].replace(/\scount="\d+"/, '') + ` count="${(tag === 'numFmts' ? c : base[{ fonts: 'font', fills: 'fill', borders: 'border', cellXfs: 'xf' }[tag]]) + items.length}">` + m[2] + items.join('') + '</' + tag + '>'); return true; }
+                        const sre = new RegExp('<' + tag + '\\b[^>]*/>'); if (sre.test(out)) { out = out.replace(sre, '<' + tag + ` count="${items.length}">` + items.join('') + '</' + tag + '>'); return true; }
+                        return false;
+                    };
+                    if (nfs.length && !app('numFmts', nfs.map(n => `<numFmt numFmtId="${n.id}" formatCode="${xbEsc(n.code)}"/>`))) out = out.replace(/(<styleSheet\b[^>]*>)/, `$1<numFmts count="${nfs.length}">` + nfs.map(n => `<numFmt numFmtId="${n.id}" formatCode="${xbEsc(n.code)}"/>`).join('') + '</numFmts>');
+                    app('fonts', fonts); app('fills', fills); app('borders', borders); app('cellXfs', xfs);
+                    return out;
+                }
+            };
+        }
+        const XNF = '#,##0';
+        function xbTheme(SB) {
+            const x = sp => SB.x(sp), z = i => i % 2 ? XC.ZEBRA : undefined;
+            const T = {
+                title: x({ font: { b: 1, sz: 15, color: XC.WHITE }, fill: XC.NAVY, border: false, al: { h: 'center' } }),
+                sub: x({ font: { i: 1, sz: 9, color: XC.GRAY }, border: false, al: { h: 'center' } }),
+                head: x({ font: { b: 1, sz: 10, color: XC.WHITE }, fill: XC.BLUE, border: 'head', al: { h: 'center', wrap: 1 } }),
+                sect: x({ font: { b: 1, sz: 11, color: XC.WHITE }, fill: XC.SLATE, border: false, al: { h: 'left' } }),
+                tot: x({ font: { b: 1, sz: 10.5, color: XC.NAVY }, fill: XC.GOLDM, border: 'total', al: { h: 'left' } }),
+                totN: x({ font: { b: 1, sz: 10.5, color: XC.NAVY }, fill: XC.GOLDM, border: 'total', nf: XNF, al: { h: 'right' } }),
+                totC: x({ font: { b: 1, sz: 10.5, color: XC.NAVY }, fill: XC.GOLDM, border: 'total', al: { h: 'center' } }),
+                lbl: x({ font: { b: 1, sz: 10 }, fill: XC.GRAYL, al: { h: 'left' } }),
+                bigN: x({ font: { b: 1, sz: 12, color: XC.NAVY }, nf: XNF, al: { h: 'right' } }),
+                big: x({ font: { b: 1, sz: 12, color: XC.NAVY }, al: { h: 'right' } }),
+                note: x({ font: { i: 1, sz: 9, color: XC.GRAY }, al: { h: 'left', wrap: 1 } }),
+                blank: x({ border: false })
+            };
+            const v = (name, sp) => [0, 1].map(i => x(Object.assign({}, sp, { fill: sp.fill || z(i) })));
+            const B = { t: v('t', { al: { h: 'left', wrap: 1 } }), c: v('c', { al: { h: 'center' } }), n: v('n', { nf: XNF, al: { h: 'right' } }), nb: v('nb', { nf: XNF, font: { b: 1, color: XC.GREEN }, al: { h: 'right' } }), tb: v('tb', { font: { b: 1 }, al: { h: 'left', wrap: 1 } }), mono: v('mono', { font: { sz: 9, color: XC.GRAY }, al: { h: 'center' } }) };
+            const tag = (bg, fg) => x({ font: { b: 1, color: fg }, fill: bg, al: { h: 'center', wrap: 1 } });
+            T.good = tag(XC.GREENL, XC.GREEN); T.warn = tag(XC.GOLDL, 'FF92400E'); T.bad = tag(XC.REDL, XC.RED); T.info = tag(XC.BLUEL, XC.BLUED); T.mute = tag(XC.GRAYL, XC.GRAY); T.purple = tag(XC.PURPLEL, XC.PURPLE);
+            T.supRow = [x({ fill: XC.GOLDL, al: { h: 'left', wrap: 1 } }), x({ fill: XC.GOLDL, nf: XNF, al: { h: 'right' } }), x({ fill: XC.GOLDL, al: { h: 'center' } })];
+            T.B = B; T.cell = (kind, i) => B[kind][i % 2];
+            T.mbody = v('mb', { font: { sz: 11 }, al: { h: 'center', wrap: 1 } }); T.mname = v('mn', { font: { b: 1, sz: 11, color: XC.NAVY }, al: { h: 'center', wrap: 1 } }); T.mnum = v('mnum', { font: { b: 1, sz: 11, color: XC.GREEN }, nf: XNF, al: { h: 'right' } });
+            return T;
+        }
+        // Định dạng ô theo tên cột (dùng cho sheet lịch sử: tạo mới và dòng cộng dồn)
+        const XB_MONEY_COLS = ['Tổng tiền (đ)', 'Đơn giá (đ)', 'Thành tiền (đ)', 'Giá bán (đ)', 'Doanh thu (đ)', 'Mục tiêu (đ)', 'Doanh số (đ)', 'Giá trị tồn (đ)', 'DT tháng (đ)'];
+        function xbHistCellStyle(T, head, val, row, i) {
+            if (row && row.__sup && head !== 'Thanh toán') return XB_MONEY_COLS.includes(head) || typeof val === 'number' ? T.supRow[1] : ['Thời gian', 'Nhân viên', 'Số ảnh', 'Có ảnh', 'Số lượng nhập', 'Người nhập', 'Loại đơn'].includes(head) ? T.supRow[2] : T.supRow[0];
+            if (head === 'Thanh toán') return val === 'Chuyển khoản' ? T.info : val === 'Tiền mặt' ? T.good : T.mute;
+            if (head === 'Loại đơn') return /bổ sung/i.test(val) ? T.warn : /sửa/i.test(val) ? T.purple : T.cell('c', i);
+            if (head === 'Tổng tiền (đ)' || head === 'Thành tiền (đ)') return T.cell('nb', i);
+            if (XB_MONEY_COLS.includes(head) || typeof val === 'number') return T.cell('n', i);
+            if (['Thời gian', 'Nhân viên', 'Số ảnh', 'Có ảnh', 'SĐT', 'Vĩ độ', 'Kinh độ', 'Người nhập', 'SĐT người nhận'].includes(head)) return T.cell('c', i);
+            if (head === 'Cửa hàng' || head === 'Sản phẩm') return T.cell('tb', i);
+            return T.cell('t', i);
+        }
+        function xbTitleRows(T, title, sub, ncol) {
+            return [{ h: 30, cells: [{ v: title, s: T.title }].concat(Array(ncol - 1).fill({ v: '', s: T.title })) }, { h: 18, cells: [{ v: sub, s: T.sub }].concat(Array(ncol - 1).fill({ v: '', s: T.sub })) }];
+        }
+        function xbSheetXml(opt) {
+            const rows = opt.rows || [], nc = Math.max(1, opt.ncol || 1);
+            const pr = (opt.tab || opt.fit) ? `<sheetPr>${opt.tab ? `<tabColor rgb="${opt.tab}"/>` : ''}${opt.fit ? '<pageSetUpPr fitToPage="1"/>' : ''}</sheetPr>` : '';
+            return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<worksheet xmlns="${XB_NS}" xmlns:r="${XB_RNS}">` + pr
+                + `<dimension ref="A1:${xbCol(nc)}${Math.max(1, rows.length)}"/>`
+                + `<sheetViews><sheetView workbookViewId="0"${opt.noGrid ? ' showGridLines="0"' : ''}>${opt.freeze ? `<pane ySplit="${opt.freeze}" topLeftCell="A${opt.freeze + 1}" activePane="bottomLeft" state="frozen"/>` : ''}</sheetView></sheetViews>`
+                + '<sheetFormatPr defaultRowHeight="16"/>'
+                + (opt.widths && opt.widths.length ? '<cols>' + opt.widths.map((w, i) => `<col min="${i + 1}" max="${i + 1}" width="${w}" customWidth="1"/>`).join('') + '</cols>' : '')
+                + '<sheetData>' + rows.map((row, i) => xbRowXml(i + 1, row)).join('') + '</sheetData>'
+                + (opt.autoFilter ? `<autoFilter ref="${opt.autoFilter}"/>` : '')
+                + (opt.merges && opt.merges.length ? `<mergeCells count="${opt.merges.length}">` + opt.merges.map(m => `<mergeCell ref="${m}"/>`).join('') + '</mergeCells>' : '')
+                + '<pageMargins left="0.4" right="0.4" top="0.5" bottom="0.5" header="0.3" footer="0.3"/>'
+                + (opt.fit ? '<pageSetup paperSize="9" orientation="landscape" fitToWidth="1" fitToHeight="0"/>' : '')
+                + (opt.drawingRid ? `<drawing r:id="${opt.drawingRid}"/>` : '')
+                + '</worksheet>';
+        }
+        // bảng chuẩn: tiêu đề + phụ đề + dòng tiêu đề cột + dữ liệu (+ dòng tổng)
+        function xbTable(T, o) {
+            const nc = o.heads.length, L = xbCol(nc);
+            const rows = xbTitleRows(T, o.title, o.sub || '', nc);
+            rows.push({ h: 30, cells: o.heads.map(v => ({ v, s: T.head })) });
+            o.data.forEach((r, i) => rows.push({ h: o.rowH, cells: o.heads.map(h => ({ v: r[h] == null ? '' : r[h], s: (o.style && o.style(h, r[h], r, i)) || xbHistCellStyle(T, h, r[h], r, i) })) }));
+            if (o.total) rows.push({ h: 22, cells: o.heads.map((h, i) => { const v = o.total[h]; return { v: v == null ? '' : v, s: i === 0 ? T.tot : typeof v === 'number' ? T.totN : T.totC }; }) });
+            return { name: o.name, rows, widths: o.widths, ncol: nc, freeze: 3, merges: [`A1:${L}1`, `A2:${L}2`], autoFilter: o.data.length ? `A3:${L}${3 + o.data.length}` : '', tab: o.tab, fit: 1 };
+        }
         function bkHistDefs(mk) {
-            const inM = h => bkInMonth(h.time, mk);
+            const inM = h => bkInMonth(h.time, mk), [y, m] = mk.split('-'), lbl = ' – THÁNG ' + m + '/' + y;
             return [
-                { name: 'Lịch sử bán hàng', key: ['Thời gian', 'Nhân viên', 'Cửa hàng'], money: 'Tổng tiền (đ)', widths: [20, 12, 26, 30, 60, 16, 16, 8],
-                  heads: ['Thời gian', 'Nhân viên', 'Cửa hàng', 'Địa chỉ', 'Chi tiết đơn hàng', 'Chiết khấu', 'Tổng tiền (đ)', 'Số ảnh'],
-                  rows: allSales().filter(inM).sort((a, b) => recTs(a) - recTs(b)).map(h => ({ 'Thời gian': h.time, 'Nhân viên': h.username, 'Cửa hàng': h.storeName, 'Địa chỉ': h.address || '', 'Chi tiết đơn hàng': h.note, 'Chiết khấu': h.discountStr || '0 đ', 'Tổng tiền (đ)': saleNet(h), 'Số ảnh': (h.photos && h.photos.length) || (h.photo ? 1 : 0) || h.photoCount || 0 })) },
-                { name: 'Lịch sử check-in', key: ['Thời gian', 'Nhân viên', 'Cửa hàng'], widths: [20, 12, 26, 14, 30, 12, 12, 30, 8],
+                { name: 'Lịch sử bán hàng', title: 'LỊCH SỬ BÁN HÀNG' + lbl, tab: XC.BLUE, key: ['Thời gian', 'Nhân viên', 'Cửa hàng'], money: 'Tổng tiền (đ)', widths: [19, 12, 24, 26, 58, 14, 14, 13, 15, 8],
+                  heads: ['Thời gian', 'Nhân viên', 'Cửa hàng', 'Địa chỉ', 'Chi tiết đơn hàng', 'Thanh toán', 'Loại đơn', 'Chiết khấu', 'Tổng tiền (đ)', 'Số ảnh'],
+                  rows: allSales().filter(inM).sort((a, b) => recTs(a) - recTs(b)).map(h => ({ 'Thời gian': h.time, 'Nhân viên': h.username, 'Cửa hàng': h.storeName, 'Địa chỉ': h.address || '', 'Chi tiết đơn hàng': h.note, 'Thanh toán': saleIsCK(h) ? 'Chuyển khoản' : 'Tiền mặt', 'Loại đơn': h.supplement ? 'Đơn bổ sung' : h.edited ? 'Đã sửa' : 'Bán tại điểm', 'Chiết khấu': h.discountStr || '0 đ', 'Tổng tiền (đ)': saleNet(h), 'Số ảnh': (h.photos && h.photos.length) || (h.photo ? 1 : 0) || h.photoCount || 0, __sup: !!h.supplement })) },
+                { name: 'Lịch sử check-in', title: 'LỊCH SỬ CHECK-IN' + lbl, tab: XC.BLUE, key: ['Thời gian', 'Nhân viên', 'Cửa hàng'], widths: [19, 12, 26, 14, 30, 12, 12, 30, 8],
                   heads: ['Thời gian', 'Nhân viên', 'Cửa hàng', 'SĐT', 'Địa chỉ', 'Vĩ độ', 'Kinh độ', 'Ghi chú', 'Có ảnh'],
                   rows: allCheckins().filter(inM).sort((a, b) => recTs(a) - recTs(b)).map(h => ({ 'Thời gian': h.time, 'Nhân viên': h.username, 'Cửa hàng': h.storeName, 'SĐT': h.phone || '', 'Địa chỉ': h.address || '', 'Vĩ độ': h.lat == null ? '' : h.lat, 'Kinh độ': h.lng == null ? '' : h.lng, 'Ghi chú': h.note || '', 'Có ảnh': (h.photo || h.photoCount) ? 'Có' : 'Không' })) },
-                { name: 'Lịch sử nhập kho', key: ['Thời gian', 'Sản phẩm', 'Số lượng nhập'], widths: [20, 46, 12, 14, 16, 12],
+                { name: 'Lịch sử nhập kho', title: 'LỊCH SỬ NHẬP KHO' + lbl, tab: XC.BLUE, key: ['Thời gian', 'Sản phẩm', 'Số lượng nhập'], widths: [19, 46, 12, 14, 16, 12],
                   heads: ['Thời gian', 'Sản phẩm', 'Số lượng nhập', 'Đơn giá (đ)', 'Thành tiền (đ)', 'Người nhập'],
                   rows: allImports().filter(inM).sort((a, b) => recTs(a) - recTs(b)).map(h => ({ 'Thời gian': h.time, 'Sản phẩm': h.productName, 'Số lượng nhập': Number(h.qty) || 0, 'Đơn giá (đ)': impUnit(h) || '', 'Thành tiền (đ)': impTotal(h) || '', 'Người nhập': h.username || '' })) },
-                { name: 'Trả hàng về kho', key: ['Thời gian', 'Người trả'], widths: [20, 16, 18, 14, 30, 50],
+                { name: 'Trả hàng về kho', title: 'TRẢ HÀNG VỀ KHO' + lbl, tab: XC.BLUE, key: ['Thời gian', 'Người trả'], widths: [19, 18, 18, 14, 30, 50],
                   heads: ['Thời gian', 'Người trả', 'Người nhận ở kho', 'SĐT người nhận', 'Ghi chú', 'Sản phẩm trả'],
                   rows: (db.returnHistory || []).filter(inM).sort((a, b) => recTs(a) - recTs(b)).map(h => ({ 'Thời gian': h.time, 'Người trả': h.byName || h.username || '', 'Người nhận ở kho': h.receiverName || '', 'SĐT người nhận': h.receiverPhone || '', 'Ghi chú': h.note || '', 'Sản phẩm trả': (h.items || []).map(i => i.name + ' x' + i.q).join('; ') })) }
             ];
         }
-        // Sheet "Thị trường" của 1 ngày (dayKey d/m/yyyy) – có ảnh cửa hàng + ảnh hóa đơn
-        async function bkMarketSpec(dayKey, S) {
+        // Sheet "Thị trường" của 1 ngày – có ảnh cửa hàng + ảnh hóa đơn
+        async function bkMarketSpec(dayKey, T) {
             const sales = allSales().filter(h => dayKeyOf(h.time) === dayKey), checks = allCheckins().filter(h => dayKeyOf(h.time) === dayKey);
             const isToday = dayKey === vnDayKey(), dayStart = parseDayKey(dayKey);
             const created = s => { const t = Number(s.id); return t > 1e12 && t >= dayStart && t < dayStart + 864e5; };
             const names = new Set(sales.map(h => h.storeName).concat(checks.map(h => h.storeName)));
             const stores = (db.stores || []).filter(s => names.has(s.name) || created(s) || (isToday && visitedToday(s)));
+            const rev = s => sales.filter(h => h.storeName === s.name).reduce((a, h) => a + saleNet(h), 0);
+            stores.sort((a, b) => rev(b) - rev(a));
             const [d, m, y] = dayKey.split('/');
             const areas = [...new Set(stores.map(s => s.district).filter(Boolean))].slice(0, 3).join(', ');
-            const heads = ['Stt', 'Tên Shop', 'Sđt', 'khu vực', 'Quy mô', 'Ngành hàng', 'Quan hệ kh', 'Doanh số', 'Ảnh shop', 'Ảnh hóa đơn', 'Lưu ý'];
-            const rows = [{ h: 42, cells: [{ v: `THỊ TRƯỜNG NGÀY ${d}/${m}/${y}${areas ? ' ( ' + areas + ' )' : ''}`, s: S.title }].concat(Array(heads.length - 1).fill({ v: '', s: S.title })) },
-                          { h: 30, cells: heads.map(v => ({ v, s: S.head })) }];
-            const imgs = []; let total = 0;
+            const heads = ['Stt', 'Tên Shop', 'Sđt', 'Khu vực', 'Quy mô', 'Ngành hàng', 'Quan hệ KH', 'Doanh số (đ)', 'Thanh toán', 'Ảnh shop', 'Ảnh hóa đơn', 'Lưu ý'], nc = heads.length;
+            const total = sales.reduce((a, h) => a + saleNet(h), 0), withO = stores.filter(s => rev(s) > 0).length;
+            const rows = xbTitleRows(T, `THỊ TRƯỜNG NGÀY ${d}/${m}/${y}${areas ? '  •  ' + areas : ''}`, `${stores.length} cửa hàng • ${withO} có đơn • ${sales.length} đơn • Doanh số ${total.toLocaleString('vi-VN')} đ • xuất lúc ${vnNowStr()}`, nc);
+            rows.push({ h: 30, cells: heads.map(v => ({ v, s: T.head })) });
+            const imgs = [];
             for (let i = 0; i < stores.length; i++) {
-                const s = stores[i], ss = sales.filter(h => h.storeName === s.name), rev = ss.reduce((a, h) => a + saleNet(h), 0); total += rev;
+                const s = stores[i], ss = sales.filter(h => h.storeName === s.name), r0 = rev(s), z = i % 2;
                 const bills = []; ss.forEach(h => { (Array.isArray(h.photos) ? h.photos : (h.photo ? [h.photo] : [])).forEach(p => { if (typeof p === 'string' && p.startsWith('data:image')) bills.push(p); }); });
                 const lost = ss.reduce((a, h) => a + ((!h.photos || !h.photos.length) && !h.photo ? (h.photoCount || 0) : 0), 0);
-                const note = [s.note || '', ss.length ? ss.length + ' đơn' : '', bills.length > 4 ? '+' + (bills.length - 4) + ' ảnh hóa đơn khác' : '', lost ? lost + ' ảnh đã xóa khỏi app' : ''].filter(Boolean).join(' • ');
-                const r = rows.length; // chỉ số dòng 0-based trong sheet
-                rows.push({ h: 85, cells: [i + 1, s.name, s.phone || '', s.district || '', s.scale || '', s.industry || '', relLabel(s.relation), rev || '', '', '', note].map((v, c) => ({ v, s: c === 7 ? S.mnum : S.mbody })) });
-                if (typeof s.storePhoto === 'string' && s.storePhoto.startsWith('data:image')) imgs.push({ dataUrl: await shrinkDataUrl(s.storePhoto, 360, 0.7), col: 8, row: r, w: 130, h: 104, xOff: 4 });
-                for (let k = 0; k < Math.min(4, bills.length); k++) imgs.push({ dataUrl: await shrinkDataUrl(bills[k], 300, 0.7), col: 9, row: r, w: 78, h: 104, xOff: 4 + k * 82 });
+                const pays = [...new Set(ss.map(h => saleIsCK(h) ? 'Chuyển khoản' : 'Tiền mặt'))].join(' + ');
+                const note = [s.note || '', ss.length ? ss.length + ' đơn' : 'Chưa có đơn', storeNoOwner(s) ? 'Chưa gặp chủ' : '', bills.length > 4 ? '+' + (bills.length - 4) + ' ảnh hóa đơn khác' : '', lost ? lost + ' ảnh đã xóa khỏi app' : ''].filter(Boolean).join(' • ');
+                const rl = relLabel(s.relation), r = rows.length;
+                rows.push({ h: 85, cells: [
+                    { v: i + 1, s: T.mbody[z] }, { v: s.name, s: T.mname[z] }, { v: s.phone || '', s: T.mbody[z] }, { v: s.district || '', s: T.mbody[z] }, { v: s.scale || '', s: T.mbody[z] }, { v: s.industry || '', s: T.mbody[z] },
+                    { v: rl, s: /cũ/i.test(rl) ? T.good : /mới/i.test(rl) ? T.info : T.mbody[z] }, { v: r0 || '', s: r0 ? T.mnum[z] : T.mbody[z] }, { v: pays || '—', s: pays === 'Chuyển khoản' ? T.info : pays === 'Tiền mặt' ? T.good : pays ? T.warn : T.mute },
+                    { v: '', s: T.mbody[z] }, { v: '', s: T.mbody[z] }, { v: note, s: storeNoOwner(s) || !ss.length ? T.warn : T.mbody[z] }] });
+                if (typeof s.storePhoto === 'string' && s.storePhoto.startsWith('data:image')) imgs.push({ dataUrl: await shrinkDataUrl(s.storePhoto, 360, 0.7), col: 9, row: r, w: 130, h: 104, xOff: 4 });
+                for (let k = 0; k < Math.min(4, bills.length); k++) imgs.push({ dataUrl: await shrinkDataUrl(bills[k], 300, 0.7), col: 10, row: r, w: 78, h: 104, xOff: 4 + k * 82 });
             }
-            if (!stores.length) rows.push({ cells: [{ v: '', s: S.mbody }, { v: 'Ngày này chưa có cửa hàng nào', s: S.mbody }] });
-            else rows.push({ h: 28, cells: ['', 'TỔNG DOANH SỐ', '', '', '', '', '', total, '', '', ''].map((v, c) => ({ v, s: c === 7 ? S.mnum : S.bold })) });
-            return { name: `Thị trường ${+d}-${+m}-${String(y).slice(2)}`, rows, imgs, widths: [6, 28, 16, 20, 12, 18, 16, 16, 20, 50, 30], merges: ['A1:K1'], ncol: heads.length };
+            if (!stores.length) rows.push({ h: 24, cells: heads.map((_, c) => ({ v: c === 1 ? 'Ngày này chưa có cửa hàng nào' : '', s: T.mute })) });
+            else rows.push({ h: 26, cells: heads.map((h, c) => ({ v: c === 1 ? 'TỔNG DOANH SỐ NGÀY' : c === 7 ? total : c === 8 ? sales.length + ' đơn' : '', s: c === 0 || c === 1 ? T.tot : c === 7 ? T.totN : T.totC })) });
+            return { name: `Thị trường ${+d}-${+m}-${String(y).slice(2)}`, rows, imgs, widths: [6, 26, 14, 18, 10, 14, 13, 16, 15, 20, 50, 30], merges: [`A1:${xbCol(nc)}1`, `A2:${xbCol(nc)}2`], ncol: nc, freeze: 3, tab: XC.GOLD, fit: 1 };
         }
-        function bkSnapshotSpecs(S, mk, counts) {
-            const tbl = (name, heads, rows, widths, nums) => ({ name, ncol: heads.length, widths, freeze: 1,
-                rows: [{ h: 24, cells: heads.map(v => ({ v, s: S.head })) }].concat(rows.map(r => ({ cells: heads.map(h => ({ v: r[h] == null ? '' : r[h], s: (nums || []).includes(h) ? S.num : S.body })) }))) });
+        function bkSnapshotSpecs(T, mk, counts) {
+            const [y, m] = mk.split('-'), inM = h => bkInMonth(h.time, mk), lbl = 'THÁNG ' + m + '/' + y, now = vnNowStr();
+            const RES = prodResolver(), sales = allSales().filter(inM), imps = allImports().filter(inM), checks = allCheckins().filter(inM);
+            const gross = sales.reduce((a, h) => a + saleGross(h), 0), net = sales.reduce((a, h) => a + saleNet(h), 0), ck = sales.filter(saleIsCK), tm = sales.filter(h => !saleIsCK(h));
+            const revS = {}, cntS = {}, lastS = {}; allSales().forEach(h => { const t = recTs(h) || 0; lastS[h.storeName] = Math.max(lastS[h.storeName] || 0, t); }); sales.forEach(h => { revS[h.storeName] = (revS[h.storeName] || 0) + saleNet(h); cntS[h.storeName] = (cntS[h.storeName] || 0) + 1; });
+            const soldP = {}; sales.forEach(h => saleItemsOf(h).forEach(i => { const p = RES(i.name), k = p ? p.name : i.name; soldP[k] = (soldP[k] || 0) + i.q; }));
+            const impP = {}, impMoney = imps.reduce((a, i) => a + impTotal(i), 0); imps.forEach(i => { const p = RES(i.productName), k = p ? p.name : i.productName; impP[k] = (impP[k] || 0) + (Number(i.qty) || 0); });
+            const mStart = isoToTs(y + '-' + m + '-01'), mEnd = isoToTs(m === '12' ? (+y + 1) + '-01-01' : y + '-' + String(+m + 1).padStart(2, '0') + '-01');
+            const stores = db.stores || [], newS = stores.filter(s => Number(s.id) > 1e12 && Number(s.id) >= mStart && Number(s.id) < mEnd);
+            const act = new Set(sales.map(h => h.storeName).concat(checks.map(h => h.storeName)).concat(newS.map(s => s.name)));
+            const actStores = stores.filter(s => act.has(s.name)), noOrder = actStores.filter(s => !revS[s.name]);
+            const prods = db.productsMaster || [], stockOf = p => dupStock(p);
+            const totStock = prods.reduce((a, p) => a + stockOf(p), 0), stockVal = prods.reduce((a, p) => a + stockOf(p) * (Number(p.price) || 0), 0);
+            const war = warrantyList().filter(w => w.receivedTs >= mStart && w.receivedTs < mEnd), retQ = (db.returnHistory || []).filter(inM).reduce((a, h) => a + (h.items || []).reduce((b, i) => b + (Number(i.q) || 0), 0), 0);
+            // ---- Tổng quan (bảng điều khiển)
+            const R = [], M = ['A1:C1', 'A2:C2'];
+            R.push(...xbTitleRows(T, 'BÁO CÁO TỔNG HỢP ' + lbl + ' – PHỤ KIỆN HOÀNG ĐẾ', 'Cập nhật lúc ' + now + ' (giờ Việt Nam) • file cộng dồn: chỉ thêm dữ liệu mới, không sửa dữ liệu cũ', 3));
+            const sect = t => { R.push({ h: 24, cells: [{ v: t, s: T.sect }, { v: '', s: T.sect }, { v: '', s: T.sect }] }); M.push(`A${R.length}:C${R.length}`); };
+            const kv = (l, v, note, st) => R.push({ h: 21, cells: [{ v: l, s: T.lbl }, { v, s: st || (typeof v === 'number' ? T.bigN : T.big) }, { v: note || '', s: T.note }] });
+            kv('Tháng của file', m + '/' + y, 'Mỗi tháng (giờ Việt Nam) dùng một file riêng');
+            sect('💰 DOANH THU');
+            kv('Doanh thu Gross (đ)', gross); kv('Doanh thu Net (đ)', net, 'Sau chiết khấu', T.x_net); kv('Tổng chiết khấu (đ)', gross - net);
+            kv('Tổng số đơn', sales.length, sales.filter(h => h.supplement).length + ' đơn bổ sung • ' + sales.filter(h => h.edited).length + ' đơn đã sửa');
+            kv('Đơn chuyển khoản', ck.length, ck.reduce((a, h) => a + saleNet(h), 0).toLocaleString('vi-VN') + ' đ', T.info); kv('Đơn tiền mặt', tm.length, tm.reduce((a, h) => a + saleNet(h), 0).toLocaleString('vi-VN') + ' đ', T.good);
+            sect('🏪 KHÁCH HÀNG');
+            kv('Tổng số cửa hàng', stores.length); kv('Cửa hàng mới trong tháng', newS.length, '', T.info); kv('Cửa hàng đã phát sinh đơn', Object.keys(revS).length, '', T.good);
+            kv('Cửa hàng chưa lấy hàng (trong tháng)', noOrder.length, 'Đã ghé / tạo mới nhưng chưa có đơn', noOrder.length ? T.warn : T.good); kv('Cửa hàng chưa gặp chủ', stores.filter(storeNoOwner).length, '', T.bad); kv('Lượt check-in', checks.length);
+            sect('📦 KHO HÀNG');
+            kv('Số sản phẩm', prods.length); kv('Tổng tồn kho (cái)', totStock); kv('Giá trị tồn theo giá bán (đ)', stockVal);
+            kv('Sản phẩm hết hàng', prods.filter(p => stockOf(p) <= 0).length, '', T.bad); kv('Sản phẩm sắp hết (1–5 cái)', prods.filter(p => stockOf(p) > 0 && stockOf(p) <= 5).length, '', T.warn);
+            kv('Nhập kho trong tháng (cái)', imps.reduce((a, i) => a + (Number(i.qty) || 0), 0), impMoney ? impMoney.toLocaleString('vi-VN') + ' đ' : ''); kv('Bán ra trong tháng (cái)', Object.values(soldP).reduce((a, v) => a + v, 0)); kv('Trả về kho trong tháng (cái)', retQ);
+            sect('🛠 BẢO HÀNH');
+            kv('Nhận bảo hành trong tháng (cái)', war.reduce((a, w) => a + (Number(w.qty) || 0), 0)); kv('Phiếu đang giữ chưa trả', warrantyList().filter(w => w.status !== 'returned').length, warrantyList().filter(w => wState(w) === 'over').length + ' phiếu quá hạn', warrantyList().some(w => wState(w) === 'over') ? T.bad : T.good);
+            sect('🏆 TOP 5 CỬA HÀNG DOANH THU CAO NHẤT');
+            Object.keys(revS).sort((a, b) => revS[b] - revS[a]).slice(0, 5).forEach((n, i) => kv((i + 1) + '. ' + n, revS[n], cntS[n] + ' đơn', T.B.nb[0]));
+            sect('🔥 TOP 5 SẢN PHẨM BÁN CHẠY');
+            const tq = Object.values(soldP).reduce((a, v) => a + v, 0) || 1;
+            Object.keys(soldP).sort((a, b) => soldP[b] - soldP[a]).slice(0, 5).forEach((n, i) => kv((i + 1) + '. ' + n, soldP[n], (soldP[n] / tq * 100).toFixed(1) + '% tổng số lượng bán', T.B.nb[0]));
+            const ov = { name: 'Tổng quan', rows: R, widths: [42, 22, 44], ncol: 3, merges: M, tab: XC.NAVY, fit: 1, noGrid: 1 };
+            // ---- Cửa hàng
+            const relSt = v => /cũ/i.test(v) ? T.good : /mới/i.test(v) ? T.info : null;
+            const shopRows = stores.slice().sort((a, b) => ((revS[b.name] || 0) - (revS[a.name] || 0)) || a.name.localeCompare(b.name, 'vi')).map((s, i) => ({ 'STT': i + 1, 'Tên cửa hàng': s.name, 'Chủ shop': s.owner || '', 'SĐT': s.phone || '', 'Tỉnh/TP': s.city || '', 'Quận/Huyện': s.district || '', 'Địa chỉ': s.address || '', 'Quy mô': s.scale || '', 'Ngành hàng': s.industry || '', 'Tình trạng KH': relLabel(s.relation), 'Quan tâm': (s.interests || []).join(', '), 'Gặp chủ': storeNoOwner(s) ? 'Chưa gặp' : 'Đã gặp', 'DT tháng (đ)': revS[s.name] || 0, 'Đơn tháng': cntS[s.name] || 0, 'Mua gần nhất': lastS[s.name] ? tsToVN(lastS[s.name]) : '', 'Ảnh shop': s.storePhoto ? 'Có' : 'Không', 'Vĩ độ': s.lat == null ? '' : s.lat, 'Kinh độ': s.lng == null ? '' : s.lng }));
+            const shop = xbTable(T, { name: 'Cửa hàng', tab: XC.GREEN, title: 'DANH SÁCH CỬA HÀNG – ' + lbl, sub: stores.length + ' cửa hàng • ' + Object.keys(revS).length + ' có đơn trong tháng • sắp xếp theo doanh thu tháng • cập nhật ' + now,
+                heads: Object.keys(shopRows[0] || { 'STT': 0, 'Tên cửa hàng': '', 'Chủ shop': '', 'SĐT': '', 'Tỉnh/TP': '', 'Quận/Huyện': '', 'Địa chỉ': '', 'Quy mô': '', 'Ngành hàng': '', 'Tình trạng KH': '', 'Quan tâm': '', 'Gặp chủ': '', 'DT tháng (đ)': 0, 'Đơn tháng': 0, 'Mua gần nhất': '', 'Ảnh shop': '', 'Vĩ độ': '', 'Kinh độ': '' }),
+                widths: [6, 26, 16, 13, 14, 16, 26, 9, 12, 13, 24, 11, 15, 9, 13, 9, 11, 11], data: shopRows,
+                style: (h, v, r, i) => h === 'STT' || h === 'Quy mô' || h === 'Ảnh shop' || h === 'Đơn tháng' || h === 'Mua gần nhất' ? T.cell('c', i) : h === 'Tình trạng KH' ? (relSt(v) || T.cell('c', i)) : h === 'Gặp chủ' ? (v === 'Chưa gặp' ? T.bad : T.good) : h === 'DT tháng (đ)' ? (v ? T.cell('nb', i) : T.cell('n', i)) : h === 'Vĩ độ' || h === 'Kinh độ' ? T.cell('mono', i) : null,
+                total: { 'STT': 'TỔNG', 'Tên cửa hàng': stores.length + ' cửa hàng', 'DT tháng (đ)': net, 'Đơn tháng': sales.length } });
+            // ---- Sản phẩm & tồn kho
+            const pr = prods.slice().sort((a, b) => prodCat(a).localeCompare(prodCat(b), 'vi') || a.name.localeCompare(b.name, 'vi')).map((p, i) => { const st = stockOf(p); return { 'STT': i + 1, 'Phân loại': prodCat(p), 'Tên sản phẩm': p.name, 'Mã SP': String(prodCode(p) || ''), 'Giá bán (đ)': Number(p.price) || 0, 'VAT': p.vat ? 'Có' : '', 'Tồn kho': st, 'Giá trị tồn (đ)': st * (Number(p.price) || 0), 'Nhập tháng': impP[p.name] || 0, 'Bán tháng': soldP[p.name] || 0, 'Trạng thái': st <= 0 ? 'Hết hàng' : st <= 5 ? 'Sắp hết' : 'Còn hàng' }; });
+            const prod = xbTable(T, { name: 'Sản phẩm & Tồn kho', tab: XC.GREEN, title: 'SẢN PHẨM & TỒN KHO – cập nhật ' + now, sub: prods.length + ' sản phẩm • tồn ' + totStock + ' cái • ' + pr.filter(r => r['Trạng thái'] === 'Hết hàng').length + ' hết hàng • ' + pr.filter(r => r['Trạng thái'] === 'Sắp hết').length + ' sắp hết',
+                heads: ['STT', 'Phân loại', 'Tên sản phẩm', 'Mã SP', 'Giá bán (đ)', 'VAT', 'Tồn kho', 'Giá trị tồn (đ)', 'Nhập tháng', 'Bán tháng', 'Trạng thái'], widths: [6, 16, 46, 10, 14, 6, 10, 16, 11, 11, 12], data: pr,
+                style: (h, v, r, i) => h === 'Trạng thái' ? (v === 'Hết hàng' ? T.bad : v === 'Sắp hết' ? T.warn : T.good) : h === 'Tồn kho' ? (v <= 0 ? T.bad : v <= 5 ? T.warn : T.cell('nb', i)) : h === 'VAT' ? (v ? T.info : T.cell('c', i)) : h === 'STT' || h === 'Mã SP' || h === 'Phân loại' ? T.cell('c', i) : h === 'Tên sản phẩm' ? T.cell('tb', i) : null,
+                total: { 'STT': 'TỔNG', 'Tên sản phẩm': prods.length + ' sản phẩm', 'Tồn kho': totStock, 'Giá trị tồn (đ)': stockVal, 'Nhập tháng': pr.reduce((a, r) => a + r['Nhập tháng'], 0), 'Bán tháng': pr.reduce((a, r) => a + r['Bán tháng'], 0) } });
+            // ---- KPI
             const kmk = kpiNowKey(), sv = [kpiCity, kpiDistrict]; kpiCity = 'all'; kpiDistrict = 'all'; const kr = kpiRows(kmk); [kpiCity, kpiDistrict] = sv;
-            const [y, m] = mk.split('-');
-            return [
-                tbl('Tổng quan', ['Mục', 'Giá trị'], [
-                    { 'Mục': 'Tháng của file', 'Giá trị': m + '/' + y },
-                    { 'Mục': 'Thời điểm sao lưu (giờ VN)', 'Giá trị': vnNowStr() },
-                    { 'Mục': 'Số đơn hàng trong file', 'Giá trị': counts.sales },
-                    { 'Mục': 'Tổng doanh thu trong file (đ)', 'Giá trị': counts.money },
-                    { 'Mục': 'Số lượt check-in trong file', 'Giá trị': counts.checkins },
-                    { 'Mục': 'Số cửa hàng hiện tại', 'Giá trị': (db.stores || []).length },
-                    { 'Mục': 'Số sản phẩm hiện tại', 'Giá trị': (db.productsMaster || []).length }
-                ], [34, 26], ['Giá trị']),
-                tbl('Cửa hàng', ['Tên cửa hàng', 'Chủ shop', 'SĐT', 'Tỉnh/TP', 'Quận/Huyện', 'Địa chỉ', 'Quy mô', 'Ngành hàng', 'Tình trạng KH', 'Quan tâm', 'Vĩ độ', 'Kinh độ', 'Có ảnh shop'],
-                    (db.stores || []).map(s => ({ 'Tên cửa hàng': s.name, 'Chủ shop': s.owner || '', 'SĐT': s.phone || '', 'Tỉnh/TP': s.city || '', 'Quận/Huyện': s.district || '', 'Địa chỉ': s.address || '', 'Quy mô': s.scale || '', 'Ngành hàng': s.industry || '', 'Tình trạng KH': s.relation || '', 'Quan tâm': (s.interests || []).join(', '), 'Vĩ độ': s.lat == null ? '' : s.lat, 'Kinh độ': s.lng == null ? '' : s.lng, 'Có ảnh shop': s.storePhoto ? 'Có' : 'Không' })),
-                    [28, 18, 14, 14, 16, 30, 8, 14, 12, 26, 11, 11, 10]),
-                tbl('Sản phẩm & Tồn kho', ['Phân loại', 'Tên sản phẩm', 'Mã SP', 'Giá bán (đ)', 'VAT', 'Tồn kho'],
-                    (db.productsMaster || []).map(p => ({ 'Phân loại': p.category || '', 'Tên sản phẩm': p.name, 'Mã SP': String(prodCode(p) || ''), 'Giá bán (đ)': Number(p.price) || 0, 'VAT': p.vat ? 'Có' : '', 'Tồn kho': dupStock(p) })),
-                    [16, 50, 12, 14, 6, 10], ['Giá bán (đ)', 'Tồn kho']),
-                tbl('KPI ' + kpiLabel(kmk).replace('/', '-'), ['STT', 'Khách hàng', 'Ngành & Quy mô', 'Khu vực', 'Đơn/tháng', 'Doanh thu (đ)', 'Δ Lượt mua', 'Δ Doanh thu', 'Mục tiêu (đ)', 'Đánh giá'],
-                    kr.map((r, i) => ({ 'STT': i + 1, 'Khách hàng': r.s.name, 'Ngành & Quy mô': kpiTrade(r.s), 'Khu vực': kpiArea(r.s), 'Đơn/tháng': r.cur.c, 'Doanh thu (đ)': r.cur.n, 'Δ Lượt mua': r.dOrd.t, 'Δ Doanh thu': r.dRev.t, 'Mục tiêu (đ)': r.target || '', 'Đánh giá': r.status })),
-                    [6, 28, 20, 30, 10, 16, 12, 12, 16, 16], ['Doanh thu (đ)', 'Mục tiêu (đ)'])
-            ];
+            const dSt = v => /tăng/i.test(v) ? T.good : /giảm/i.test(v) ? T.bad : /mới/i.test(v) ? T.info : null;
+            const kpi = xbTable(T, { name: 'KPI ' + kpiLabel(kmk).replace('/', '-'), tab: XC.PURPLE, title: 'KPI KHÁCH HÀNG ' + kpiLabel(kmk), sub: kr.length + ' khách • so sánh với tháng trước • cập nhật ' + now,
+                heads: ['STT', 'Khách hàng', 'Ngành & Quy mô', 'Khu vực', 'Đơn/tháng', 'Doanh thu (đ)', 'Δ Lượt mua', 'Δ Doanh thu', 'Mục tiêu (đ)', 'Đánh giá'], widths: [6, 28, 20, 30, 10, 16, 13, 13, 15, 18],
+                data: kr.map((r, i) => ({ 'STT': i + 1, 'Khách hàng': r.s.name, 'Ngành & Quy mô': kpiTrade(r.s), 'Khu vực': kpiArea(r.s), 'Đơn/tháng': r.cur.c, 'Doanh thu (đ)': r.cur.n, 'Δ Lượt mua': r.dOrd.t, 'Δ Doanh thu': r.dRev.t, 'Mục tiêu (đ)': r.target || '', 'Đánh giá': r.status })),
+                style: (h, v, r, i) => h === 'Đánh giá' ? (/không đạt|chưa đạt/i.test(v) ? T.bad : /đạt/i.test(v) ? T.good : T.mute) : (h === 'Δ Lượt mua' || h === 'Δ Doanh thu') ? (dSt(v) || T.cell('c', i)) : h === 'STT' || h === 'Đơn/tháng' ? T.cell('c', i) : h === 'Khách hàng' ? T.cell('tb', i) : h === 'Doanh thu (đ)' ? (v ? T.cell('nb', i) : T.cell('n', i)) : null,
+                total: { 'STT': 'TỔNG', 'Khách hàng': kr.length + ' khách', 'Đơn/tháng': kr.reduce((a, r) => a + (r.cur.c || 0), 0), 'Doanh thu (đ)': kr.reduce((a, r) => a + (r.cur.n || 0), 0) } });
+            return [ov, shop, prod, kpi];
         }
         async function buildBackup(existingBuf, opts) {
             if (typeof JSZip === 'undefined') throw new Error('Chưa tải được thư viện nén (JSZip). Hãy kiểm tra mạng rồi thử lại.');
@@ -7098,8 +7367,7 @@
             } else zip = xbSkeleton();
             const B = await xbBook(zip);
             if (existingBuf && !B.sheets.some(s => s.name === 'Lịch sử bán hàng')) throw new Error('File này không phải file sao lưu của app (thiếu sheet "Lịch sử bán hàng").');
-            const stF = await zip.file('xl/styles.xml').async('string'), ST = xbStylesAppend(stF), S = ST.S;
-            zip.file('xl/styles.xml', ST.xml);
+            const stF = await zip.file('xl/styles.xml').async('string'), SB = xbStyleBuilder(stF), T = xbTheme(SB);
             const ct = [];
             if (existingBuf && !opts.force) {
                 const ov = B.sheets.find(s => s.name === 'Tổng quan');
@@ -7112,8 +7380,9 @@
             for (const def of bkHistDefs(mk)) {
                 const sh = B.sheets.find(s => s.name === def.name);
                 if (!sh) {
-                    const rows = [{ h: 24, cells: def.heads.map(v => ({ v, s: S.head })) }].concat(def.rows.map(r => ({ values: def.heads.map(h => r[h] == null ? '' : r[h]) })));
-                    await xbAddSheet(zip, B, def.name, xbSheetXml({ rows, widths: def.widths, freeze: 1, ncol: def.heads.length }), ct);
+                    const tb = xbTable(T, { name: def.name, tab: def.tab, title: def.title, sub: 'Cộng dồn theo ngày: dữ liệu mới được thêm xuống cuối bảng • tạo lúc ' + vnNowStr(), heads: def.heads, widths: def.widths, data: def.rows });
+                    tb.autoFilter = `A3:${xbCol(def.heads.length)}3`;   // lọc theo dòng tiêu đề, áp dụng cho cả dòng thêm sau này
+                    await xbAddSheet(zip, B, def.name, xbSheetXml(tb), ct);
                     if (def.name === 'Lịch sử bán hàng') { counts.sales = def.rows.length; counts.money = def.rows.reduce((a, r) => a + (Number(r[def.money]) || 0), 0); counts.added.sales = def.rows.length; }
                     if (def.name === 'Lịch sử check-in') { counts.checkins = def.rows.length; counts.added.checkins = def.rows.length; }
                     if (def.name === 'Lịch sử nhập kho') counts.added.imports = def.rows.length;
@@ -7121,15 +7390,23 @@
                     continue;
                 }
                 let xml = await zip.file(sh.path).async('string');
-                const old = xbReadRows(xml, B.sst), hdr = (old.find(r => r.r === 1) || { vals: {} }).vals;
+                const old = xbReadRows(xml, B.sst), hdrRow = old.find(r => r.r <= 5 && Object.values(r.vals).some(v => String(v).trim() === 'Thời gian')) || { r: 1, vals: {} }, hdr = hdrRow.vals;
                 const colOf = {}; Object.keys(hdr).forEach(c => { colOf[String(hdr[c]).trim()] = c; });
-                const data = old.filter(r => r.r > 1 && !Object.values(r.vals).some(v => v === 'Không có dữ liệu'));
+                const data = old.filter(r => r.r > hdrRow.r && !Object.values(r.vals).some(v => v === 'Không có dữ liệu'));
                 const keyCols = def.key.map(k => colOf[k]);
                 const seen = new Set(data.map(r => bkSaleKey(...keyCols.map(c => c ? r.vals[c] : ''))));
                 const fresh = def.rows.filter(r => !seen.has(bkSaleKey(...def.key.map(k => r[k]))));
                 let last = old.reduce((a, r) => Math.max(a, r.r), 1);
-                const maxCol = Object.keys(colOf).reduce((a, k) => Math.max(a, xbColNum(colOf[k])), 1);
-                const add = fresh.map(r => { last++; const cells = Array.from({ length: maxCol }, () => ({ v: '' })); def.heads.forEach(h => { if (colOf[h]) cells[xbColNum(colOf[h]) - 1] = { v: r[h] == null ? '' : r[h] }; }); return xbRowXml(last, { cells }); }).join('');
+                let maxCol = Object.keys(colOf).reduce((a, k) => Math.max(a, xbColNum(colOf[k])), 1);
+                { // cột mới (VD "Thanh toán", "Loại đơn") chưa có trong file cũ: chỉ THÊM ô tiêu đề vào cuối dòng tiêu đề, không sửa ô cũ
+                    const miss = def.heads.filter(h => !colOf[h]);
+                    const hre = new RegExp('(<row\\b[^>]*\\br="' + hdrRow.r + '"[^>]*>)([\\s\\S]*?)(</row>)');
+                    if (miss.length && hdrRow.r && hre.test(xml)) {
+                        const addH = miss.map(h => { maxCol++; colOf[h] = xbCol(maxCol); return xbCell(xbCol(maxCol) + hdrRow.r, h, T.head); }).join('');
+                        xml = xml.replace(hre, (m0, a1, a2, a3) => a1 + a2 + addH + a3);
+                    }
+                }
+                const add = fresh.map(r => { last++; const z = last; const cells = Array.from({ length: maxCol }, () => ({ v: '', s: T.cell('t', z) })); def.heads.forEach(h => { if (colOf[h]) { const v = r[h] == null ? '' : r[h]; cells[xbColNum(colOf[h]) - 1] = { v, s: xbHistCellStyle(T, h, v, r, z) }; } }); return xbRowXml(last, { cells }); }).join('');
                 if (add) {
                     xml = /<sheetData\s*\/>/.test(xml) ? xml.replace(/<sheetData\s*\/>/, '<sheetData>' + add + '</sheetData>') : xml.replace('</sheetData>', add + '</sheetData>');
                     xml = xml.replace(/<dimension ref="([A-Z]+\d+):([A-Z]+)\d+"\s*\/>/, (m0, a, c) => `<dimension ref="${a}:${c}${last}"/>`);
@@ -7142,8 +7419,8 @@
                 if (def.name === 'Trả hàng về kho') counts.added.returns = fresh.length;
             }
             // 2) Sheet trạng thái hiện tại: thay bằng số liệu mới nhất (KHÔNG đụng sheet lịch sử / thị trường)
-            for (const sp of bkSnapshotSpecs(S, mk, counts)) {
-                const xml = xbSheetXml({ rows: sp.rows, widths: sp.widths, freeze: sp.freeze, ncol: sp.ncol });
+            for (const sp of bkSnapshotSpecs(T, mk, counts)) {
+                const xml = xbSheetXml(sp);
                 const sh = B.sheets.find(s => s.name === sp.name);
                 if (sh) zip.file(sh.path, xml); else await xbAddSheet(zip, B, sp.name, xml, ct);
             }
@@ -7156,16 +7433,16 @@
                 const [d, m, y] = dk.split('/'), nm = `Thị trường ${+d}-${+m}-${String(y).slice(2)}`;
                 const ex = B.sheets.find(s => s.name === nm);
                 if (ex && dk !== today) continue;              // ngày cũ đã có: giữ nguyên tuyệt đối
-                const sp = await bkMarketSpec(dk, S);
+                const sp = await bkMarketSpec(dk, T);
                 if (ex) { // làm mới sheet hôm nay: thay nội dung + ảnh của riêng sheet này
                     const rp = xbRelsPath(ex.path), rf = zip.file(rp);
                     if (rf) { const rx = await rf.async('string'); (rx.match(/Target="([^"]*hd_drawing\d+\.xml)"/g) || []).forEach(t => { const dp = xbPathJoin(ex.path, t.slice(8, -1)); const drp = xbRelsPath(dp); zip.remove(dp); zip.remove(drp); }); zip.remove(rp); }
                     const rid = await xbAttachImages(zip, ex.path, sp.imgs, ct, 'tt' + (+d) + '_' + (+m));
-                    zip.file(ex.path, xbSheetXml({ rows: sp.rows, widths: sp.widths, merges: sp.merges, ncol: sp.ncol, drawingRid: rid }));
+                    zip.file(ex.path, xbSheetXml(Object.assign({}, sp, { drawingRid: rid })));
                 } else {
                     const sh = await xbAddSheet(zip, B, sp.name, '', ct);
                     const rid = await xbAttachImages(zip, sh.path, sp.imgs, ct, 'tt' + (+d) + '_' + (+m));
-                    zip.file(sh.path, xbSheetXml({ rows: sp.rows, widths: sp.widths, merges: sp.merges, ncol: sp.ncol, drawingRid: rid }));
+                    zip.file(sh.path, xbSheetXml(Object.assign({}, sp, { drawingRid: rid })));
                     mAdded++;
                 }
             }
@@ -7177,6 +7454,7 @@
             // bỏ khai báo của bản vẽ đã xóa (sheet hôm nay làm mới)
             (ctXml.match(/<Override PartName="\/xl\/drawings\/hd_drawing\d+\.xml"[^>]*\/>/g) || []).forEach(o => { const pn = /PartName="\/([^"]+)"/.exec(o)[1]; if (!zip.file(pn)) ctXml = ctXml.replace(o, ''); });
             zip.file('[Content_Types].xml', ctXml);
+            zip.file('xl/styles.xml', SB.finish());
             zip.file('xl/workbook.xml', B.wbXml);
             zip.file('xl/_rels/workbook.xml.rels', B.relsXml);
             const blob = await zip.generateAsync({ type: 'blob', mimeType: XLSX_MIME, compression: 'DEFLATE', compressionOptions: { level: 6 } });
