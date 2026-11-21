@@ -816,6 +816,15 @@
 
         let lastSyncError = '', cloudState = 'loading', cloudOk = false, cloudVersion = 0, pushTimer = null, pushing = false, pendingPush = false, pulling = false, lastSyncText = '';
         const isCloudConfigured = () => !!CLOUD_API_URL && !CLOUD_API_URL.includes('DÁN_LINK');
+        // ===== Bản 66: mã kết nối máy chủ (lưu trên từng máy, không nằm trong code) =====
+        const cloudKey = () => { try { return localStorage.getItem('hoangde_cloud_key') || ''; } catch (e) { return ''; } };
+        function askCloudKey(msg) {
+            const k = prompt((msg ? msg + '\n\n' : '') + 'Nhập MÃ KẾT NỐI máy chủ (Admin lấy trong Google Apps Script, hàm taoMaKetNoi):', cloudKey());
+            if (k === null) return false;
+            try { localStorage.setItem('hoangde_cloud_key', k.trim().toUpperCase()); } catch (e) {}
+            return true;
+        }
+        function changeCloudKey() { if (askCloudKey()) { cloudOk = false; pullCloud('init'); } }
         const isDirty = () => { try { return localStorage.getItem('hoangde_dirty') === '1'; } catch (e) { return false; } };
         const setDirty = v => { try { v ? localStorage.setItem('hoangde_dirty', '1') : localStorage.removeItem('hoangde_dirty'); } catch (e) {} };
 
@@ -988,6 +997,7 @@
 
         function describeSyncError(e) {
             const m = String((e && e.message) || e || '');
+            if (e && e.auth) return (e.serverMsg || 'Sai hoặc thiếu mã kết nối.') + ' Vào Cài đặt → Đồng bộ → "Nhập / đổi mã kết nối".';
             if (/JSON|Unexpected token|DOCTYPE|<html/i.test(m)) return 'Link trả về một trang web thay vì dữ liệu. Thường do script chưa chọn quyền "Bất kỳ ai" (Anyone) hoặc chưa Triển khai phiên bản mới.';
             if (/Failed to fetch|Load failed|NetworkError|network/i.test(m)) return 'Không kết nối được tới link Google Script. Có thể: link trong CLOUD_API_URL bị sai, điện thoại mất mạng, hoặc quyền script chưa là "Bất kỳ ai".';
             return m || 'Lỗi không rõ';
@@ -1016,8 +1026,10 @@
 
         async function fetchCloud(versionOnly) {
             const sep = CLOUD_API_URL.includes('?') ? '&' : '?';
-            const res = await fetch(CLOUD_API_URL + sep + (versionOnly ? 'action=version&' : '') + 't=' + Date.now(), { redirect: 'follow' });
-            return await res.json();
+            const res = await fetch(CLOUD_API_URL + sep + (versionOnly ? 'action=version&' : '') + 'key=' + encodeURIComponent(cloudKey()) + '&t=' + Date.now(), { redirect: 'follow' });
+            const data = await res.json();
+            if (data && data.reason === 'auth') { const er = new Error('AUTH'); er.auth = true; er.serverMsg = data.message; throw er; }
+            return data;
         }
         function applyFromCloud(data) {
             db.users = data.users;
@@ -1073,6 +1085,12 @@
             } catch (e) {
                 console.warn('Không tải được cloud', e);
                 cloudState = 'error'; lastSyncError = describeSyncError(e);
+                if (e && e.auth && mode === 'init') {   // Bản 66: hỏi mã kết nối, bấm Hủy thì dừng
+                    pulling = false; updateSyncBadge();
+                    if (askCloudKey(e.serverMsg || 'Sai hoặc thiếu mã kết nối.')) { cloudOk = false; return pullCloud('init'); }
+                    if (!getCurrentUser()) render();
+                    return;
+                }
             }
             pulling = false;
             updateSyncBadge();
@@ -1087,7 +1105,7 @@
             updateSyncBadge();
         }
 
-        async function pushCloud() {
+        async function pushCloud(force) {
             if (!isCloudConfigured() || !cloudOk) return;
             if (pushing) { pendingPush = true; return; }
             pushing = true; updateSyncBadge();
@@ -1095,7 +1113,7 @@
                 const res = await fetch(CLOUD_API_URL, {
                     method: 'POST', redirect: 'follow',
                     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                    body: JSON.stringify({ type: 'sync_all', baseVersion: cloudVersion, data: db })
+                    body: JSON.stringify({ type: 'sync_all', key: cloudKey(), force: !!force, baseVersion: cloudVersion, data: db })
                 });
                 const r = await res.json();
                 if (r && r.ok) {
@@ -1111,6 +1129,14 @@
                         alert('Dữ liệu trên cloud đã được cập nhật từ thiết bị khác, app vừa tải bản mới nhất về.\nNếu thao tác bạn vừa làm bị mất, hãy làm lại giúp mình nhé.');
                         pushing = false; safeRender(); return;
                     }
+                } else if (r && r.reason === 'auth') {
+                    cloudState = 'error'; lastSyncError = describeSyncError({ auth: true, serverMsg: r.message });
+                } else if (r && r.reason === 'guard') {   // Bản 66: máy chủ chặn vì dữ liệu giảm bất thường
+                    cloudState = 'error'; lastSyncError = r.message;
+                    if (!force && /giảm/.test(r.message || '') && isAdminU() && confirm(r.message + '\n\nNếu bạn (Admin) CỐ Ý xóa nhiều dữ liệu, bấm OK để vẫn lưu lên cloud.\nBấm Hủy để dừng lại: dữ liệu trên máy này vẫn giữ nguyên, chưa ghi lên cloud.')) {
+                        pushing = false; return pushCloud(true);
+                    }
+                    if (!force) alert(r.message + '\n\nDữ liệu trên máy này CHƯA được lưu lên cloud. Hãy báo Admin kiểm tra trước khi thao tác tiếp.');
                 } else { cloudState = 'error'; lastSyncError = 'Máy chủ báo lỗi: ' + ((r && (r.message || r.reason)) || 'không rõ'); }
             } catch (e) { console.warn('Lỗi đẩy cloud', e); cloudState = 'error'; lastSyncError = describeSyncError(e); }
             pushing = false;
@@ -1363,7 +1389,7 @@
                         </div>
                         <div>
                             <h1 class="font-black text-xs sm:text-sm uppercase tracking-wider">PHỤ KIỆN HOÀNG ĐẾ</h1>
-                            <p class="text-[11px] sm:text-xs opacity-75">Nhân sự: <span class="font-bold text-amber-500">${user.fullname}</span> (${isPcMode() ? 'Chế độ PC' : 'Chế độ Mobile'} • Bản 65)</p>
+                            <p class="text-[11px] sm:text-xs opacity-75">Nhân sự: <span class="font-bold text-amber-500">${user.fullname}</span> (${isPcMode() ? 'Chế độ PC' : 'Chế độ Mobile'} • Bản 66)</p>
                         </div>
                     </div>
                     <div class="flex space-x-2 w-full sm:w-auto justify-end">
@@ -3755,8 +3781,9 @@
         const actSeenTs = () => { try { return Number(localStorage.getItem('hoangde_act_seen')) || 0; } catch (e) { return 0; } };
         function actVisible() { const u = getCurrentUser(); if (!u) return []; const L = db.activityLog || []; return u.role === 'admin' ? L : L.filter(e => e.owner === u.username || e.by === u.username); }
         // ===== Bản 55: Chuông thông báo, Bảo hành, Báo cáo theo khoảng ngày, Bảng trả kho =====
-        const APP_VER = 65;
+        const APP_VER = 66;
         const APP_NOTES = {
+            66: ['Bảo mật đồng bộ: máy chủ yêu cầu MÃ KẾT NỐI (nhập 1 lần trên mỗi máy, ở Cài đặt → Đồng bộ)', 'Máy chủ chặn ghi khi dữ liệu gửi lên rỗng hoặc giảm bất thường; Admin xác nhận mới cho lưu', 'Máy chủ sao lưu thêm mỗi giờ, giữ 24 giờ gần nhất'],
             65: ['Chuông thông báo hiện MỌI thay đổi: bán đơn, sửa / xóa hóa đơn, đơn bổ sung, nhận / trả bảo hành, nhập kho, trả kho, đổi tên / giá sản phẩm, gộp / xóa sản phẩm, cửa hàng mới, duyệt yêu cầu…', 'Đồng bộ đủ bảo hành, nhật ký, yêu cầu duyệt giữa điện thoại và máy tính'],
             64: ['Bảo hành chia 2 mục: Nhận hàng / Trả hàng (trả có trừ tồn kho), phiếu trả bảo hành JPG'],
             63: ['Phiếu yêu cầu bảo hành JPG có chụp ảnh, chia sẻ Zalo; thẻ Báo cáo đưa lên trên KPI'],
@@ -4775,6 +4802,7 @@
                         <p class="text-xs opacity-75">Mọi thay đổi (khách hàng, sản phẩm, tọa độ, kho, lịch sử) tự lưu lên cloud. Đăng nhập thiết bị khác sẽ thấy đúng dữ liệu lần cuối.</p>
                         <p id="sync-status-text" class="text-xs font-semibold"></p>
                         <button onclick="syncNow()" class="w-full py-3 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl text-xs transition shadow"><i class="fa-solid fa-rotate mr-1"></i> Đồng bộ ngay</button>
+                        <button onclick="changeCloudKey()" class="w-full py-3 bg-slate-600 hover:bg-slate-700 text-white font-bold rounded-xl text-xs transition shadow"><i class="fa-solid fa-key mr-1"></i> Nhập / đổi mã kết nối${cloudKey() ? '' : ' (chưa có)'}</button>
                     </div>
 
                     <!-- CÀI ĐẶT CHẾ ĐỘ THIẾT BỊ (MOBILE / PC) -->
