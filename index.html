@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>PHỤ KIỆN HOÀNG ĐẾ - Quản lý Thị trường & Sales</title>
     <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.tailwindcss.com/3.4.17"></script>
     <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- html2canvas để xuất ảnh JPG -->
@@ -1389,7 +1389,7 @@
                         </div>
                         <div>
                             <h1 class="font-black text-xs sm:text-sm uppercase tracking-wider">PHỤ KIỆN HOÀNG ĐẾ</h1>
-                            <p class="text-[11px] sm:text-xs opacity-75">Nhân sự: <span class="font-bold text-amber-500">${user.fullname}</span> (${isPcMode() ? 'Chế độ PC' : 'Chế độ Mobile'} • Bản 66)</p>
+                            <p class="text-[11px] sm:text-xs opacity-75">Nhân sự: <span class="font-bold text-amber-500">${user.fullname}</span> (${isPcMode() ? 'Chế độ PC' : 'Chế độ Mobile'} • Bản 67)</p>
                         </div>
                     </div>
                     <div class="flex space-x-2 w-full sm:w-auto justify-end">
@@ -3781,8 +3781,9 @@
         const actSeenTs = () => { try { return Number(localStorage.getItem('hoangde_act_seen')) || 0; } catch (e) { return 0; } };
         function actVisible() { const u = getCurrentUser(); if (!u) return []; const L = db.activityLog || []; return u.role === 'admin' ? L : L.filter(e => e.owner === u.username || e.by === u.username); }
         // ===== Bản 55: Chuông thông báo, Bảo hành, Báo cáo theo khoảng ngày, Bảng trả kho =====
-        const APP_VER = 66;
+        const APP_VER = 67;
         const APP_NOTES = {
+            67: ['Ghim thư viện giao diện Tailwind 3.4.17 để giao diện ổn định'],
             66: ['Bảo mật đồng bộ: máy chủ yêu cầu MÃ KẾT NỐI (nhập 1 lần trên mỗi máy, ở Cài đặt → Đồng bộ)', 'Máy chủ chặn ghi khi dữ liệu gửi lên rỗng hoặc giảm bất thường; Admin xác nhận mới cho lưu', 'Máy chủ sao lưu thêm mỗi giờ, giữ 24 giờ gần nhất'],
             65: ['Chuông thông báo hiện MỌI thay đổi: bán đơn, sửa / xóa hóa đơn, đơn bổ sung, nhận / trả bảo hành, nhập kho, trả kho, đổi tên / giá sản phẩm, gộp / xóa sản phẩm, cửa hàng mới, duyệt yêu cầu…', 'Đồng bộ đủ bảo hành, nhật ký, yêu cầu duyệt giữa điện thoại và máy tính'],
             64: ['Bảo hành chia 2 mục: Nhận hàng / Trả hàng (trả có trừ tồn kho), phiếu trả bảo hành JPG'],
