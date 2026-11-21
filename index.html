@@ -1360,7 +1360,7 @@
                         </div>
                         <div>
                             <h1 class="font-black text-xs sm:text-sm uppercase tracking-wider">PHỤ KIỆN HOÀNG ĐẾ</h1>
-                            <p class="text-[11px] sm:text-xs opacity-75">Nhân sự: <span class="font-bold text-amber-500">${user.fullname}</span> (${isPcMode() ? 'Chế độ PC' : 'Chế độ Mobile'} • Bản 63)</p>
+                            <p class="text-[11px] sm:text-xs opacity-75">Nhân sự: <span class="font-bold text-amber-500">${user.fullname}</span> (${isPcMode() ? 'Chế độ PC' : 'Chế độ Mobile'} • Bản 64)</p>
                         </div>
                     </div>
                     <div class="flex space-x-2 w-full sm:w-auto justify-end">
@@ -3686,8 +3686,8 @@
             (db.stockLog = db.stockLog || []).unshift({ id: newRecId(), time: vnNowStr(), ts: Date.now(), username: u ? u.username : '', type, productId: String(productId), productName: p ? p.name : String(productId), delta, note: note || '' });
         }
         // chỉ các thay đổi KHÔNG nằm trong lịch sử nhập / bán / trả mới tính vào cột Điều chỉnh (gộp, sửa đơn, xóa phiếu trả đã tự cân trong các cột khác)
-        const STOCK_ADJ_TYPES = ['reset', 'delete', 'manual'];
-        const STOCK_LOG_LABEL = { return: 'Trả kho', return_undo: 'Xóa phiếu trả kho (cộng lại)', merge_in: 'Gộp sản phẩm (nhận)', merge_out: 'Gộp sản phẩm (chuyển đi)', reset: 'Đặt lại kho', delete: 'Xóa sản phẩm', edit_sale: 'Sửa hóa đơn', restore: 'Khôi phục' };
+        const STOCK_ADJ_TYPES = ['reset', 'delete', 'manual', 'warranty_out'];
+        const STOCK_LOG_LABEL = { warranty_out: 'Trả bảo hành cho khách', return: 'Trả kho', return_undo: 'Xóa phiếu trả kho (cộng lại)', merge_in: 'Gộp sản phẩm (nhận)', merge_out: 'Gộp sản phẩm (chuyển đi)', reset: 'Đặt lại kho', delete: 'Xóa sản phẩm', edit_sale: 'Sửa hóa đơn', restore: 'Khôi phục' };
         // ===== Bản 55: Chuông thông báo, Bảo hành, Báo cáo theo khoảng ngày, Bảng trả kho =====
         const APP_VER = 55;
         const APP_NOTES = {
@@ -3705,46 +3705,79 @@
         function warrantyList() { return db.warranties = db.warranties || []; }
         function wOpenOf(storeId) { return warrantyList().filter(w => String(w.storeId) === String(storeId) && w.status !== 'returned'); }
         function wState(w) { if (w.status === 'returned') return 'done'; const now = Date.now(); if (now > w.dueTs) return 'over'; if (w.dueTs - now < 864e5) return 'soon'; return 'ok'; }
-        function openWarranty(storeId) { if (String(wStoreId) !== String(storeId)) wPhotos = []; wStoreId = storeId; wRender(); }
+        function openWarranty(storeId) { if (String(wStoreId) !== String(storeId)) { wPhotos = []; wTab = 'in'; wOutSel = ''; } wStoreId = storeId; wRender(); }
         function wClose() { const m = document.getElementById('w-modal'); if (m) m.classList.add('hidden'); wStoreId = null; wPhotos = []; }
+        let wTab = 'in', wOutSel = '';
+        function wSetTab(t, sel) { wTab = t; if (sel != null) wOutSel = String(sel); wRender(); }
         function wRender() {
             const s = (db.stores || []).find(x => String(x.id) === String(wStoreId)); if (!s) return;
             let m = document.getElementById('w-modal');
             if (!m) { m = document.createElement('div'); m.id = 'w-modal'; m.className = 'fixed inset-0 z-50 bg-black/70 flex items-end sm:items-center justify-center p-0 sm:p-4'; document.body.appendChild(m); }
             m.classList.remove('hidden');
-            const list = warrantyList().filter(w => String(w.storeId) === String(s.id)).sort((a, b) => (a.status === 'returned') - (b.status === 'returned') || a.dueTs - b.dueTs);
+            const all = warrantyList().filter(w => String(w.storeId) === String(s.id)), open = all.filter(w => w.status !== 'returned');
+            const list = all.slice().sort((a, b) => (a.status === 'returned') - (b.status === 'returned') || a.dueTs - b.dueTs);
             const inp = 'w-full px-3 py-2.5 rounded-xl bg-theme-input border border-theme-border text-theme-text text-sm', admin = isAdminU();
             const tag = w => { const st = wState(w); return st === 'done' ? '<span class="text-emerald-400 font-bold">Đã trả khách</span>' : st === 'over' ? `<span class="text-rose-400 font-bold">Quá hạn ${Math.ceil((Date.now() - w.dueTs) / 864e5)} ngày</span>` : st === 'soon' ? '<span class="text-amber-500 font-bold">Đến hạn trả hôm nay</span>' : `<span class="text-sky-400 font-bold">Còn ${Math.ceil((w.dueTs - Date.now()) / 864e5)} ngày</span>`; };
+            const tabBtn = (t, ic, l, n) => `<button onclick="wSetTab('${t}')" class="flex-1 py-2.5 rounded-xl text-xs font-bold border ${wTab === t ? (t === 'in' ? 'bg-amber-500 text-slate-950 border-amber-500' : 'bg-emerald-500 text-slate-950 border-emerald-500') : 'bg-theme-input border-theme-border'}"><i class="fa-solid ${ic} mr-1"></i>${l}${n ? ' (' + n + ')' : ''}</button>`;
+            const photoBox = `<div class="space-y-2">
+                    <div class="grid grid-cols-2 gap-2">
+                        <label class="py-3 rounded-xl bg-sky-500 text-slate-950 font-bold text-center cursor-pointer"><i class="fa-solid fa-camera mr-1"></i>Chụp ảnh sản phẩm<input type="file" accept="image/*" capture="environment" class="hidden" onchange="wAddPhotos(this)"></label>
+                        <label class="py-3 rounded-xl bg-theme-input border border-theme-border font-bold text-center cursor-pointer"><i class="fa-solid fa-images mr-1"></i>Chọn ảnh có sẵn<input type="file" accept="image/*" multiple class="hidden" onchange="wAddPhotos(this)"></label>
+                    </div>
+                    <div id="w-photos" class="flex flex-wrap gap-2">${wPhotosHtml()}</div>
+                    <div class="opacity-60">Tối đa ${W_MAX_PHOTOS} ảnh. Ảnh chỉ dùng để tạo phiếu JPG gửi Zalo, <b>không lưu trong app</b> (tự xóa sau khi chia sẻ).</div>
+                </div>`;
+            const dl = `<datalist id="w-prods">${db.productsMaster.map(p => `<option value="${escHtml(p.name)}"></option>`).join('')}</datalist>`;
+            const sel = open.find(w => String(w.id) === wOutSel);
+            const formIn = `<div class="p-3 rounded-2xl border border-amber-500/40 bg-amber-500/5 space-y-2">
+                    <div class="font-bold">Nhận hàng bảo hành từ khách</div>${photoBox}${dl}
+                    <input id="w-prod" list="w-prods" placeholder="Tên sản phẩm bảo hành *" class="${inp}">
+                    <div class="grid grid-cols-2 gap-2"><label>Số lượng *<input id="w-qty" type="number" min="1" value="1" inputmode="numeric" class="${inp}"></label><label>Hẹn trả khách *<input id="w-due" type="date" min="${invTodayIso()}" value="${invIsoShift(invTodayIso(), 7)}" class="${inp}"></label></div>
+                    <textarea id="w-issue" rows="2" placeholder="Lỗi / tình trạng hàng (VD: sạc không vào, đứt dây...)" class="${inp}"></textarea>
+                    <button onclick="wSave()" class="w-full py-3 rounded-xl bg-amber-500 text-slate-950 font-bold"><i class="fa-solid fa-box-open mr-1"></i>Xác nhận nhận & tạo phiếu JPG</button>
+                    <div class="opacity-60">Nhận hàng KHÔNG đụng tồn kho. Chuông thông báo sẽ nhắc khi gần đến / quá ngày hẹn trả.</div>
+                </div>`;
+            const formOut = `<div class="p-3 rounded-2xl border border-emerald-500/40 bg-emerald-500/5 space-y-2">
+                    <div class="font-bold">Trả hàng bảo hành cho khách</div>${photoBox}${dl}
+                    <label class="block">Theo phiếu nhận<select id="wo-sel" onchange="wSetTab('out', this.value)" class="${inp}"><option value="">— Không theo phiếu (trả/đổi trực tiếp) —</option>${open.map(w => `<option value="${w.id}" ${String(w.id) === wOutSel ? 'selected' : ''}>BH-${String(w.id).slice(-6)} • ${escHtml(w.product)} × ${w.qty} • hẹn ${tsToVN(w.dueTs)}</option>`).join('')}</select></label>
+                    <input id="wo-prod" list="w-prods" value="${escHtml(sel ? sel.product : '')}" placeholder="Sản phẩm trả cho khách (lấy từ kho) *" class="${inp}">
+                    <div class="grid grid-cols-2 gap-2"><label>Số lượng trả *<input id="wo-qty" type="number" min="1" value="${sel ? sel.qty : 1}" inputmode="numeric" class="${inp}"></label><label class="flex items-center gap-2 mt-5 font-semibold"><input id="wo-deduct" type="checkbox" checked class="w-4 h-4 accent-emerald-500"> Trừ vào tồn kho</label></div>
+                    <textarea id="wo-note" rows="2" placeholder="Ghi chú khi trả (VD: đổi mới 1:1, đã sửa xong...)" class="${inp}"></textarea>
+                    <button onclick="wOutSave()" class="w-full py-3 rounded-xl bg-emerald-500 text-slate-950 font-bold"><i class="fa-solid fa-hand-holding-heart mr-1"></i>Xác nhận trả & tạo phiếu JPG</button>
+                    <div class="opacity-60">Trả hàng sẽ <b>trừ vào tồn kho</b> số lượng sản phẩm đã chọn (bỏ tick nếu trả lại chính hàng đã sửa).</div>
+                </div>`;
             m.innerHTML = `<div class="bg-theme-card border border-theme-border rounded-t-3xl sm:rounded-3xl w-full max-w-lg max-h-[94vh] flex flex-col">
                 <div class="p-4 border-b border-theme-border flex items-center justify-between gap-2"><div class="font-bold text-sm"><i class="fa-solid fa-screwdriver-wrench text-amber-500 mr-2"></i>Bảo hành • ${escHtml(s.name)}</div><button onclick="wClose()" class="px-3 py-1 rounded-lg bg-theme-input text-xs font-bold">Đóng</button></div>
                 <div class="p-4 overflow-y-auto space-y-3 text-xs">
-                    <div class="p-3 rounded-2xl border border-amber-500/40 bg-amber-500/5 space-y-2">
-                        <div class="font-bold">Nhận hàng bảo hành mới</div>
-                        <div class="space-y-2">
-                            <div class="grid grid-cols-2 gap-2">
-                                <label class="py-3 rounded-xl bg-sky-500 text-slate-950 font-bold text-center cursor-pointer"><i class="fa-solid fa-camera mr-1"></i>Chụp ảnh sản phẩm<input type="file" accept="image/*" capture="environment" class="hidden" onchange="wAddPhotos(this)"></label>
-                                <label class="py-3 rounded-xl bg-theme-input border border-theme-border font-bold text-center cursor-pointer"><i class="fa-solid fa-images mr-1"></i>Chọn ảnh có sẵn<input type="file" accept="image/*" multiple class="hidden" onchange="wAddPhotos(this)"></label>
-                            </div>
-                            <div id="w-photos" class="flex flex-wrap gap-2">${wPhotosHtml()}</div>
-                            <div class="opacity-60">Tối đa ${W_MAX_PHOTOS} ảnh. Ảnh chỉ dùng để tạo phiếu JPG gửi Zalo, <b>không lưu trong app</b> (tự xóa sau khi chia sẻ).</div>
-                        </div>
-                        <datalist id="w-prods">${db.productsMaster.map(p => `<option value="${escHtml(p.name)}"></option>`).join('')}</datalist>
-                        <input id="w-prod" list="w-prods" placeholder="Tên sản phẩm bảo hành *" class="${inp}">
-                        <div class="grid grid-cols-2 gap-2"><label>Số lượng *<input id="w-qty" type="number" min="1" value="1" inputmode="numeric" class="${inp}"></label><label>Hẹn trả khách *<input id="w-due" type="date" min="${invTodayIso()}" value="${invIsoShift(invTodayIso(), 7)}" class="${inp}"></label></div>
-                        <textarea id="w-issue" rows="2" placeholder="Lỗi / tình trạng hàng (VD: sạc không vào, đứt dây...)" class="${inp}"></textarea>
-                        <button onclick="wSave()" class="w-full py-3 rounded-xl bg-amber-500 text-slate-950 font-bold"><i class="fa-solid fa-box-open mr-1"></i>Xác nhận & tạo phiếu bảo hành JPG</button>
-                        <div class="opacity-60">Sau khi nhận, chuông thông báo sẽ nhắc khi gần đến và quá ngày hẹn trả hàng cho khách.</div>
-                    </div>
-                    <div class="font-bold">Hàng bảo hành của shop (${list.length})</div>
+                    <div class="flex gap-2">${tabBtn('in', 'fa-box-open', 'Nhận hàng bảo hành')}${tabBtn('out', 'fa-hand-holding-heart', 'Trả hàng bảo hành', open.length)}</div>
+                    ${wTab === 'out' ? formOut : formIn}
+                    <div class="font-bold">Lịch sử bảo hành của shop (${list.length})</div>
                     ${list.length ? list.map(w => `<div class="p-3 rounded-xl border ${wState(w) === 'over' ? 'border-rose-500/50' : 'border-theme-border'} bg-theme-input/40 space-y-1">
-                        <div class="flex justify-between gap-2"><b>${escHtml(w.product)} × ${w.qty}</b>${tag(w)}</div>
-                        <div class="opacity-80">Nhận: ${escHtml(w.receivedTime)}${w.byName ? ' • ' + escHtml(w.byName) : ''} • Hẹn trả: <b>${tsToVN(w.dueTs)}</b></div>
+                        <div class="flex justify-between gap-2"><b>${w.kind === 'out' ? '↩︎ Trả trực tiếp: ' : ''}${escHtml(w.product)} × ${w.qty}</b>${tag(w)}</div>
+                        ${w.kind !== 'out' ? `<div class="opacity-80">Nhận: ${escHtml(w.receivedTime)}${w.byName ? ' • ' + escHtml(w.byName) : ''} • Hẹn trả: <b>${tsToVN(w.dueTs)}</b></div>` : ''}
                         ${w.issue ? `<div class="opacity-80">Lỗi: ${escHtml(w.issue)}</div>` : ''}
-                        <button onclick="wMakeTicket('${w.id}', false)" class="w-full py-2 rounded-lg bg-sky-500/15 border border-sky-500/40 text-sky-400 font-bold"><i class="fa-solid fa-file-image mr-1"></i>Tạo lại phiếu JPG (không kèm ảnh)</button>
-                        ${w.status === 'returned' ? `<div class="text-emerald-400">Đã trả lúc ${escHtml(w.returnedTime || '')}${w.returnedBy ? ' • ' + escHtml(w.returnedBy) : ''}</div>` : `<button onclick="wReturn('${w.id}')" class="w-full py-2 rounded-lg bg-emerald-500 text-slate-950 font-bold"><i class="fa-solid fa-check mr-1"></i>Đã trả hàng cho khách</button>`}
+                        ${w.status === 'returned' ? `<div class="text-emerald-400">Đã trả lúc ${escHtml(w.returnedTime || '')}${w.returnedBy ? ' • ' + escHtml(w.returnedBy) : ''}${w.outProduct ? ' • trả: ' + escHtml(w.outProduct) + ' × ' + (w.outQty || '') : ''}${w.deducted ? ' • đã trừ kho' : ''}${w.returnNote ? ' • ' + escHtml(w.returnNote) : ''}</div>` : `<button onclick="wSetTab('out','${w.id}')" class="w-full py-2 rounded-lg bg-emerald-500 text-slate-950 font-bold"><i class="fa-solid fa-hand-holding-heart mr-1"></i>Trả hàng cho khách</button>`}
+                        <div class="flex gap-2"><button onclick="wMakeTicket('${w.id}', false)" class="flex-1 py-1.5 rounded-lg bg-sky-500/15 border border-sky-500/40 text-sky-400 font-bold">Phiếu nhận JPG</button>${w.status === 'returned' ? `<button onclick="wMakeTicket('${w.id}', false, 'out')" class="flex-1 py-1.5 rounded-lg bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 font-bold">Phiếu trả JPG</button>` : ''}</div>
                         ${admin ? `<button onclick="wDelete('${w.id}')" class="text-[10px] text-rose-400 underline">Xóa phiếu</button>` : ''}
                     </div>`).join('') : '<div class="opacity-60">Chưa có hàng bảo hành.</div>'}
                 </div></div>`;
+        }
+        function wOutSave() {
+            const s = (db.stores || []).find(x => String(x.id) === String(wStoreId)); if (!s) return;
+            const selId = document.getElementById('wo-sel').value, prodName = document.getElementById('wo-prod').value.trim(), qty = parseInt(document.getElementById('wo-qty').value) || 0, deduct = document.getElementById('wo-deduct').checked, note = document.getElementById('wo-note').value.trim();
+            if (!prodName) { alert('Nhập sản phẩm trả cho khách.'); return; }
+            if (qty < 1) { alert('Số lượng trả phải từ 1 trở lên.'); return; }
+            const p = invProd(prodName);
+            if (deduct) {
+                if (!p) { alert('"' + prodName + '" không có trong kho sản phẩm nên không trừ kho được. Hãy chọn từ danh sách gợi ý hoặc bỏ tick "Trừ vào tồn kho".'); return; }
+                const st = dupStock(p); if (st < qty) { alert('Kho chỉ còn ' + st + ' cái "' + p.name + '", không đủ để trả ' + qty + ' cái.'); return; }
+            }
+            const u = getCurrentUser(), now = vnNowStr(); let w = selId ? warrantyList().find(x => String(x.id) === selId) : null;
+            if (!w) { w = { id: Date.now() + '' + Math.floor(Math.random() * 1000), kind: 'out', storeId: s.id, storeName: s.name, phone: s.phone || '', product: p ? p.name : prodName, qty, issue: '', receivedTs: Date.now(), receivedTime: now, dueTs: Date.now(), by: u.username, byName: u.fullname || u.username }; warrantyList().unshift(w); }
+            Object.assign(w, { status: 'returned', returnedTime: now, returnedTs: Date.now(), returnedBy: u.fullname || u.username, outProduct: p ? p.name : prodName, outQty: qty, deducted: deduct, returnNote: note, outPhotoCount: wPhotos.length });
+            if (deduct) { const wh = db.warehouse.find(x => String(x.productId) === String(p.id)); wh.qty = (Number(wh.qty) || 0) - qty; stockLog('warranty_out', p.id, -qty, 'Trả bảo hành cho ' + s.name); }
+            saveData(); wOutSel = ''; wRender(); render(); bellRender();
+            wMakeTicket(w.id, true, 'out');
         }
         function wSave() {
             const s = (db.stores || []).find(x => String(x.id) === String(wStoreId)); if (!s) return;
@@ -3779,11 +3812,13 @@
         }
         const wLoadImg = src => new Promise(res => { const im = new Image(); im.onload = () => res(im); im.onerror = () => res(null); im.src = src; });
         function wWrap(ctx, text, maxW) { const out = []; String(text || '').split('\n').forEach(par => { let line = ''; par.split(/\s+/).forEach(w => { const t = line ? line + ' ' + w : w; if (ctx.measureText(t).width > maxW && line) { out.push(line); line = w; } else line = t; }); out.push(line); }); return out; }
-        async function wDrawTicket(w, photos) {
+        async function wDrawTicket(w, photos, kind) {
             const s = (db.stores || []).find(x => String(x.id) === String(w.storeId)) || {}, W = 1080, P = 56, cw = W - P * 2;
             const addr = [s.address, s.district, s.city].filter(Boolean).join(', ') || '—';
             const meas = document.createElement('canvas').getContext('2d');
-            const rows = [['Mã phiếu', 'BH-' + String(w.id).slice(-6)], ['Ngày nhận', w.receivedTime], ['Cửa hàng', w.storeName], ['Địa chỉ', addr], ['Sản phẩm', w.product], ['Số lượng', w.qty + ' cái'], ['Hẹn trả khách', tsToVN(w.dueTs)], ['Lỗi / tình trạng', w.issue || '—'], ['Người nhận hàng', w.byName || w.by || '']];
+            const OUT = kind === 'out';
+            const rows = OUT ? [['Mã phiếu', 'TBH-' + String(w.id).slice(-6)], ['Ngày trả', w.returnedTime || vnNowStr()], ['Cửa hàng', w.storeName], ['Địa chỉ', addr], ['Sản phẩm trả', w.outProduct || w.product], ['Số lượng', (w.outQty || w.qty) + ' cái'], ['Theo phiếu nhận', w.kind === 'out' ? 'Trả trực tiếp (không có phiếu nhận)' : 'Theo phiếu BH-' + String(w.id).slice(-6) + ' (nhận ' + w.receivedTime + ')'], ['Lỗi ban đầu', w.issue || '—'], ['Ghi chú khi trả', w.returnNote || '—'], ['Người trả hàng', w.returnedBy || '']]
+                : [['Mã phiếu', 'BH-' + String(w.id).slice(-6)], ['Ngày nhận', w.receivedTime], ['Cửa hàng', w.storeName], ['Địa chỉ', addr], ['Sản phẩm', w.product], ['Số lượng', w.qty + ' cái'], ['Hẹn trả khách', tsToVN(w.dueTs)], ['Lỗi / tình trạng', w.issue || '—'], ['Người nhận hàng', w.byName || w.by || '']];
             meas.font = '600 34px Arial'; const valW = cw - 300 - 24;
             const lay = rows.map(r => ({ k: r[0], lines: wWrap(meas, r[1], valW) }));
             const infoH = lay.reduce((a, r) => a + Math.max(1, r.lines.length) * 44 + 28, 0);
@@ -3793,13 +3828,13 @@
             const H = 300 + infoH + photoH + 150;
             const c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d');
             g.fillStyle = '#f8fafc'; g.fillRect(0, 0, W, H);
-            const grd = g.createLinearGradient(0, 0, W, 0); grd.addColorStop(0, '#1f3864'); grd.addColorStop(1, '#2f5597'); g.fillStyle = grd; g.fillRect(0, 0, W, 250);
+            const grd = g.createLinearGradient(0, 0, W, 0); grd.addColorStop(0, OUT ? '#065f46' : '#1f3864'); grd.addColorStop(1, OUT ? '#059669' : '#2f5597'); g.fillStyle = grd; g.fillRect(0, 0, W, 250);
             g.fillStyle = '#fbbf24'; g.font = '900 40px Arial'; g.textAlign = 'center'; g.fillText('PHỤ KIỆN HOÀNG ĐẾ', W / 2, 78);
-            g.fillStyle = '#ffffff'; g.font = '900 58px Arial'; g.fillText('PHIẾU YÊU CẦU BẢO HÀNH', W / 2, 160);
-            g.font = '500 28px Arial'; g.fillStyle = '#cbd5e1'; g.fillText('Mã phiếu BH-' + String(w.id).slice(-6) + '  •  ' + w.receivedTime, W / 2, 212);
+            g.fillStyle = '#ffffff'; g.font = '900 58px Arial'; g.fillText(OUT ? 'PHIẾU TRẢ HÀNG BẢO HÀNH' : 'PHIẾU YÊU CẦU BẢO HÀNH', W / 2, 160);
+            g.font = '500 28px Arial'; g.fillStyle = '#cbd5e1'; g.fillText('Mã phiếu ' + (OUT ? 'TBH-' : 'BH-') + String(w.id).slice(-6) + '  •  ' + (OUT ? (w.returnedTime || '') : w.receivedTime), W / 2, 212);
             g.textAlign = 'left'; let y = 290;
             lay.forEach((r, i) => {
-                const h = Math.max(1, r.lines.length) * 44 + 28, hot = r.k === 'Hẹn trả khách', main = r.k === 'Sản phẩm' || r.k === 'Cửa hàng';
+                const h = Math.max(1, r.lines.length) * 44 + 28, hot = r.k === (OUT ? 'Sản phẩm trả' : 'Hẹn trả khách'), main = r.k === 'Sản phẩm' || r.k === 'Cửa hàng' || r.k === 'Ngày trả';
                 g.fillStyle = hot ? '#fef3c7' : i % 2 ? '#ffffff' : '#eef2f7'; g.fillRect(P, y, cw, h);
                 g.strokeStyle = '#cbd5e1'; g.lineWidth = 2; g.strokeRect(P, y, cw, h);
                 g.fillStyle = '#475569'; g.font = '700 30px Arial'; g.fillText(r.k, P + 22, y + 48);
@@ -3808,7 +3843,7 @@
                 y += h;
             });
             if (imgs.length) {
-                y += 30; g.fillStyle = '#1f3864'; g.font = '800 34px Arial'; g.fillText('Ảnh sản phẩm bảo hành (' + imgs.length + ')', P, y + 24); y += 50;
+                y += 30; g.fillStyle = '#1f3864'; g.font = '800 34px Arial'; g.fillText((OUT ? 'Ảnh hàng trả cho khách (' : 'Ảnh sản phẩm bảo hành (') + imgs.length + ')', P, y + 24); y += 50;
                 imgs.forEach((im, i) => {
                     const cx = P + (i % cols) * (cellW + gap), cy = y + Math.floor(i / cols) * (cellH + gap);
                     g.fillStyle = '#e2e8f0'; g.fillRect(cx, cy, cellW, cellH);
@@ -3818,25 +3853,25 @@
                 });
                 y += Math.ceil(imgs.length / cols) * (cellH + gap);
             }
-            g.fillStyle = '#1f3864'; g.fillRect(0, H - 110, W, 110);
-            g.fillStyle = '#fde68a'; g.font = '700 28px Arial'; g.textAlign = 'center'; g.fillText('Vui lòng giữ phiếu này để đối chiếu khi nhận lại hàng', W / 2, H - 62);
-            g.fillStyle = '#cbd5e1'; g.font = '500 24px Arial'; g.fillText('Phụ Kiện Hoàng Đế • Hẹn trả: ' + tsToVN(w.dueTs), W / 2, H - 26);
+            g.fillStyle = OUT ? '#065f46' : '#1f3864'; g.fillRect(0, H - 110, W, 110);
+            g.fillStyle = '#fde68a'; g.font = '700 28px Arial'; g.textAlign = 'center'; g.fillText(OUT ? 'Khách đã nhận lại hàng bảo hành – cảm ơn quý khách' : 'Vui lòng giữ phiếu này để đối chiếu khi nhận lại hàng', W / 2, H - 62);
+            g.fillStyle = '#cbd5e1'; g.font = '500 24px Arial'; g.fillText(OUT ? 'Phụ Kiện Hoàng Đế • Ngày trả: ' + (w.returnedTime || '') : 'Phụ Kiện Hoàng Đế • Hẹn trả: ' + tsToVN(w.dueTs), W / 2, H - 26);
             const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.88)); c.width = c.height = 0;
             return blob;
         }
-        async function wMakeTicket(id, withPhotos) {
+        async function wMakeTicket(id, withPhotos, kind) {
             const w = warrantyList().find(x => x.id === id); if (!w) return;
             const photos = withPhotos ? wPhotos.slice() : [];
-            let blob = null; try { blob = await wDrawTicket(w, photos); } catch (e) { console.error(e); }
+            let blob = null; try { blob = await wDrawTicket(w, photos, kind); } catch (e) { console.error(e); }
             if (!blob) { alert('Không tạo được phiếu JPG. Hãy thử lại.'); return; }
-            if (wTicket && wTicket.url) URL.revokeObjectURL(wTicket.url);
-            const name = 'Phieu-Bao-Hanh-' + w.storeName.replace(/[^\p{L}\p{N}]+/gu, '-') + '-' + String(w.id).slice(-6) + '.jpg';
+            
+            const name = (kind === 'out' ? 'Phieu-Tra-Bao-Hanh-' : 'Phieu-Bao-Hanh-') + w.storeName.replace(/[^\p{L}\p{N}]+/gu, '-') + '-' + String(w.id).slice(-6) + '.jpg';
             wTicket = { id, blob, url: URL.createObjectURL(blob), file: new File([blob], name, { type: 'image/jpeg' }), name };
             let m = document.getElementById('wt-modal');
             if (!m) { m = document.createElement('div'); m.id = 'wt-modal'; m.className = 'fixed inset-0 z-[70] bg-black/80 flex items-end sm:items-center justify-center p-0 sm:p-4'; document.body.appendChild(m); }
             m.classList.remove('hidden');
             m.innerHTML = `<div class="bg-theme-card border border-theme-border rounded-t-3xl sm:rounded-3xl w-full max-w-md max-h-[94vh] flex flex-col text-theme-text">
-                <div class="p-4 border-b border-theme-border flex justify-between items-center"><b class="text-sm"><i class="fa-solid fa-file-image text-amber-500 mr-2"></i>Phiếu yêu cầu bảo hành</b><button onclick="wTicketClose()" class="px-3 py-1 rounded-lg bg-theme-input text-xs font-bold">Đóng</button></div>
+                <div class="p-4 border-b border-theme-border flex justify-between items-center"><b class="text-sm"><i class="fa-solid fa-file-image text-amber-500 mr-2"></i>${kind === 'out' ? 'Phiếu trả hàng bảo hành' : 'Phiếu yêu cầu bảo hành'}</b><button onclick="wTicketClose()" class="px-3 py-1 rounded-lg bg-theme-input text-xs font-bold">Đóng</button></div>
                 <div class="p-3 overflow-y-auto"><img src="${wTicket.url}" class="w-full rounded-xl border border-theme-border"></div>
                 <div class="p-4 border-t border-theme-border space-y-2">
                     <button onclick="wTicketShare()" class="w-full py-3 rounded-xl bg-sky-500 text-slate-950 font-bold text-sm"><i class="fa-solid fa-share-nodes mr-1"></i>Chia sẻ sang Zalo / gửi</button>
@@ -3853,8 +3888,9 @@
             wTicketSave(); alert('Máy không hỗ trợ chia sẻ trực tiếp. Ảnh đã được tải về – hãy mở Zalo và gửi ảnh vừa tải.');
         }
         function wTicketSave() { if (!wTicket) return; const a = document.createElement('a'); a.href = wTicket.url; a.download = wTicket.name; document.body.appendChild(a); a.click(); a.remove(); wClearPhotos(); }
-        function wTicketClose() { const m = document.getElementById('wt-modal'); if (m) { m.classList.add('hidden'); m.innerHTML = ''; } if (wTicket && wTicket.url) setTimeout(() => { try { URL.revokeObjectURL(wTicket.url); } catch (e) { } wTicket = null; }, 500); wClearPhotos(); }
-        function wReturn(id) {
+        function wTicketClose() { const m = document.getElementById('wt-modal'); if (m) { m.classList.add('hidden'); m.innerHTML = ''; } const old = wTicket; if (old && old.url) setTimeout(() => { try { URL.revokeObjectURL(old.url); } catch (e) { } if (wTicket === old) wTicket = null; }, 500); wClearPhotos(); }
+        function wReturn(id) { const w = warrantyList().find(x => x.id === id); if (!w) return; wStoreId = w.storeId; wSetTab('out', id); }
+        function wReturnOld(id) {
             const w = warrantyList().find(x => x.id === id); if (!w) return;
             if (!confirm('Xác nhận đã trả "' + w.product + ' × ' + w.qty + '" cho khách ' + w.storeName + '?')) return;
             const u = getCurrentUser(); w.status = 'returned'; w.returnedTime = vnNowStr(); w.returnedTs = Date.now(); w.returnedBy = u.fullname || u.username;
