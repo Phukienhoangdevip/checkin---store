@@ -1007,15 +1007,16 @@
             let cls, icon, txt;
             if (!isCloudConfigured()) { cls = 'bg-slate-500/15 text-slate-400 border-slate-500/30'; icon = 'fa-cloud'; txt = 'Chưa nối cloud'; }
             else if (cloudState === 'loading') { cls = 'bg-slate-500/15 text-slate-300 border-slate-500/30'; icon = 'fa-spinner fa-spin'; txt = 'Đang tải dữ liệu...'; }
-            else if (cloudState === 'error') { cls = 'bg-rose-500/15 text-rose-400 border-rose-500/30'; icon = 'fa-cloud-exclamation'; txt = 'Lỗi đồng bộ - bấm thử lại'; }
-            else if (pushing || pushTimer || (isDirty() && cloudOk)) { cls = 'bg-amber-500/15 text-amber-500 border-amber-500/30'; icon = 'fa-cloud-arrow-up'; txt = 'Đang lưu lên cloud...'; }
-            else { cls = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'; icon = 'fa-cloud-check'; txt = 'Đã đồng bộ'; }
+            else if (cloudState === 'offline' || navigator.onLine === false) { const n = pendingN(); cls = 'bg-amber-500/15 text-amber-500 border-amber-500/30'; icon = 'fa-plane'; txt = '🟠 Offline' + (isDirty() ? ' – còn ' + (n || 1) + ' thay đổi chưa gửi' : ''); }
+            else if (cloudState === 'error') { cls = 'bg-rose-500/15 text-rose-400 border-rose-500/30'; icon = 'fa-cloud-exclamation'; txt = 'Lỗi đồng bộ - bấm xem lý do'; }
+            else if (pushing || pushTimer || (isDirty() && cloudOk)) { cls = 'bg-sky-500/15 text-sky-400 border-sky-500/30'; icon = 'fa-rotate fa-spin'; txt = '🔵 Đang đồng bộ' + (isDirty() && pendingN() ? ' (' + pendingN() + ' thay đổi)' : '') + '...'; }
+            else { cls = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'; icon = 'fa-cloud-check'; txt = '🟢 Đã đồng bộ'; }
             return `<button id="sync-badge" onclick="syncNow()" class="px-3 py-2 rounded-xl text-xs font-semibold flex items-center transition border ${cls}"><i class="fa-solid ${icon.replace('fa-cloud-exclamation', 'fa-triangle-exclamation').replace('fa-cloud-check', 'fa-circle-check')} mr-1"></i><span>${txt}</span></button>`;
         }
         function updateSyncBadge() {
             const el = document.getElementById('sync-badge'); if (el) el.outerHTML = syncBadgeHtml();
             const st = document.getElementById('sync-status-text');
-            if (st) st.innerText = (isCloudConfigured() ? (cloudState === 'ok' ? 'Đã kết nối cloud.' : cloudState === 'error' ? 'Chưa kết nối được cloud. Lý do: ' + lastSyncError : 'Đang kết nối...') : 'Chưa cấu hình link cloud.') + (lastSyncText ? ' Lần đồng bộ gần nhất: ' + lastSyncText : '');
+            if (st) st.innerText = (isCloudConfigured() ? (cloudState === 'ok' ? 'Đã kết nối cloud.' : cloudState === 'offline' ? '📴 Offline: ' + lastSyncError : cloudState === 'error' ? 'Chưa kết nối được cloud. Lý do: ' + lastSyncError : 'Đang kết nối...') : 'Chưa cấu hình link cloud.') + (lastMergeText ? '\n' + lastMergeText : '') + (lastSyncText ? ' Lần đồng bộ gần nhất: ' + lastSyncText : '');
         }
         function safeRender() {
             const ae = document.activeElement;
@@ -1024,9 +1025,22 @@
             render();
         }
 
+        // ===== Bản 70: gọi máy chủ có giới hạn thời gian, nhận biết mất mạng =====
+        async function fetchT(url, opt, ms) {
+            if (navigator.onLine === false) { const e = new Error('OFFLINE'); e.offline = true; throw e; }
+            const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null, t = ctrl ? setTimeout(() => ctrl.abort(), ms) : null;
+            try { return await fetch(url, Object.assign({}, opt, ctrl ? { signal: ctrl.signal } : {})); }
+            catch (e) { if (!e.auth) e.offline = true; throw e; }
+            finally { if (t) clearTimeout(t); }
+        }
+        const isNetErr = e => !!(e && (e.offline || e.name === 'AbortError' || e.name === 'TypeError' || /Failed to fetch|Load failed|NetworkError|network/i.test(String(e.message || ''))));
+        const pendingN = () => { try { return Number(localStorage.getItem('hoangde_pending_n')) || 0; } catch (e) { return 0; } };
+        const setPendingN = n => { try { n ? localStorage.setItem('hoangde_pending_n', String(n)) : localStorage.removeItem('hoangde_pending_n'); } catch (e) {} };
+        function markOffline(e) { cloudState = 'offline'; lastSyncError = 'Không có mạng hoặc mạng quá yếu. Dữ liệu đã lưu trong máy và sẽ tự gửi khi có mạng.'; }
+
         async function fetchCloud(versionOnly) {
             const sep = CLOUD_API_URL.includes('?') ? '&' : '?';
-            const res = await fetch(CLOUD_API_URL + sep + (versionOnly ? 'action=version&' : '') + 'key=' + encodeURIComponent(cloudKey()) + '&t=' + Date.now(), { redirect: 'follow' });
+            const res = await fetchT(CLOUD_API_URL + sep + (versionOnly ? 'action=version&' : '') + 'key=' + encodeURIComponent(cloudKey()) + '&t=' + Date.now(), { redirect: 'follow' }, versionOnly ? 12000 : 45000);
             const data = await res.json();
             if (data && data.reason === 'auth') { const er = new Error('AUTH'); er.auth = true; er.serverMsg = data.message; throw er; }
             return data;
@@ -1048,10 +1062,133 @@
             normalizeDb();
             cloudVersion = data.version || 0;
             try { localStorage.setItem('hoangde_cloud_version', String(cloudVersion)); } catch (e) {}
-            setDirty(false);
+            setDirty(false); setPendingN(0);
             localCacheWrite();
+            baseSave(data, cloudVersion);   // Bản 70: bản gốc = dữ liệu cloud vừa nhận
             lastSyncText = new Date().toLocaleTimeString('vi-VN');
         }
+        // ===== Bản 70: bản gốc (lần đồng bộ thành công gần nhất) + gộp dữ liệu 3 phía =====
+        const SYNC_IDB = { db: null };
+        function syncIdbOpen() {
+            return new Promise(res => {
+                if (SYNC_IDB.db) { res(SYNC_IDB.db); return; }
+                try { const r = indexedDB.open('hoangde_sync', 1); r.onupgradeneeded = () => r.result.createObjectStore('k');
+                    r.onsuccess = () => { SYNC_IDB.db = r.result; res(r.result); }; r.onerror = r.onblocked = () => res(null); } catch (e) { res(null); }
+            });
+        }
+        const noPhotoJSON = o => JSON.stringify(o, (k, v) => PHOTO_KEYS.has(k) ? undefined : v);
+        async function baseSave(obj, ver) {
+            try { const d = await syncIdbOpen(); if (!d) return; const txt = typeof obj === 'string' ? obj : noPhotoJSON(obj);
+                await new Promise(r => { const tx = d.transaction('k', 'readwrite'); tx.objectStore('k').put({ ver: String(ver || 0), txt }, 'base'); tx.oncomplete = tx.onerror = tx.onabort = () => r(); }); } catch (e) {}
+        }
+        async function baseLoad() {
+            try { const d = await syncIdbOpen(); if (!d) return null;
+                const v = await new Promise(r => { const rq = d.transaction('k', 'readonly').objectStore('k').get('base'); rq.onsuccess = () => r(rq.result || null); rq.onerror = () => r(null); });
+                return v && v.txt ? JSON.parse(v.txt) : null; } catch (e) { return null; }
+        }
+        const isObj = v => v && typeof v === 'object' && !Array.isArray(v);
+        const same = (a, b) => a === b || noPhotoJSON(a) === noPhotoJSON(b);
+        function mKey(r, path) {
+            if (!isObj(r)) return 'v:' + JSON.stringify(r);
+            if (path === 'users') return 'u:' + r.username;
+            if (path === 'warehouse') return 'w:' + r.productId;
+            if (r.id != null && r.id !== '') return 'i:' + r.id;
+            return 's:' + [r.time, r.storeName, r.username, r.note, r.productName, r.qty, r.type, r.ts].join('|');
+        }
+        // giữ ảnh của máy này nếu bản được chọn không có ảnh (máy chủ có thể không giữ ảnh)
+        function keepPhotos(win, loc) {
+            if (!isObj(win) || !isObj(loc) || win === loc) return win;
+            let out = win;
+            Object.keys(loc).forEach(k => {
+                if (PHOTO_KEYS.has(k)) { const lv = loc[k], wv = win[k]; const empty = wv == null || wv === '' || (Array.isArray(wv) && !wv.some(Boolean));
+                    if (empty && lv && (!Array.isArray(lv) || lv.some(Boolean))) { if (out === win) out = Object.assign({}, win); out[k] = lv; } }
+            });
+            return out;
+        }
+        const MERGE = { conflicts: 0, addedLocal: 0, addedCloud: 0 };
+        function mergeList(b, l, c, path) {
+            b = Array.isArray(b) ? b : []; l = Array.isArray(l) ? l : []; c = Array.isArray(c) ? c : [];
+            const B = new Map(), L = new Map(), C = new Map();
+            b.forEach(x => B.set(mKey(x, path), x)); l.forEach(x => L.set(mKey(x, path), x)); c.forEach(x => C.set(mKey(x, path), x));
+            const me = currentUsername, out = [], pos = new Map();
+            const pick = (k, bx, lx, cx) => {
+                if (path === 'warehouse' && lx && cx) {   // tồn kho: cộng phần thay đổi của máy này vào số trên cloud
+                    if (!bx && MERGE.noBase) { if (!same(lx, cx)) MERGE.conflicts++; return lx; }   // chưa có bản gốc (lần đầu lên Bản 70): giữ số của máy này
+                    const base = bx ? (Number(bx.qty) || 0) : 0, q = (Number(cx.qty) || 0) + (Number(lx.qty) || 0) - base;
+                    const rest = mergeVal(bx, Object.assign({}, lx, { qty: 0 }), Object.assign({}, cx, { qty: 0 }), path + '.item');
+                    return Object.assign({}, rest, { qty: q });
+                }
+                if (same(lx, cx)) return keepPhotos(lx, lx);
+                if (bx && same(lx, bx)) return keepPhotos(cx, lx);
+                if (bx && same(cx, bx)) return lx;
+                // cùng 1 bản ghi bị sửa ở 2 nơi: bản ghi của tài khoản đang dùng máy này thì ưu tiên bản máy này, còn lại ưu tiên cloud
+                const mine = !!(isObj(lx) && me && (lx.username === me || lx.by === me));
+                if (isObj(lx) && isObj(cx) && bx && isObj(bx)) { const pm = MERGE.mine; MERGE.mine = mine; const v = mergeVal(bx, lx, cx, path + '.item'); MERGE.mine = pm; return keepPhotos(v, lx); }
+                MERGE.conflicts++;
+                return mine ? lx : keepPhotos(cx, lx);
+            };
+            c.forEach(cx => {   // giữ thứ tự của cloud
+                const k = mKey(cx, path); if (pos.has(k)) return;
+                const bx = B.get(k), lx = L.get(k);
+                if (lx === undefined) { if (bx !== undefined && same(cx, bx)) return; pos.set(k, out.length); out.push(cx); if (bx === undefined) MERGE.addedCloud++; return; }   // máy này đã xóa (cloud không sửa) thì bỏ
+                pos.set(k, out.length); out.push(pick(k, bx, lx, cx));
+            });
+            let prev = null;
+            l.forEach(lx => {   // bản ghi chỉ có ở máy này: chèn đúng chỗ theo thứ tự trên máy này
+                const k = mKey(lx, path);
+                if (pos.has(k)) { prev = k; return; }
+                const bx = B.get(k);
+                if (bx !== undefined && same(lx, bx)) { return; }   // cloud đã xóa, máy này không sửa thì bỏ
+                const at = prev == null || !pos.has(prev) ? 0 : pos.get(prev) + 1;
+                out.splice(at, 0, lx); pos.clear(); out.forEach((x, i) => pos.set(mKey(x, path), i)); prev = k; MERGE.addedLocal++;
+            });
+            return out;
+        }
+        function mergeVal(b, l, c, path) {
+            if (l === undefined) return c; if (c === undefined) return l;
+            if (same(l, c)) return l;
+            if (b !== undefined && same(l, b)) return c;
+            if (b !== undefined && same(c, b)) return l;
+            if (Array.isArray(l) && Array.isArray(c)) {
+                if (/\.item\b/.test(path)) { MERGE.conflicts++; return MERGE.mine ? l : c; }   // mảng con bên trong 1 bản ghi (VD danh sách món): coi là một khối
+                if (path === 'categories' || l.concat(c).every(x => !isObj(x))) {   // danh sách chữ: hợp lại, bỏ mục đã bị xóa ở 1 bên
+                    const bs = new Set((Array.isArray(b) ? b : []).map(String)), ls = new Set(l.map(String)), cs = new Set(c.map(String)), out = [];
+                    c.concat(l).forEach(x => { const k = String(x); if (out.some(y => String(y) === k)) return; if (bs.has(k) && (!ls.has(k) || !cs.has(k))) return; out.push(x); });
+                    return out;
+                }
+                return mergeList(b, l, c, path);
+            }
+            if (isObj(l) && isObj(c)) {
+                const out = {}, bb = isObj(b) ? b : {};
+                new Set([...Object.keys(c), ...Object.keys(l)]).forEach(k => {
+                    const v = mergeVal(bb[k], l[k], c[k], path ? path + '.' + k : k);
+                    if (v !== undefined) out[k] = v;
+                });
+                return out;
+            }
+            MERGE.conflicts++;
+            return MERGE.mine ? l : c;
+        }
+        // Gộp: bản gốc (base) + dữ liệu máy này (db) + dữ liệu cloud → ghi vào db, giữ trạng thái "còn thay đổi chưa gửi"
+        async function mergeIntoLocal(cloud) {
+            const base = await baseLoad();
+            MERGE.conflicts = MERGE.addedLocal = MERGE.addedCloud = 0; MERGE.noBase = !base; MERGE.mine = false;
+            try { const d = await syncIdbOpen(); if (d) await new Promise(r => { const tx = d.transaction('k', 'readwrite'); tx.objectStore('k').put({ at: Date.now(), txt: noPhotoJSON(db) }, 'before_merge'); tx.oncomplete = tx.onerror = tx.onabort = () => r(); }); } catch (e) {}
+            const keepMode = db.settings && db.settings.deviceMode;
+            const merged = mergeVal(base || undefined, db, cloud, '');
+            const keys = new Set([...Object.keys(db), ...Object.keys(merged)]);
+            keys.forEach(k => { if (k === 'version') return; if (merged[k] === undefined) delete db[k]; else db[k] = merged[k]; });
+            if (db.settings && keepMode) db.settings.deviceMode = keepMode;
+            normalizeDb();
+            cloudVersion = cloud.version || 0;
+            try { localStorage.setItem('hoangde_cloud_version', String(cloudVersion)); } catch (e) {}
+            await baseSave(cloud, cloudVersion);   // bản gốc mới = đúng bản cloud vừa gộp
+            setDirty(true); localCacheWrite();
+            lastMergeText = 'Đã gộp ' + new Date().toLocaleTimeString('vi-VN') + ': thêm ' + MERGE.addedLocal + ' mục từ máy này, ' + MERGE.addedCloud + ' mục từ máy khác' + (MERGE.conflicts ? ', ' + MERGE.conflicts + ' chỗ cùng sửa (bản cũ đã lưu dự phòng)' : '');
+            return MERGE;
+        }
+        let lastMergeText = '';
+
         function backupConflict() {
             try { localStorage.setItem('hoangde_conflict_backup', JSON.stringify(db, (k, v) => ['photo', 'photos', 'storePhoto', 'img'].includes(k) ? (Array.isArray(v) ? [] : '') : v)); } catch (e) {}
         }
@@ -1077,7 +1214,10 @@
                     cloudOk = true; cloudState = 'ok'; cloudVersion = data.version || 0;
                     pulling = false; await pushCloud(); return;
                 }
-                if (isDirty()) backupConflict();
+                if (isDirty()) {   // Bản 70: máy này còn thay đổi chưa gửi mà cloud đã có bản mới → GỘP rồi gửi, không đè
+                    await mergeIntoLocal(data);
+                    cloudOk = true; cloudState = 'ok'; pulling = false; safeRender(); await pushCloud(); return;
+                }
                 const changed = mode === 'init' || String(data.version || 0) !== String(cloudVersion || 0);
                 applyFromCloud(data);
                 cloudOk = true; cloudState = 'ok';
@@ -1085,6 +1225,7 @@
             } catch (e) {
                 console.warn('Không tải được cloud', e);
                 cloudState = 'error'; lastSyncError = describeSyncError(e);
+                if (!e.auth && isNetErr(e)) markOffline(e);
                 if (e && e.auth && mode === 'init') {   // Bản 66: hỏi mã kết nối, bấm Hủy thì dừng
                     pulling = false; updateSyncBadge();
                     if (askCloudKey(e.serverMsg || 'Sai hoặc thiếu mã kết nối.')) { cloudOk = false; return pullCloud('init'); }
@@ -1098,37 +1239,39 @@
         }
 
         function schedulePush() {
-            setDirty(true);
+            setDirty(true); setPendingN(pendingN() + 1);
             if (!isCloudConfigured() || !cloudOk) { updateSyncBadge(); return; }
             clearTimeout(pushTimer);
             pushTimer = setTimeout(() => { pushTimer = null; pushCloud(); }, 800);
             updateSyncBadge();
         }
 
+        let mergeTries = 0;
         async function pushCloud(force) {
             if (!isCloudConfigured() || !cloudOk) return;
             if (pushing) { pendingPush = true; return; }
             pushing = true; updateSyncBadge();
             try {
-                const res = await fetch(CLOUD_API_URL, {
+                const sentN = pendingN(), baseTxt = noPhotoJSON(db), body = JSON.stringify({ type: 'sync_all', key: cloudKey(), force: !!force, baseVersion: cloudVersion, data: db });
+                const res = await fetchT(CLOUD_API_URL, {
                     method: 'POST', redirect: 'follow',
                     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                    body: JSON.stringify({ type: 'sync_all', key: cloudKey(), force: !!force, baseVersion: cloudVersion, data: db })
-                });
+                    body
+                }, 90000);
                 const r = await res.json();
                 if (r && r.ok) {
-                    cloudVersion = r.version;
+                    cloudVersion = r.version; mergeTries = 0;
                     try { localStorage.setItem('hoangde_cloud_version', String(cloudVersion)); } catch (e) {}
-                    if (!pendingPush) setDirty(false);
+                    baseSave(baseTxt, cloudVersion);   // Bản 70: bản gốc = đúng dữ liệu vừa lưu lên cloud
+                    if (!pendingPush) { setDirty(false); setPendingN(0); } else setPendingN(Math.max(1, pendingN() - sentN));
                     cloudState = 'ok'; lastSyncText = new Date().toLocaleTimeString('vi-VN');
                 } else if (r && r.reason === 'conflict') {
-                    backupConflict();
+                    // Bản 70: máy khác vừa lưu → tải bản cloud, GỘP với dữ liệu máy này rồi gửi lại (tối đa 3 lần), không đè mất
                     const data = await fetchCloud(false);
-                    if (data && Array.isArray(data.users) && data.users.length) {
-                        applyFromCloud(data); cloudState = 'ok'; pendingPush = false;
-                        alert('Dữ liệu trên cloud đã được cập nhật từ thiết bị khác, app vừa tải bản mới nhất về.\nNếu thao tác bạn vừa làm bị mất, hãy làm lại giúp mình nhé.');
-                        pushing = false; safeRender(); return;
+                    if (data && Array.isArray(data.users) && data.users.length && mergeTries < 3) {
+                        mergeTries++; await mergeIntoLocal(data); pushing = false; safeRender(); return pushCloud(force);
                     }
+                    mergeTries = 0; cloudState = 'error'; lastSyncError = 'Máy chủ liên tục báo xung đột. Dữ liệu vẫn giữ trong máy, app sẽ thử lại sau.';
                 } else if (r && r.reason === 'auth') {
                     cloudState = 'error'; lastSyncError = describeSyncError({ auth: true, serverMsg: r.message });
                 } else if (r && r.reason === 'guard') {   // Bản 66: máy chủ chặn vì dữ liệu giảm bất thường
@@ -1137,8 +1280,8 @@
                         pushing = false; return pushCloud(true);
                     }
                     if (!force) alert(r.message + '\n\nDữ liệu trên máy này CHƯA được lưu lên cloud. Hãy báo Admin kiểm tra trước khi thao tác tiếp.');
-                } else { cloudState = 'error'; lastSyncError = 'Máy chủ báo lỗi: ' + ((r && (r.message || r.reason)) || 'không rõ'); }
-            } catch (e) { console.warn('Lỗi đẩy cloud', e); cloudState = 'error'; lastSyncError = describeSyncError(e); }
+                } else { cloudState = 'error'; lastSyncError = 'Máy chủ báo lỗi: ' + ((r && (r.message || r.reason)) || 'không rõ') + '. Dữ liệu vẫn giữ trong máy, app sẽ thử lại sau.'; }
+            } catch (e) { console.warn('Lỗi đẩy cloud', e); mergeTries = 0; cloudState = 'error'; lastSyncError = describeSyncError(e); if (isNetErr(e)) markOffline(e); }
             pushing = false;
             updateSyncBadge();
             if (pendingPush) { pendingPush = false; schedulePush(); }
@@ -1146,6 +1289,7 @@
 
         function syncNow() {
             if (!isCloudConfigured()) { alert('Chưa cấu hình link Google Apps Script trong file index.html (biến CLOUD_API_URL).'); return; }
+            if (navigator.onLine === false) { alert('📴 Máy đang không có mạng.\n\nDữ liệu đã lưu trong máy' + (isDirty() ? ' (còn ' + (pendingN() || 1) + ' thay đổi chưa gửi)' : '') + '. Có mạng lại app sẽ tự đồng bộ, bạn không cần bấm gì.'); updateSyncBadge(); return; }
             if (cloudState === 'error' && lastSyncError) alert('Lý do lỗi đồng bộ:\n\n' + lastSyncError + '\n\nLink đang dùng:\n' + CLOUD_API_URL.slice(0, 60) + '...');
             if (cloudOk && isDirty()) pushCloud(); else { cloudOk = false; pullCloud('init'); }
         }
@@ -1181,9 +1325,23 @@
         });
         setInterval(() => {
             if (document.visibilityState !== 'visible') return;
+            if (navigator.onLine === false) { if (cloudState !== 'offline') { markOffline(); updateSyncBadge(); } return; }
             if (!cloudOk) { pullCloud('init'); return; }
             if (isDirty() && !pushing && !pushTimer) pushCloud(); else if (!isDirty()) pullCloud('silent');
-        }, 60000);
+        }, cloudState === 'offline' ? 30000 : 45000);
+        // Bản 70: có mạng lại thì đồng bộ ngay; mất mạng thì chuyển trạng thái Offline
+        window.addEventListener('online', () => { setTimeout(() => { if (!getCurrentUser() && !cloudOk) { pullCloud('init'); return; } if (!cloudOk) pullCloud('init'); else if (isDirty()) pushCloud(); else pullCloud('silent'); }, 1200); });
+        window.addEventListener('offline', () => { markOffline(); updateSyncBadge(); });
+        // Bản 70: service worker – lưu sẵn app + thư viện để mở được khi không có mạng
+        if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+            window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(e => console.warn('SW', e)); });
+            navigator.serviceWorker.addEventListener('message', ev => {
+                const d = ev.data || {}; if (d.type !== 'hd-new-version' || !(Number(d.ver) > APP_VER) || document.getElementById('hd-update-bar')) return;
+                const bar = document.createElement('button'); bar.id = 'hd-update-bar'; bar.type = 'button';
+                bar.className = 'fixed bottom-3 left-3 right-3 z-[9999] py-3 rounded-2xl bg-amber-500 text-slate-950 font-bold text-sm shadow-xl';
+                bar.textContent = '⬆️ Đã có Bản ' + d.ver + ' – bấm để cập nhật'; bar.onclick = () => location.reload(); document.body.appendChild(bar);
+            });
+        }
 
         
 
@@ -1389,7 +1547,7 @@
                         </div>
                         <div>
                             <h1 class="font-black text-xs sm:text-sm uppercase tracking-wider">PHỤ KIỆN HOÀNG ĐẾ</h1>
-                            <p class="text-[11px] sm:text-xs opacity-75">Nhân sự: <span class="font-bold text-amber-500">${user.fullname}</span> (${isPcMode() ? 'Chế độ PC' : 'Chế độ Mobile'} • Bản 69)</p>
+                            <p class="text-[11px] sm:text-xs opacity-75">Nhân sự: <span class="font-bold text-amber-500">${user.fullname}</span> (${isPcMode() ? 'Chế độ PC' : 'Chế độ Mobile'} • Bản 70)</p>
                         </div>
                     </div>
                     <div class="flex space-x-2 w-full sm:w-auto justify-end">
@@ -3781,8 +3939,9 @@
         const actSeenTs = () => { try { return Number(localStorage.getItem('hoangde_act_seen')) || 0; } catch (e) { return 0; } };
         function actVisible() { const u = getCurrentUser(); if (!u) return []; const L = db.activityLog || []; return u.role === 'admin' ? L : L.filter(e => e.owner === u.username || e.by === u.username); }
         // ===== Bản 55: Chuông thông báo, Bảo hành, Báo cáo theo khoảng ngày, Bảng trả kho =====
-        const APP_VER = 69;
+        const APP_VER = 70;
         const APP_NOTES = {
+            70: ['Chế độ offline tự động: mất mạng vẫn mở app và làm việc bình thường (app + thư viện lưu sẵn trong máy)', 'Có mạng lại tự đồng bộ ngay; trạng thái 🟢 Đã đồng bộ / 🟠 Offline – còn N thay đổi / 🔵 Đang đồng bộ', 'Gộp dữ liệu 3 phía khi máy khác cũng sửa: không mất đơn, không mất check-in, không trùng đơn, tồn kho cộng đúng phần thay đổi'],
             69: ['Sheet 3 "Gợi ý chào hàng": mỗi tiệm liệt kê món hay lấy (số lần, cách bao nhiêu ngày, trung bình mỗi lần) → gợi ý chào lại ~X cái; món quá chu kỳ quen báo đỏ', 'Nút Đã chốt (mở form bán hàng) / Chưa chốt (ghi lý do, lưu vào nhật ký chăm sóc, đồng bộ mọi máy)', 'Chưa chốt = đã liên hệ nhưng chưa lấy hàng: không đặt lại bộ đếm 15 ngày, gợi ý ngày gọi lại'],
             68: ['Chăm sóc khách 15 ngày: đếm lại từ lần GHÉ TIỆM (check-in, bán hàng đúng GPS tại tiệm) hoặc lần gọi chăm sóc', 'Mỗi đơn bán lưu khoảng cách GPS tới tiệm: bán từ xa vẫn bán bình thường nhưng không tính là đã ghé; đơn bổ sung không tính', 'Dòng thời gian dễ nhìn: mỗi đơn một khung, liệt kê từng món + số lượng, dấu ✓ Đúng GPS / ⚠ Không đúng GPS; check-in chấm tím'],
             67: ['Ghim thư viện giao diện Tailwind 3.4.17 để giao diện ổn định'],
@@ -7006,7 +7165,7 @@
                 await getFreshPosition();
                 if (!hasRealGPS) { alert('Chưa có GPS! Hãy bật định vị trên điện thoại rồi thử lại.'); return; }
                 if (!storeHasCoords(store)) { alert('Cửa hàng "' + store.name + '" chưa có tọa độ GPS nên không thể check-in. Hãy vào Sửa cửa hàng và cập nhật vị trí khi đứng tại cửa hàng.'); return; }
-                if ((currentGpsAccuracy || 0) > GPS_MAX_ACC) { lastGpsTime = 0; alert('Tín hiệu GPS đang yếu (sai số ~' + Math.round(currentGpsAccuracy) + 'm). Hãy ra chỗ thoáng, đợi vài giây rồi bấm Check-in lại.'); return; }
+                if ((currentGpsAccuracy || 0) > GPS_MAX_ACC) { lastGpsTime = 0; alert('Tín hiệu GPS đang yếu (sai số ~' + Math.round(currentGpsAccuracy) + 'm). Hãy ra ngoài cửa / chỗ thoáng đứng 10–20 giây, bật Wi-Fi (không cần kết nối) để định vị nhanh hơn, rồi bấm Check-in lại. GPS không cần mạng 4G.'); return; }
                 const raw = calculateDistance(currentLivePos.lat, currentLivePos.lng, store.lat, store.lng);
                 if (!(effectiveDistance(store) <= radius)) {
                     alert(`Quá xa (${Math.round(raw)}m, sai số GPS ~${Math.round(currentGpsAccuracy || 0)}m)! Tiến lại gần cửa hàng hơn để check-in.`);
@@ -8191,6 +8350,7 @@
             }
             const map = L.map(box, { zoomControl: true, attributionControl: true });
             leafMap = map;
+            if (navigator.onLine === false) setTimeout(() => setSt('📴 Đang offline: ảnh bản đồ nền cần có mạng. Vị trí tiệm, GPS và khoảng cách vẫn dùng bình thường.'), 50);
             const mk = (url, opt) => L.tileLayer(url, Object.assign({ maxZoom: 19, referrerPolicy: 'origin' }, opt));
             const bases = [
                 { name: 'Bản đồ (OpenStreetMap)', layer: mk('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }) },
