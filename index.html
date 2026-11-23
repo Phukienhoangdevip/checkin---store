@@ -833,6 +833,7 @@
         function isMobileDevice() { const ua = navigator.userAgent || ''; return /iPhone|iPad|iPod|Android|Mobile/i.test(ua) || (/Macintosh/.test(ua) && (navigator.maxTouchPoints || 0) > 1); }
         function isPcMode() { return !isMobileDevice() && !!db && !!db.settings && db.settings.deviceMode === 'pc'; }
         function normalizeDb() {
+            ST.ver++;
             if (!db.users || !db.users.length) db.users = [{ username: 'admin', password: '123', role: 'admin', status: 'approved', fullname: 'Quản trị viên (Hoàng Đế)', permissions: { stores: true, master: true, warehouse: true, history: true } }];
             ['stores', 'productsMaster', 'warehouse', 'checkinHistory', 'importHistory', 'routes', 'returnHistory'].forEach(k => { if (!Array.isArray(db[k])) db[k] = []; });
             if (!db.salesHistory) db.salesHistory = db.history || [];
@@ -1312,7 +1313,70 @@
         function saveSession() {
             try { if (currentUsername) localStorage.setItem('hoangde_current_username_cloud', currentUsername); else localStorage.removeItem('hoangde_current_username_cloud'); } catch (e) {}
         }
+        // ===== Bản 72: mỗi đơn / check-in thuộc ĐÚNG 1 tiệm (kể cả khi có tiệm trùng tên) =====
+        const ST = { ver: 0, built: -1, arr: null, len: -1, byName: null, byId: null, memo: null };
+        const stNorm = x => String(x || '').trim().toLowerCase().replace(/\s+/g, ' ');
+        const stDigits = x => String(x || '').replace(/\D/g, '');
+        function stIndex() {
+            const arr = db.stores || [];
+            if (ST.built === ST.ver && ST.arr === arr && ST.len === arr.length) return ST;
+            ST.byName = new Map(); ST.byId = new Map(); ST.memo = new WeakMap();
+            arr.forEach(s => { ST.byId.set(String(s.id), s); const k = String(s.name || ''); (ST.byName.get(k) || ST.byName.set(k, []).get(k)).push(s); });
+            ST.built = ST.ver; ST.arr = arr; ST.len = arr.length; return ST;
+        }
+        function storeOfRec(h) {
+            if (!h) return null; const I = stIndex();
+            if (h.storeId != null && I.byId.has(String(h.storeId))) { const s = I.byId.get(String(h.storeId)); if (s.name === h.storeName || !I.byName.has(h.storeName)) return s; }
+            const list = I.byName.get(String(h.storeName || '')); if (!list) return null; if (list.length === 1) return list[0];
+            if (I.memo.has(h)) return I.memo.get(h);
+            const ph = stDigits(h.phone), addr = stNorm(h.address);
+            let best = null, bs = -1;
+            list.forEach(s => {
+                let sc = 0;
+                if (ph && ph.length >= 8 && stDigits(s.phone) === ph) sc += 4;
+                if (h.lat != null && s.lat != null && Math.abs(Number(h.lat) - Number(s.lat)) < 3e-4 && Math.abs(Number(h.lng) - Number(s.lng)) < 3e-4) sc += 3;
+                if (addr && s.address && addr.startsWith(stNorm(s.address))) sc += 2;
+                if (sc > bs || (sc === bs && Number(s.id) < Number(best.id))) { best = s; bs = sc; }
+            });
+            I.memo.set(h, best); return best;
+        }
+        const recAtStore = (h, s) => !!s && storeOfRec(h) === s;
+        const stKeyOfRec = h => { const s = storeOfRec(h); return s ? 'id:' + s.id : 'n:' + (h && h.storeName); };
+        const stKey = s => 'id:' + s.id;
+        // tên hiển thị: tiệm trùng tên thì thêm khu vực / SĐT để phân biệt
+        function stLabel(s) { if (!s) return ''; const l = stIndex().byName.get(String(s.name || '')); return l && l.length > 1 ? s.name + ' (' + (s.district || s.city || s.phone || ('#' + String(s.id).slice(-4))) + ')' : s.name; }
+        const stLabelOfRec = h => { const s = storeOfRec(h); return s ? stLabel(s) : (h && h.storeName) || ''; };
+        function dupNameGroups() { const g = new Map(); (db.stores || []).forEach(s => { const k = stNorm(s.name); if (!k) return; (g.get(k) || g.set(k, []).get(k)).push(s); }); return [...g.values()].filter(l => l.length > 1); }
+        function nameTaken(name, exceptId) { const k = stNorm(name); return (db.stores || []).find(s => stNorm(s.name) === k && String(s.id) !== String(exceptId)) || null; }
+
+        // Công cụ xử lý tiệm trùng tên (admin): đổi tên chỉ chuyển đúng đơn / check-in của tiệm đó
+        function renameStoreSafe(s, newName) {
+            const recs = [db.salesHistory, db.checkinHistory, (db.historyArchive || {}).sales, (db.historyArchive || {}).checkin].flatMap(l => (l || []).filter(h => h && recAtStore(h, s)));
+            s.name = newName; recs.forEach(h => { h.storeName = newName; h.storeId = s.id; }); return recs.length;
+        }
+        function openStoreDup() {
+            let m = document.getElementById('dup-store-modal');
+            if (!m) { m = document.createElement('div'); m.id = 'dup-store-modal'; m.className = 'fixed inset-0 z-[60] bg-black/70 flex items-end sm:items-center justify-center p-0 sm:p-4'; document.body.appendChild(m); }
+            m.classList.remove('hidden');
+            const G = dupNameGroups(), admin = isAdminU(), S = allSales(), C = allCheckins();
+            m.innerHTML = `<div class="bg-theme-card border border-theme-border rounded-t-3xl sm:rounded-3xl w-full max-w-xl max-h-[92vh] flex flex-col text-theme-text text-xs">
+                <div class="p-4 border-b border-theme-border flex justify-between items-center gap-2"><b class="text-sm"><i class="fa-solid fa-clone text-rose-400 mr-2"></i>Tiệm trùng tên (${G.length} nhóm)</b><button onclick="document.getElementById('dup-store-modal').classList.add('hidden');render()" class="px-3 py-1 rounded-lg bg-theme-input font-bold">Đóng</button></div>
+                <div class="p-4 overflow-y-auto space-y-3">
+                    <p class="opacity-80">Các tiệm dưới đây cùng tên nên dễ lẫn đơn. App đã tự chia mỗi đơn về đúng 1 tiệm theo SĐT / tọa độ / địa chỉ lúc bán. Hãy đổi tên để phân biệt (VD thêm khu vực): app chỉ chuyển <b>đúng các đơn, check-in của tiệm đó</b>.</p>
+                    ${G.length ? G.map(g => `<div class="p-3 rounded-2xl border border-rose-500/40 space-y-2"><b class="text-rose-400">${escHtml(g[0].name)}</b>${g.map(st => { const ns = S.filter(h => recAtStore(h, st)), nc = C.filter(h => recAtStore(h, st)).length;
+                        return `<div class="p-2 rounded-xl bg-theme-input/50 border border-theme-border space-y-1"><div>📞 <b>${escHtml(st.phone || '-')}</b> • ${escHtml([st.address, st.district, st.city].filter(Boolean).join(', ') || '-')}</div><div class="opacity-80">${ns.length} đơn (${rpFmt(ns.reduce((a, h) => a + saleNet(h), 0))} đ) • ${nc} check-in • tạo ${Number(st.id) > 1e12 ? tsToVN(Number(st.id)) : '-'}</div>${admin ? `<button onclick="storeDupRename('${st.id}')" class="px-3 py-1.5 rounded-lg bg-amber-500 text-slate-950 font-bold"><i class="fa-solid fa-pen mr-1"></i>Đổi tên tiệm này</button>` : ''}</div>`; }).join('')}</div>`).join('') : '<div class="p-4 text-center text-emerald-400 font-bold">✓ Không còn tiệm nào trùng tên.</div>'}
+                </div></div>`;
+        }
+        function storeDupRename(id) {
+            const st = (db.stores || []).find(x => String(x.id) === String(id)); if (!st) return;
+            const nn = (prompt('Tên mới cho tiệm (SĐT ' + (st.phone || '-') + ', ' + (st.district || st.city || '') + '):', st.name + ' – ' + (st.district || st.city || '')) || '').trim();
+            if (!nn || nn === st.name) return;
+            if (nameTaken(nn, st.id)) { alert('Tên "' + nn + '" vẫn trùng với tiệm khác. Hãy chọn tên khác.'); return; }
+            const n = renameStoreSafe(st, nn); saveData(); alert('Đã đổi tên thành "' + nn + '" và chuyển ' + n + ' đơn / check-in của đúng tiệm này.'); openStoreDup();
+        }
+
         function saveData() {
+            ST.ver++;
             try { actDiff(); } catch (e) { console.warn('actDiff', e); }
             saveSession();
             localCacheWrite();
@@ -1548,7 +1612,7 @@
                         </div>
                         <div>
                             <h1 class="font-black text-xs sm:text-sm uppercase tracking-wider">PHỤ KIỆN HOÀNG ĐẾ</h1>
-                            <p class="text-[11px] sm:text-xs opacity-75">Nhân sự: <span class="font-bold text-amber-500">${user.fullname}</span> (${isPcMode() ? 'Chế độ PC' : 'Chế độ Mobile'} • Bản 71)</p>
+                            <p class="text-[11px] sm:text-xs opacity-75">Nhân sự: <span class="font-bold text-amber-500">${user.fullname}</span> (${isPcMode() ? 'Chế độ PC' : 'Chế độ Mobile'} • Bản 72)</p>
                         </div>
                     </div>
                     <div class="flex space-x-2 w-full sm:w-auto justify-end">
@@ -1629,9 +1693,11 @@
             });
 
             const requiredMins = db.settings?.requiredMinutes || 5;
+            const dupG = dupNameGroups();   // Bản 72
 
             return `
                 <div class="space-y-4 sm:space-y-6 text-theme-text">
+                    ${dupG.length ? `<button type="button" onclick="openStoreDup()" class="w-full p-3 rounded-2xl bg-rose-500/15 border border-rose-500/50 text-rose-400 text-xs font-bold text-left"><i class="fa-solid fa-triangle-exclamation mr-1"></i>Có ${dupG.length} nhóm tiệm TRÙNG TÊN (${dupG.map(g => escHtml(g[0].name)).slice(0, 3).join(', ')}${dupG.length > 3 ? '…' : ''}). ${isAdmin ? 'Bấm để đổi tên phân biệt.' : 'Báo admin đổi tên để không lẫn đơn.'}</button>` : ''}
                     <div class="bg-theme-card border border-theme-border p-4 sm:p-6 rounded-2xl shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                         <div>
                             <h2 class="font-bold text-base sm:text-lg flex items-center space-x-2">
@@ -1836,9 +1902,10 @@
             const id = document.getElementById('edit-store-id').value;
             const s = db.stores.find(x => String(x.id) === String(id));
             if(!s) return;
-            const oldStoreName = s.name;
-            s.name = document.getElementById('e-shop').value.trim();
-            if (oldStoreName && s.name && oldStoreName !== s.name) [db.salesHistory, db.checkinHistory, (db.historyArchive || {}).sales, (db.historyArchive || {}).checkin].forEach(l => (l || []).forEach(h => { if (h && h.storeName === oldStoreName) h.storeName = s.name; }));
+            const oldStoreName = s.name, newName = document.getElementById('e-shop').value.trim();
+            if (newName && nameTaken(newName, s.id)) { alert('⚠ Đã có tiệm khác tên "' + newName + '".\nHãy thêm khu vực để phân biệt, VD: "' + newName + ' – ' + (document.getElementById('e-district') ? document.getElementById('e-district').value : (s.district || 'Khu vực')) + '".'); return; }
+            if (oldStoreName && newName && oldStoreName !== newName) renameStoreSafe(s, newName); else s.name = newName;   // Bản 72: chỉ lịch sử của ĐÚNG tiệm này
+            if (0) [db.salesHistory].forEach(l => (l || []).forEach(h => { if (h && h.storeName === oldStoreName) h.storeName = s.name; }));
             s.owner = document.getElementById('e-owner').value.trim();
             s.phone = document.getElementById('e-phone').value.trim();
             s.city = document.getElementById('e-city').value.trim();
@@ -2233,7 +2300,7 @@
                 if (d.deduct) { const delta = invDelta([], items), pr = invStockProblems(delta); if (pr.length) return 'Không đủ hàng tồn để trừ:\n' + pr.join('\n'); invApplyStock(delta); }
                 const [y, mo, dd] = d.date.split('-').map(Number), time = d.clock + ':00 ' + dd + '/' + mo + '/' + y;
                 const ou = (db.users || []).find(x => x.username === owner) || {};
-                const rec = { time, username: owner, storeName: st.name, address: st.address || '', owner: st.owner || '', phone: st.phone || '', saleName: ou.fullname || owner,
+                const rec = { time, username: owner, storeName: st.name, storeId: st.id, address: st.address || '', owner: st.owner || '', phone: st.phone || '', saleName: ou.fullname || owner,
                     note: invNote('Đơn bổ sung', d.pay, items, c.net, d.reason), discountStr: c.str, gross: c.gross, net: c.net, discountAmount: c.amt, pay: d.pay, items, photos: [], photo: '',
                     supplement: true, reason: d.reason, noStock: !d.deduct, createdAt: vnNowStr(), approvedBy: approver };
                 let k = 0; while (invFind(saleKeyOf(rec)) && k < 59) { k++; rec.time = d.clock + ':' + String(k).padStart(2, '0') + ' ' + dd + '/' + mo + '/' + y; }
@@ -2284,7 +2351,7 @@
 
         function viewSavedBill(i, arch) {
             const h = (arch ? ((db.historyArchive || {}).sales || []) : (db.salesHistory || []))[i]; if (!h) return;
-            const st = db.stores.find(x => x.name === h.storeName) || {};
+            const st = storeOfRec(h) || {};
             let items = h.items;
             if (!items || !items.length) {
                 const body = String(h.note || '').replace(/^[^:]*\):\s*/, '').replace(/\s*\|\s*Tổng:.*$/, '');
@@ -3940,8 +4007,9 @@
         const actSeenTs = () => { try { return Number(localStorage.getItem('hoangde_act_seen')) || 0; } catch (e) { return 0; } };
         function actVisible() { const u = getCurrentUser(); if (!u) return []; const L = db.activityLog || []; return u.role === 'admin' ? L : L.filter(e => e.owner === u.username || e.by === u.username); }
         // ===== Bản 55: Chuông thông báo, Bảo hành, Báo cáo theo khoảng ngày, Bảng trả kho =====
-        const APP_VER = 71;
+        const APP_VER = 72;
         const APP_NOTES = {
+            72: ['Sửa lỗi 2 tiệm TRÙNG TÊN bị tính chung đơn (Excel thị trường, báo cáo, KPI, chăm sóc, gợi ý chào hàng): mỗi đơn chỉ thuộc đúng 1 tiệm', 'Đơn / check-in mới lưu mã tiệm; đơn cũ tự nhận đúng tiệm theo SĐT, tọa độ, địa chỉ', 'Chặn tạo / sửa tiệm trùng tên; admin có công cụ xử lý tiệm trùng tên (đổi tên chỉ chuyển đúng đơn của tiệm đó)'],
             71: ['Báo cáo ngày: bảng đầu có Doanh thu Gross / Net, số bill, bill chuyển khoản / tiền mặt, cửa hàng thêm mới / đã bán / đã ghé chưa bán, bảo hành, SL bán ra, chiết khấu', 'Chốt nộp tiền công ty (admin): chọn từ ngày – đến ngày, liệt kê đơn tiền mặt + chuyển khoản chưa nộp, ghi người nhận', 'Báo cáo tổng hợp + Excel: cột Nộp công ty, mỗi đơn ghi Đã thanh toán về công ty / Chưa nộp'],
             70: ['Chế độ offline tự động: mất mạng vẫn mở app và làm việc bình thường (app + thư viện lưu sẵn trong máy)', 'Có mạng lại tự đồng bộ ngay; trạng thái 🟢 Đã đồng bộ / 🟠 Offline – còn N thay đổi / 🔵 Đang đồng bộ', 'Gộp dữ liệu 3 phía khi máy khác cũng sửa: không mất đơn, không mất check-in, không trùng đơn, tồn kho cộng đúng phần thay đổi'],
             69: ['Sheet 3 "Gợi ý chào hàng": mỗi tiệm liệt kê món hay lấy (số lần, cách bao nhiêu ngày, trung bình mỗi lần) → gợi ý chào lại ~X cái; món quá chu kỳ quen báo đỏ', 'Nút Đã chốt (mở form bán hàng) / Chưa chốt (ghi lý do, lưu vào nhật ký chăm sóc, đồng bộ mọi máy)', 'Chưa chốt = đã liên hệ nhưng chưa lấy hàng: không đặt lại bộ đếm 15 ngày, gợi ý ngày gọi lại'],
@@ -4393,10 +4461,12 @@
             const gross = sales.reduce((s, h) => s + saleGross(h), 0), net = sales.reduce((s, h) => s + saleNet(h), 0);
             const ck = sales.filter(saleIsCK), tm = sales.filter(h => !saleIsCK(h));
             const created = s => { const t = Number(s.id); return t > 1e12 && t >= a && t < b; };
-            const names = new Set(sales.map(h => h.storeName).concat(checks.map(h => h.storeName)));
-            const stores = (db.stores || []).filter(s => names.has(s.name) || created(s));
-            const rev = {}; sales.forEach(h => { rev[h.storeName] = (rev[h.storeName] || 0) + saleNet(h); });
-            const withO = stores.filter(s => rev[s.name] != null).sort((x, y) => rev[y.name] - rev[x.name]), noO = stores.filter(s => rev[s.name] == null).sort((x, y) => x.name.localeCompare(y.name, 'vi'));
+            const names = new Set(sales.map(stKeyOfRec).concat(checks.map(stKeyOfRec)));
+            const stores = (db.stores || []).filter(s => names.has(stKey(s)) || created(s));
+            const revK = {}; sales.forEach(h => { const k = stKeyOfRec(h); revK[k] = (revK[k] || 0) + saleNet(h); });
+            const rev = revK;
+            const rv = s => revK[stKey(s)];
+            const withO = stores.filter(s => rv(s) != null).sort((x, y) => rv(y) - rv(x)), noO = stores.filter(s => rv(s) == null).sort((x, y) => x.name.localeCompare(y.name, 'vi'));
             const war = warrantyList().filter(w => w.receivedTs >= a && w.receivedTs < b);
             const RES = prodResolver();
             const sold = {}; sales.forEach(h => saleItemsOf(h).forEach(i => { const p = RES(i.name), k = p ? p.name : i.name; sold[k] = (sold[k] || 0) + i.q; }));
@@ -4417,7 +4487,7 @@
             const invNames2 = [...new Set(invNames.concat(Object.keys(ret)))].sort((x, y) => x.localeCompare(y, 'vi'));
             const inv = invNames2.map(n => { const o = { n, imp: imp[n] || 0, stock: stockOf(n), sold: sold[n] || 0, ret: ret[n] || 0, adj: adj[n] || 0 }; o.lech = o.stock - (o.imp - o.sold - o.ret + o.adj); return o; });
             const pIdx = payoutIndex(), paidOf = h => payoutOf(h, pIdx), paidSum = sales.filter(paidOf).reduce((s, h) => s + saleNet(h), 0);   // Bản 71
-            return { paidOf, paidSum, unpaidSum: sales.reduce((s, h) => s + saleNet(h), 0) - paidSum, unpaidN: sales.filter(h => !paidOf(h)).length, a, b, label: rpFrom === rpTo ? isoToVN(rpFrom) : isoToVN(rpFrom) + ' → ' + isoToVN(rpTo), sales, checks, gross, net, disc: gross - net, ck, tm, ckSum: ck.reduce((s, h) => s + saleNet(h), 0), tmSum: tm.reduce((s, h) => s + saleNet(h), 0), added: (db.stores || []).filter(created), stores, withO, noO, rev, noOwner: stores.filter(s => storeNoOwner(s)), war, warQty: war.reduce((s, w) => s + (Number(w.qty) || 0), 0), ranked, unsold, never, slow, totalSold, inv };
+            return { revOf: rv, paidOf, paidSum, unpaidSum: sales.reduce((s, h) => s + saleNet(h), 0) - paidSum, unpaidN: sales.filter(h => !paidOf(h)).length, a, b, label: rpFrom === rpTo ? isoToVN(rpFrom) : isoToVN(rpFrom) + ' → ' + isoToVN(rpTo), sales, checks, gross, net, disc: gross - net, ck, tm, ckSum: ck.reduce((s, h) => s + saleNet(h), 0), tmSum: tm.reduce((s, h) => s + saleNet(h), 0), added: (db.stores || []).filter(created), stores, withO, noO, rev, noOwner: stores.filter(s => storeNoOwner(s)), war, warQty: war.reduce((s, w) => s + (Number(w.qty) || 0), 0), ranked, unsold, never, slow, totalSold, inv };
         }
         function spanReportBlocks() {
             const D = spanData(), blocks = [];
@@ -4432,7 +4502,7 @@
             blocks.push(row(box('Tổng số lượng bảo hành', D.warQty + ' cái', '#c4b5fd'), box('Tổng SL sản phẩm bán ra', D.totalSold + ' cái', '#fff')));
             blocks.push(row(box('Đã nộp công ty', rpFmt(D.paidSum) + ' đ', '#34d399'), box('Còn phải nộp', D.unpaidN + ' đơn • ' + rpFmt(D.unpaidSum) + ' đ', D.unpaidN ? '#fda4af' : '#34d399')));
             blocks.push(RP_BREAK);
-            const sc = (s, i, has) => rpCard(`<div style="display:flex;justify-content:space-between;gap:6px"><b style="color:${has ? '#fcd34d' : '#cbd5e1'}">${i + 1}. ${escHtml(s.name)}</b><b style="color:${has ? '#fbbf24' : '#94a3b8'};white-space:nowrap">${has ? rpFmt(D.rev[s.name]) + ' đ' : 'Chưa có đơn'}</b></div><div>📞 <span style="color:#60a5fa">${escHtml(s.phone || 'N/A')}</span>${storeNoOwner(s) ? ' • <span style="color:#fda4af">Không gặp chủ</span>' : ''}</div>${(s.interests || []).length ? `<div style="opacity:.85">Quan tâm: ${escHtml(s.interests.join(', '))}</div>` : ''}`);
+            const sc = (s, i, has) => rpCard(`<div style="display:flex;justify-content:space-between;gap:6px"><b style="color:${has ? '#fcd34d' : '#cbd5e1'}">${i + 1}. ${escHtml(s.name)}</b><b style="color:${has ? '#fbbf24' : '#94a3b8'};white-space:nowrap">${has ? rpFmt(D.revOf(s)) + ' đ' : 'Chưa có đơn'}</b></div><div>📞 <span style="color:#60a5fa">${escHtml(s.phone || 'N/A')}</span>${storeNoOwner(s) ? ' • <span style="color:#fda4af">Không gặp chủ</span>' : ''}</div>${(s.interests || []).length ? `<div style="opacity:.85">Quan tâm: ${escHtml(s.interests.join(', '))}</div>` : ''}`);
             rpSection(`🏪 Cửa hàng đã phát sinh đơn (${D.withO.length})`, D.withO.map((s, i) => sc(s, i, true)), 'Không có cửa hàng nào phát sinh đơn.').forEach(b => blocks.push(b));
             rpSection(`🏪 Cửa hàng chưa phát sinh đơn (${D.noO.length})`, D.noO.map((s, i) => sc(s, i, false)), 'Không có.').forEach(b => blocks.push(b));
             const pl = (lbl, x, c) => rpLine(`<b style="color:${c}">${lbl}</b>: ${escHtml(x.n)} — <b>${x.q} cái</b> (${x.pct.toFixed(1)}%)`);
@@ -4657,7 +4727,7 @@
                 xlRow(s1, ['Đã nộp công ty (đ)', D.paidSum], { num: [2], fill: 'FFD1FAE5', bold: true }); xlRow(s1, ['Còn phải nộp (đ) – ' + D.unpaidN + ' đơn', D.unpaidSum], { num: [2], fill: D.unpaidN ? 'FFFFE4E6' : 'FFD1FAE5', bold: true });
                 const s2 = wb.addWorksheet('Cửa hàng'); [6, 30, 16, 36, 18, 18].forEach((w, i) => s2.getColumn(i + 1).width = w);
                 xlTitle(s2, 'DANH SÁCH CỬA HÀNG • ' + D.label, 6); xlHead(s2, ['STT', 'Cửa hàng', 'SĐT', 'Mục quan tâm', 'Đã phát sinh (đ)', 'Tình trạng']);
-                D.withO.forEach((s, i) => xlRow(s2, [i + 1, s.name, s.phone || '', (s.interests || []).join(', '), D.rev[s.name], storeNoOwner(s) ? 'Không gặp chủ' : 'Đã có đơn'], { num: [5], fill: 'FFD1FAE5' }));
+                D.withO.forEach((s, i) => xlRow(s2, [i + 1, s.name, s.phone || '', (s.interests || []).join(', '), D.revOf(s), storeNoOwner(s) ? 'Không gặp chủ' : 'Đã có đơn'], { num: [5], fill: 'FFD1FAE5' }));
                 D.noO.forEach((s, i) => xlRow(s2, [D.withO.length + i + 1, s.name, s.phone || '', (s.interests || []).join(', '), 0, storeNoOwner(s) ? 'Không gặp chủ' : 'Chưa lấy hàng'], { num: [5], fill: storeNoOwner(s) ? 'FFFFE4E6' : 'FFF3F4F6' }));
                 xlRow(s2, ['', 'TỔNG', D.stores.length + ' cửa hàng', '', D.net, ''], { bold: true, num: [5], fill: 'FFFDE68A' });
                 const s3 = wb.addWorksheet('Thống kê bán ra'); [8, 46, 12, 12, 22].forEach((w, i) => s3.getColumn(i + 1).width = w);
@@ -4793,7 +4863,7 @@
             const byStore = {}, byDay = {}; let g = 0, n = 0;
             sales.forEach(h => {
                 const gg = saleGross(h), nn = saleNet(h); g += gg; n += nn;
-                const b = (byStore[h.storeName] = byStore[h.storeName] || { name: h.storeName, c: 0, g: 0, n: 0, list: [] }); b.c++; b.g += gg; b.n += nn; b.list.push(h);
+                const sk = stKeyOfRec(h), b = (byStore[sk] = byStore[sk] || { name: stLabelOfRec(h), c: 0, g: 0, n: 0, list: [] }); b.c++; b.g += gg; b.n += nn; b.list.push(h);
                 const k = dayKeyOf(h.time), d = (byDay[k] = byDay[k] || { c: 0, n: 0 }); d.c++; d.n += nn;
             });
             const stores = Object.values(byStore).sort((a, b) => b.n - a.n || a.name.localeCompare(b.name, 'vi'));
@@ -5198,7 +5268,7 @@
         function kpiLabel(k) { const [y, m] = k.split('-'); return 'T' + (+m) + '/' + y; }
         function kpiSalesOf(store) {
             const u = getCurrentUser(), admin = u.role === 'admin';
-            return allSales().filter(h => h.storeName === store.name && (admin || h.username === u.username));
+            return allSales().filter(h => recAtStore(h, store) && (admin || h.username === u.username));
         }
         function kpiMonthly(store) {
             const by = {};
@@ -5292,7 +5362,7 @@
         const careDay = ts => { const d = new Date(ts); return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime(); };
         const careDate = ts => { const d = new Date(ts); return d.getDate() + '/' + (d.getMonth() + 1) + '/' + d.getFullYear(); };
         function careCallsOf(s) { return (db.careLog || []).filter(c => String(c.storeId) === String(s.id)); }
-        function careChecksOf(s) { const u = getCurrentUser(), admin = u && u.role === 'admin'; return allCheckins().filter(c => c.storeName === s.name && (admin || (u && c.username === u.username))); }
+        function careChecksOf(s) { const u = getCurrentUser(), admin = u && u.role === 'admin'; return allCheckins().filter(c => recAtStore(c, s) && (admin || (u && c.username === u.username))); }
         function careRows(noFilter) {
             const today = careDay(Date.now()), mk = kpiNowKey(), q = normTxt(careQ.trim());
             let rows = (db.stores || []).filter(s => (kpiCity === 'all' || s.city === kpiCity) && (kpiDistrict === 'all' || s.district === kpiDistrict)).map(s => {
@@ -5965,7 +6035,7 @@
         function rpBillBlocks(list, mainTitle) {
             if (!list.length) return rpSection(mainTitle, [], 'Chưa có đơn hàng nào.');
             const groups = {};
-            list.forEach(h => { (groups[h.storeName] = groups[h.storeName] || []).push(h); });
+            list.forEach(h => { const k = stLabelOfRec(h); (groups[k] = groups[k] || []).push(h); });
             const out = []; let first = true;
             Object.keys(groups).sort((a, b) => a.localeCompare(b, 'vi')).forEach(name => {
                 const g = groups[name]; const net = g.reduce((a, h) => a + saleNet(h), 0);
@@ -5983,7 +6053,7 @@
             sales.forEach(h => {
                 const gg = saleGross(h), nn = saleNet(h); g += gg; n += nn;
                 const k = dayKeyOf(h.time); (days[k] = days[k] || { c: 0, g: 0, n: 0 }); days[k].c++; days[k].g += gg; days[k].n += nn;
-                (perStore[h.storeName] = perStore[h.storeName] || { c: 0, n: 0 }); perStore[h.storeName].c++; perStore[h.storeName].n += nn;
+                { const k = stKeyOfRec(h); (perStore[k] = perStore[k] || { c: 0, n: 0 }); perStore[k].c++; perStore[k].n += nn; }
             });
             const dayKeys = Object.keys(days).filter(Boolean).sort((a, b) => parseDayKey(a) - parseDayKey(b));
             const range = dayKeys.length ? `${dayKeys[0]} → ${todayVN()}` : 'Chưa có đơn hàng';
@@ -5993,8 +6063,8 @@
             blocks.push(`<div style="display:flex;gap:6px;margin-bottom:6px">${box('Số đơn', sales.length, '#fff')}${box('Cửa hàng', stores.length, '#34d399')}${box('Check-in', checks.length, '#60a5fa')}</div>`);
             rpSection('📅 Doanh thu theo ngày', dayKeys.map(k => rpLine(`🔹 <b>${k}</b>: ${days[k].c} đơn • Gross ${rpFmt(days[k].g)} • <b style="color:#fbbf24">Net ${rpFmt(days[k].n)}</b>`)), 'Chưa có đơn hàng nào.').forEach(b => blocks.push(b));
             rpSection(`👥 Thông tin khách hàng (${stores.length} điểm bán)`, stores.map((s, i) => {
-                const ps = perStore[s.name] || { c: 0, n: 0 };
-                const nCheck = checks.filter(h => h.storeName === s.name).length;
+                const ps = perStore[stKey(s)] || { c: 0, n: 0 };
+                const nCheck = checks.filter(h => recAtStore(h, s)).length;
                 const added = !isNaN(Number(s.id)) && Number(s.id) > 1e12 ? new Date(Number(s.id)).toLocaleDateString('vi-VN') : '-';
                 const gps = s.lat != null && s.lng != null ? `[${Number(s.lat).toFixed(5)}, ${Number(s.lng).toFixed(5)}]` : 'N/A';
                 return rpCard(`<div style="font-weight:800;color:#fcd34d">${i + 1}. ${escHtml(s.name)}</div><div>Chủ: <b>${escHtml(s.owner || 'N/A')}</b> - SĐT: <span style="color:#60a5fa">${escHtml(s.phone || 'N/A')}</span></div><div style="opacity:.85">Địa chỉ: ${escHtml(s.address || '')}, ${escHtml(s.district || '')}, ${escHtml(s.city || '')}</div><div style="opacity:.9;margin-top:2px">Quy mô: <b>${escHtml(s.scale || '-')}</b> • Ngành: <b>${escHtml(s.industry || '-')}</b> • ${escHtml(relLabel(s.relation) || '-')}</div>${s.interests && s.interests.length ? '<div style="margin-top:2px;color:#7dd3fc">❤ Quan tâm: ' + s.interests.map(escHtml).join(', ') + '</div>' : ''}<div style="margin-top:2px">📍 <span style="color:#fbbf24;font-family:monospace">${gps}</span> • Thêm: ${added}</div><div style="margin-top:2px;color:#6ee7b7">${ps.c} đơn • Net <b>${rpFmt(ps.n)} đ</b> • ${nCheck} lần check-in</div>` + kpiStoreMonthLine(s, 3));
@@ -6017,8 +6087,8 @@
             const byStore = {};
             sales.forEach(h => {
                 const v = moneyOf(h.note); revenue += v;
-                if (!byStore[h.storeName]) byStore[h.storeName] = { count: 0, revenue: 0 };
-                byStore[h.storeName].count++; byStore[h.storeName].revenue += v;
+                const sk = stKeyOfRec(h); if (!byStore[sk]) byStore[sk] = { count: 0, revenue: 0 };
+                byStore[sk].count++; byStore[sk].revenue += v;
                 for (const m of h.note.matchAll(/x(\d+)/g)) outQty += parseInt(m[1]) || 0;
             });
             const visits = (db.stores || []).filter(visitedToday).length;
@@ -6030,8 +6100,8 @@
                 const row = (...b) => `<div style="display:flex;gap:6px;margin-bottom:6px">${b.join('')}</div>`;
                 const g = sales.reduce((a, h) => a + saleGross(h), 0), n = sales.reduce((a, h) => a + saleNet(h), 0);
                 const ck = sales.filter(saleIsCK), tm = sales.filter(h => !saleIsCK(h)), sum = l => l.reduce((a, h) => a + saleNet(h), 0);
-                const soldSet = new Set(sales.map(h => h.storeName));
-                const visitSet = new Set(checkins.map(h => h.storeName).concat((db.stores || []).filter(visitedToday).map(x => x.name)));
+                const soldSet = new Set(sales.map(stKeyOfRec));
+                const visitSet = new Set(checkins.map(stKeyOfRec).concat((db.stores || []).filter(visitedToday).map(stKey)));
                 const t0 = parseDayKey(todayVN()), war = warrantyList().filter(w => w.kind !== 'out' && w.receivedTs >= t0 && w.receivedTs < t0 + 864e5 && rptMine(w));
                 const qty = sales.reduce((a, h) => a + saleItemsOf(h).reduce((x, i) => x + (Number(i.q) || 0), 0), 0);
                 blocks.push(row(box('Doanh thu Gross', rpFmt(g) + ' đ'), box('Doanh thu Net', rpFmt(n) + ' đ', '#fbbf24')));
@@ -6051,8 +6121,8 @@
             rpSection('🏪 Danh sách cửa hàng mới thêm', newStores.map((s, i) => rpCard(`<div style="font-weight:800;color:#fcd34d">${i + 1}. ${escHtml(s.name)}</div><div>Chủ: <b>${escHtml(s.owner || 'N/A')}</b> - SĐT: <span style="color:#60a5fa">${escHtml(s.phone || 'N/A')}</span></div><div style="opacity:.8">Địa chỉ: ${escHtml(s.address)}, ${escHtml(s.district)}, ${escHtml(s.city)}</div><div style="opacity:.9;margin-top:2px">Quy mô: <b>${escHtml(s.scale || '-')}</b> • Ngành: <b>${escHtml(s.industry || '-')}</b> • ${escHtml(relLabel(s.relation) || '-')}</div>${s.interests && s.interests.length ? '<div style="margin-top:2px;color:#7dd3fc">❤ Quan tâm: ' + s.interests.map(escHtml).join(', ') + '</div>' : ''}`)), 'Không có cửa hàng mới trong ngày.').forEach(b => blocks.push(b));
 
             rpSection('✅ Cửa hàng check-in & đơn hàng', checkins.map((h, i) => {
-                const st = byStore[h.storeName] || { count: 0, revenue: 0 };
-                const store = (db.stores || []).find(x => x.name === h.storeName);
+                const st = byStore[stKeyOfRec(h)] || { count: 0, revenue: 0 };
+                const store = storeOfRec(h);
                 const gps = h.lat != null && h.lng != null ? `[${Number(h.lat).toFixed(5)}, ${Number(h.lng).toFixed(5)}]` : (store ? `[${Number(store.lat).toFixed(5)}, ${Number(store.lng).toFixed(5)}]` : 'N/A');
                 return rpCard(`<div style="display:flex;justify-content:space-between;gap:6px"><b style="color:#6ee7b7">${i + 1}. ${escHtml(h.storeName)}</b><span style="font-size:9px;opacity:.7;white-space:nowrap">${escHtml(h.time)}</span></div><div>SĐT: <span style="color:#60a5fa">${escHtml(h.phone || 'N/A')}</span> | ${escHtml(h.address || '')}</div><div>📍 GPS: <span style="color:#fbbf24;font-family:monospace">${gps}</span></div><div>Sale: <span style="color:#fbbf24">@${escHtml(h.username)}</span></div><div style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.25);border-radius:8px;padding:5px 7px;margin-top:4px"><div>• Số đơn: <b>${st.count}</b> • Doanh thu: <b style="color:#fbbf24">${st.revenue.toLocaleString('vi-VN')} đ</b></div><div style="font-size:10px;opacity:.85;margin-top:2px">${escHtml(h.note)}</div></div>`);
             }), 'Chưa có lịch sử check-in trong hôm nay.').forEach(b => blocks.push(b));
@@ -6259,6 +6329,7 @@
             const district = document.getElementById('a-district').value.trim();
             const address = document.getElementById('a-address').value.trim();
             if(!name || !owner || !phone || !address || !city || !district) { alert('Điền đủ thông tin!'); return; }
+            if (nameTaken(name)) { alert('⚠ Đã có tiệm tên "' + name + '".\nHãy thêm khu vực để phân biệt, VD: "' + name + ' – ' + district + '".'); return; }
 
             db.stores.unshift({
                 id: Date.now(), name, owner, phone, city, district, address,
@@ -7111,7 +7182,7 @@
             db.salesHistory.unshift({ 
                 time: time, 
                 username: user.username, 
-                storeName: store.name, 
+                storeName: store.name, storeId: store.id,   // Bản 72
                 address: store.address, 
                 note: `Bán đơn hàng (${pay.value}): ${summary.join(', ')} | Tổng: ${grandTotal.toLocaleString()}đ`, 
                 discountStr: discountStr,
@@ -7238,6 +7309,7 @@
             const a = document.getElementById('s-address').value.trim();
 
             if(!n || !o || !p) { alert('Vui lòng điền Tên Shop, Tên Chủ shop và Số điện thoại!'); return; }
+            if (nameTaken(n)) { alert('⚠ Đã có tiệm tên "' + n + '" trong danh sách.\nHãy thêm khu vực để phân biệt, VD: "' + n + ' – ' + (d || 'Khu vực') + '".\n(Hai tiệm trùng tên sẽ bị lẫn đơn hàng.)'); return; }
             if(!c || !d || !a) { alert('Vui lòng điền đầy đủ Tỉnh/Thành phố, Quận/Huyện và Địa chỉ chi tiết (hoặc gõ tay vào ô)!'); return; }
             const cv = getChipValues('s');
             if(!cv.scale) { alert('Vui lòng chọn Quy mô cửa hàng (Nhỏ / Vừa / To)!'); return; }
@@ -7365,7 +7437,7 @@
             s.visitTimeStr = timeStr;
             if (!db.checkinHistory) db.checkinHistory = [];
             db.checkinHistory.unshift({
-                time: timeStr, username: u.username, storeName: s.name,
+                time: timeStr, username: u.username, storeName: s.name, storeId: s.id,
                 address: `${s.address}, ${s.district}, ${s.city}`, phone: s.phone || 'N/A',
                 lat: s.lat, lng: s.lng,
                 note: `[ĐÃ GHÉ THĂM] Thời gian làm việc: ${elapsedMinutes} phút. Ghi chú: ${s.note || 'Không có'}`,
@@ -7683,9 +7755,9 @@
             ws.orderNo = 100 + wb.worksheets.length;
 
             const revenueBy = {};
-            salesToday.forEach(h => { revenueBy[h.storeName] = (revenueBy[h.storeName] || 0) + moneyOf(h.note); });
-            const sold = new Set(salesToday.map(h => h.storeName)), checked = new Set(checkinsToday.map(h => h.storeName));
-            const stores = (db.stores || []).filter(s => visitedToday(s) || addedToday(s) || sold.has(s.name) || checked.has(s.name));
+            salesToday.forEach(h => { const k = stKeyOfRec(h); revenueBy[k] = (revenueBy[k] || 0) + moneyOf(h.note); });
+            const sold = new Set(salesToday.map(stKeyOfRec)), checked = new Set(checkinsToday.map(stKeyOfRec));
+            const stores = (db.stores || []).filter(s => visitedToday(s) || addedToday(s) || sold.has(stKey(s)) || checked.has(stKey(s)));
             const areas = [...new Set(stores.map(s => s.district).filter(Boolean))].slice(0, 3).join(', ');
 
             const widths = [6, 28, 16, 20, 12, 18, 22, 16, 24, 30];
@@ -7706,7 +7778,7 @@
 
             let total = 0;
             stores.forEach((s, i) => {
-                const rev = revenueBy[s.name] || 0; total += rev;
+                const rev = revenueBy[stKey(s)] || 0; total += rev;
                 const r = ws.addRow([i + 1, s.name, s.phone || '', s.district || '', s.scale || '', s.industry || '', relLabel(s.relation), rev || '', '', s.note || '']);
                 r.height = 85;
                 r.eachCell({ includeEmpty: true }, (c, col) => {
@@ -7953,9 +8025,9 @@
             const sales = allSales().filter(h => dayKeyOf(h.time) === dayKey), checks = allCheckins().filter(h => dayKeyOf(h.time) === dayKey);
             const isToday = dayKey === vnDayKey(), dayStart = parseDayKey(dayKey);
             const created = s => { const t = Number(s.id); return t > 1e12 && t >= dayStart && t < dayStart + 864e5; };
-            const names = new Set(sales.map(h => h.storeName).concat(checks.map(h => h.storeName)));
-            const stores = (db.stores || []).filter(s => names.has(s.name) || created(s) || (isToday && visitedToday(s)));
-            const rev = s => sales.filter(h => h.storeName === s.name).reduce((a, h) => a + saleNet(h), 0);
+            const names = new Set(sales.map(stKeyOfRec).concat(checks.map(stKeyOfRec)));   // Bản 72: theo tiệm thật, không theo tên
+            const stores = (db.stores || []).filter(s => names.has(stKey(s)) || created(s) || (isToday && visitedToday(s)));
+            const rev = s => sales.filter(h => recAtStore(h, s)).reduce((a, h) => a + saleNet(h), 0);
             stores.sort((a, b) => rev(b) - rev(a));
             const [d, m, y] = dayKey.split('/');
             const areas = [...new Set(stores.map(s => s.district).filter(Boolean))].slice(0, 3).join(', ');
@@ -7965,7 +8037,7 @@
             rows.push({ h: 30, cells: heads.map(v => ({ v, s: T.head })) });
             const imgs = [];
             for (let i = 0; i < stores.length; i++) {
-                const s = stores[i], ss = sales.filter(h => h.storeName === s.name), r0 = rev(s), z = i % 2;
+                const s = stores[i], ss = sales.filter(h => recAtStore(h, s)), r0 = rev(s), z = i % 2;
                 const bills = []; ss.forEach(h => { (Array.isArray(h.photos) ? h.photos : (h.photo ? [h.photo] : [])).forEach(p => { if (typeof p === 'string' && p.startsWith('data:image')) bills.push(p); }); });
                 const lost = ss.reduce((a, h) => a + ((!h.photos || !h.photos.length) && !h.photo ? (h.photoCount || 0) : 0), 0);
                 const pays = [...new Set(ss.map(h => saleIsCK(h) ? 'Chuyển khoản' : 'Tiền mặt'))].join(' + ');
@@ -7986,13 +8058,14 @@
             const [y, m] = mk.split('-'), inM = h => bkInMonth(h.time, mk), lbl = 'THÁNG ' + m + '/' + y, now = vnNowStr();
             const RES = prodResolver(), sales = allSales().filter(inM), imps = allImports().filter(inM), checks = allCheckins().filter(inM);
             const gross = sales.reduce((a, h) => a + saleGross(h), 0), net = sales.reduce((a, h) => a + saleNet(h), 0), ck = sales.filter(saleIsCK), tm = sales.filter(h => !saleIsCK(h));
-            const revS = {}, cntS = {}, lastS = {}; allSales().forEach(h => { const t = recTs(h) || 0; lastS[h.storeName] = Math.max(lastS[h.storeName] || 0, t); }); sales.forEach(h => { revS[h.storeName] = (revS[h.storeName] || 0) + saleNet(h); cntS[h.storeName] = (cntS[h.storeName] || 0) + 1; });
+            const revS = {}, cntS = {}, lastS = {}, lblS = {};   // Bản 72: theo tiệm thật
+            allSales().forEach(h => { const t = recTs(h) || 0; const k = stKeyOfRec(h); lastS[k] = Math.max(lastS[k] || 0, t); }); sales.forEach(h => { const k = stKeyOfRec(h); revS[k] = (revS[k] || 0) + saleNet(h); cntS[k] = (cntS[k] || 0) + 1; lblS[k] = stLabelOfRec(h); });
             const soldP = {}; sales.forEach(h => saleItemsOf(h).forEach(i => { const p = RES(i.name), k = p ? p.name : i.name; soldP[k] = (soldP[k] || 0) + i.q; }));
             const impP = {}, impMoney = imps.reduce((a, i) => a + impTotal(i), 0); imps.forEach(i => { const p = RES(i.productName), k = p ? p.name : i.productName; impP[k] = (impP[k] || 0) + (Number(i.qty) || 0); });
             const mStart = isoToTs(y + '-' + m + '-01'), mEnd = isoToTs(m === '12' ? (+y + 1) + '-01-01' : y + '-' + String(+m + 1).padStart(2, '0') + '-01');
             const stores = db.stores || [], newS = stores.filter(s => Number(s.id) > 1e12 && Number(s.id) >= mStart && Number(s.id) < mEnd);
-            const act = new Set(sales.map(h => h.storeName).concat(checks.map(h => h.storeName)).concat(newS.map(s => s.name)));
-            const actStores = stores.filter(s => act.has(s.name)), noOrder = actStores.filter(s => !revS[s.name]);
+            const act = new Set(sales.map(stKeyOfRec).concat(checks.map(stKeyOfRec)).concat(newS.map(stKey)));
+            const actStores = stores.filter(s => act.has(stKey(s))), noOrder = actStores.filter(s => !revS[stKey(s)]);
             const prods = db.productsMaster || [], stockOf = p => dupStock(p);
             const totStock = prods.reduce((a, p) => a + stockOf(p), 0), stockVal = prods.reduce((a, p) => a + stockOf(p) * (Number(p.price) || 0), 0);
             const war = warrantyList().filter(w => w.receivedTs >= mStart && w.receivedTs < mEnd), retQ = (db.returnHistory || []).filter(inM).reduce((a, h) => a + (h.items || []).reduce((b, i) => b + (Number(i.q) || 0), 0), 0);
@@ -8016,14 +8089,14 @@
             sect('🛠 BẢO HÀNH');
             kv('Nhận bảo hành trong tháng (cái)', war.reduce((a, w) => a + (Number(w.qty) || 0), 0)); kv('Phiếu đang giữ chưa trả', warrantyList().filter(w => w.status !== 'returned').length, warrantyList().filter(w => wState(w) === 'over').length + ' phiếu quá hạn', warrantyList().some(w => wState(w) === 'over') ? T.bad : T.good);
             sect('🏆 TOP 5 CỬA HÀNG DOANH THU CAO NHẤT');
-            Object.keys(revS).sort((a, b) => revS[b] - revS[a]).slice(0, 5).forEach((n, i) => kv((i + 1) + '. ' + n, revS[n], cntS[n] + ' đơn', T.B.nb[0]));
+            Object.keys(revS).sort((a, b) => revS[b] - revS[a]).slice(0, 5).forEach((n, i) => kv((i + 1) + '. ' + (lblS[n] || n), revS[n], cntS[n] + ' đơn', T.B.nb[0]));
             sect('🔥 TOP 5 SẢN PHẨM BÁN CHẠY');
             const tq = Object.values(soldP).reduce((a, v) => a + v, 0) || 1;
             Object.keys(soldP).sort((a, b) => soldP[b] - soldP[a]).slice(0, 5).forEach((n, i) => kv((i + 1) + '. ' + n, soldP[n], (soldP[n] / tq * 100).toFixed(1) + '% tổng số lượng bán', T.B.nb[0]));
             const ov = { name: 'Tổng quan', rows: R, widths: [42, 22, 44], ncol: 3, merges: M, tab: XC.NAVY, fit: 1, noGrid: 1 };
             // ---- Cửa hàng
             const relSt = v => /cũ/i.test(v) ? T.good : /mới/i.test(v) ? T.info : null;
-            const shopRows = stores.slice().sort((a, b) => ((revS[b.name] || 0) - (revS[a.name] || 0)) || a.name.localeCompare(b.name, 'vi')).map((s, i) => ({ 'STT': i + 1, 'Tên cửa hàng': s.name, 'Chủ shop': s.owner || '', 'SĐT': s.phone || '', 'Tỉnh/TP': s.city || '', 'Quận/Huyện': s.district || '', 'Địa chỉ': s.address || '', 'Quy mô': s.scale || '', 'Ngành hàng': s.industry || '', 'Tình trạng KH': relLabel(s.relation), 'Quan tâm': (s.interests || []).join(', '), 'Gặp chủ': storeNoOwner(s) ? 'Chưa gặp' : 'Đã gặp', 'DT tháng (đ)': revS[s.name] || 0, 'Đơn tháng': cntS[s.name] || 0, 'Mua gần nhất': lastS[s.name] ? tsToVN(lastS[s.name]) : '', 'Ảnh shop': s.storePhoto ? 'Có' : 'Không', 'Vĩ độ': s.lat == null ? '' : s.lat, 'Kinh độ': s.lng == null ? '' : s.lng }));
+            const shopRows = stores.slice().sort((a, b) => ((revS[stKey(b)] || 0) - (revS[stKey(a)] || 0)) || a.name.localeCompare(b.name, 'vi')).map((s, i) => ({ 'STT': i + 1, 'Tên cửa hàng': stLabel(s), 'Chủ shop': s.owner || '', 'SĐT': s.phone || '', 'Tỉnh/TP': s.city || '', 'Quận/Huyện': s.district || '', 'Địa chỉ': s.address || '', 'Quy mô': s.scale || '', 'Ngành hàng': s.industry || '', 'Tình trạng KH': relLabel(s.relation), 'Quan tâm': (s.interests || []).join(', '), 'Gặp chủ': storeNoOwner(s) ? 'Chưa gặp' : 'Đã gặp', 'DT tháng (đ)': revS[stKey(s)] || 0, 'Đơn tháng': cntS[stKey(s)] || 0, 'Mua gần nhất': lastS[stKey(s)] ? tsToVN(lastS[stKey(s)]) : '', 'Ảnh shop': s.storePhoto ? 'Có' : 'Không', 'Vĩ độ': s.lat == null ? '' : s.lat, 'Kinh độ': s.lng == null ? '' : s.lng }));
             const shop = xbTable(T, { name: 'Cửa hàng', tab: XC.GREEN, title: 'DANH SÁCH CỬA HÀNG – ' + lbl, sub: stores.length + ' cửa hàng • ' + Object.keys(revS).length + ' có đơn trong tháng • sắp xếp theo doanh thu tháng • cập nhật ' + now,
                 heads: Object.keys(shopRows[0] || { 'STT': 0, 'Tên cửa hàng': '', 'Chủ shop': '', 'SĐT': '', 'Tỉnh/TP': '', 'Quận/Huyện': '', 'Địa chỉ': '', 'Quy mô': '', 'Ngành hàng': '', 'Tình trạng KH': '', 'Quan tâm': '', 'Gặp chủ': '', 'DT tháng (đ)': 0, 'Đơn tháng': 0, 'Mua gần nhất': '', 'Ảnh shop': '', 'Vĩ độ': '', 'Kinh độ': '' }),
                 widths: [6, 26, 16, 13, 14, 16, 26, 9, 12, 13, 24, 11, 15, 9, 13, 9, 11, 11], data: shopRows,
