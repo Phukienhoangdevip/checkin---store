@@ -834,6 +834,7 @@
         function isPcMode() { return !isMobileDevice() && !!db && !!db.settings && db.settings.deviceMode === 'pc'; }
         function normalizeDb() {
             ST.ver++;
+            try { storeNumbering(); } catch (e) { console.warn('storeNumbering', e); }
             if (!db.users || !db.users.length) db.users = [{ username: 'admin', password: '123', role: 'admin', status: 'approved', fullname: 'Quản trị viên (Hoàng Đế)', permissions: { stores: true, master: true, warehouse: true, history: true } }];
             ['stores', 'productsMaster', 'warehouse', 'checkinHistory', 'importHistory', 'routes', 'returnHistory'].forEach(k => { if (!Array.isArray(db[k])) db[k] = []; });
             if (!db.salesHistory) db.salesHistory = db.history || [];
@@ -1326,6 +1327,7 @@
         }
         function storeOfRec(h) {
             if (!h) return null; const I = stIndex();
+            if (h.storeId == null && Number(h.storeNo) > 0) { const s = (db.stores || []).find(x => Number(x.no) === Number(h.storeNo)); if (s && s.name === h.storeName) return s; }
             if (h.storeId != null && I.byId.has(String(h.storeId))) { const s = I.byId.get(String(h.storeId)); if (s.name === h.storeName || !I.byName.has(h.storeName)) return s; }
             const list = I.byName.get(String(h.storeName || '')); if (!list) return null; if (list.length === 1) return list[0];
             if (I.memo.has(h)) return I.memo.get(h);
@@ -1344,8 +1346,25 @@
         const stKeyOfRec = h => { const s = storeOfRec(h); return s ? 'id:' + s.id : 'n:' + (h && h.storeName); };
         const stKey = s => 'id:' + s.id;
         // tên hiển thị: tiệm trùng tên thì thêm khu vực / SĐT để phân biệt
-        function stLabel(s) { if (!s) return ''; const l = stIndex().byName.get(String(s.name || '')); return l && l.length > 1 ? s.name + ' (' + (s.district || s.city || s.phone || ('#' + String(s.id).slice(-4))) + ')' : s.name; }
+        function stLabel(s) { return stName(s); }
         const stLabelOfRec = h => { const s = storeOfRec(h); return s ? stLabel(s) : (h && h.storeName) || ''; };
+        // Bản 73: số thứ tự khách hàng #1, #2… (chỉ tăng, không dùng lại). Trùng số do 2 máy tạo lúc offline: tiệm tạo trước giữ số, tiệm sau nhận số mới
+        function storeNumbering() {
+            const L = db.stores || []; if (!db.settings || typeof db.settings !== 'object') db.settings = {};
+            let seq = Math.max(Number(db.settings.storeSeq) || 0, 0); L.forEach(s => { const n = Number(s.no) || 0; if (n > seq) seq = n; });
+            const byId = L.slice().sort((a, b) => (Number(a.id) || 0) - (Number(b.id) || 0) || String(a.id).localeCompare(String(b.id)));
+            const used = new Set(); let changed = false;
+            byId.forEach(s => { const n = Number(s.no) || 0; if (n > 0 && !used.has(n)) { used.add(n); if (s.no !== n) s.no = n; } else if (n > 0) { s.no = 0; } });
+            byId.forEach(s => { if (!(Number(s.no) > 0)) { s.no = ++seq; changed = true; } });
+            if (db.settings.storeSeq !== seq) db.settings.storeSeq = seq;
+            return changed;
+        }
+        const stName = s => s ? (Number(s.no) > 0 ? '#' + s.no + ' ' : '') + (s.name || '') : '';
+        function storeByLabel(txt) {
+            const t = String(txt || '').trim(), m = /^#(\d+)\s*(.*)$/.exec(t), L = db.stores || [];
+            if (m) { const s = L.find(x => Number(x.no) === Number(m[1])); if (s) return s; }
+            return L.find(x => x.name === t) || L.find(x => stNorm(x.name) === stNorm(m ? m[2] : t)) || null;
+        }
         function dupNameGroups() { const g = new Map(); (db.stores || []).forEach(s => { const k = stNorm(s.name); if (!k) return; (g.get(k) || g.set(k, []).get(k)).push(s); }); return [...g.values()].filter(l => l.length > 1); }
         function nameTaken(name, exceptId) { const k = stNorm(name); return (db.stores || []).find(s => stNorm(s.name) === k && String(s.id) !== String(exceptId)) || null; }
 
@@ -1377,6 +1396,7 @@
 
         function saveData() {
             ST.ver++;
+            try { storeNumbering(); } catch (e) { console.warn('storeNumbering', e); }
             try { actDiff(); } catch (e) { console.warn('actDiff', e); }
             saveSession();
             localCacheWrite();
@@ -1612,7 +1632,7 @@
                         </div>
                         <div>
                             <h1 class="font-black text-xs sm:text-sm uppercase tracking-wider">PHỤ KIỆN HOÀNG ĐẾ</h1>
-                            <p class="text-[11px] sm:text-xs opacity-75">Nhân sự: <span class="font-bold text-amber-500">${user.fullname}</span> (${isPcMode() ? 'Chế độ PC' : 'Chế độ Mobile'} • Bản 72)</p>
+                            <p class="text-[11px] sm:text-xs opacity-75">Nhân sự: <span class="font-bold text-amber-500">${user.fullname}</span> (${isPcMode() ? 'Chế độ PC' : 'Chế độ Mobile'} • Bản 73)</p>
                         </div>
                     </div>
                     <div class="flex space-x-2 w-full sm:w-auto justify-end">
@@ -1639,7 +1659,7 @@
 
         // ===== Bản 42: tìm cửa hàng, lọc tỉnh/quận có ô tìm =====
         let storeQ = '', pickKind = '';
-        function storeKey(s) { return normTxt([s.name, s.owner, s.phone, s.address, s.district, s.city].join(' ')); }
+        function storeKey(s) { return normTxt([s.no ? '#' + s.no + ' ' + s.no : '', s.name, s.owner, s.phone, s.address, s.district, s.city].join(' ')); }
         function storeMatch(s) { const k = normTxt(storeQ).trim(); return !k || storeKey(s).includes(k); }
         function storeSearchInput(v) {
             storeQ = v; const k = normTxt(v).trim(); let n = 0;
@@ -1697,7 +1717,7 @@
 
             return `
                 <div class="space-y-4 sm:space-y-6 text-theme-text">
-                    ${dupG.length ? `<button type="button" onclick="openStoreDup()" class="w-full p-3 rounded-2xl bg-rose-500/15 border border-rose-500/50 text-rose-400 text-xs font-bold text-left"><i class="fa-solid fa-triangle-exclamation mr-1"></i>Có ${dupG.length} nhóm tiệm TRÙNG TÊN (${dupG.map(g => escHtml(g[0].name)).slice(0, 3).join(', ')}${dupG.length > 3 ? '…' : ''}). ${isAdmin ? 'Bấm để đổi tên phân biệt.' : 'Báo admin đổi tên để không lẫn đơn.'}</button>` : ''}
+                    ${0 && dupG.length ? `<button type="button" onclick="openStoreDup()" class="w-full p-3 rounded-2xl bg-rose-500/15 border border-rose-500/50 text-rose-400 text-xs font-bold text-left"><i class="fa-solid fa-triangle-exclamation mr-1"></i>Có ${dupG.length} nhóm tiệm TRÙNG TÊN (${dupG.map(g => escHtml(g[0].name)).slice(0, 3).join(', ')}${dupG.length > 3 ? '…' : ''}). ${isAdmin ? 'Bấm để đổi tên phân biệt.' : 'Báo admin đổi tên để không lẫn đơn.'}</button>` : ''}
                     <div class="bg-theme-card border border-theme-border p-4 sm:p-6 rounded-2xl shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                         <div>
                             <h2 class="font-bold text-base sm:text-lg flex items-center space-x-2">
@@ -1766,7 +1786,7 @@
                                                 #${index + 1}
                                             </div>
                                             <div>
-                                                <h3 class="font-bold text-sm sm:text-base">${s.name}</h3>
+                                                <h3 class="font-bold text-sm sm:text-base">${escHtml(stName(s))}</h3>
                                                 <p class="text-xs opacity-75 mt-0.5">Chủ: <b class="opacity-100">${s.owner || 'N/A'}</b> | SĐT: <a href="tel:${s.phone}" class="text-blue-400 underline">${s.phone || 'N/A'}</a></p>
                                                 <p class="text-xs opacity-75 mt-0.5"><i class="fa-solid fa-location-dot mr-1 text-amber-500"></i>${s.address}, ${s.district}, ${s.city} <span class="text-[10px] text-blue-400 bg-blue-500/10 border border-blue-500/20 px-1.5 py-0.5 rounded font-mono">[${s.lat}, ${s.lng}]</span></p>
                                                 ${(s.scale || s.industry || s.relation) ? `<div class="flex flex-wrap gap-1 mt-1.5">${s.scale ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-500 border border-amber-500/30 font-semibold">Quy mô: ${s.scale}</span>` : ''}${s.industry ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-400 border border-blue-500/30 font-semibold">${s.industry}</span>` : ''}${s.relation ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-semibold">${s.relation}</span>` : ''}</div>` : ''}
@@ -1903,7 +1923,6 @@
             const s = db.stores.find(x => String(x.id) === String(id));
             if(!s) return;
             const oldStoreName = s.name, newName = document.getElementById('e-shop').value.trim();
-            if (newName && nameTaken(newName, s.id)) { alert('⚠ Đã có tiệm khác tên "' + newName + '".\nHãy thêm khu vực để phân biệt, VD: "' + newName + ' – ' + (document.getElementById('e-district') ? document.getElementById('e-district').value : (s.district || 'Khu vực')) + '".'); return; }
             if (oldStoreName && newName && oldStoreName !== newName) renameStoreSafe(s, newName); else s.name = newName;   // Bản 72: chỉ lịch sử của ĐÚNG tiệm này
             if (0) [db.salesHistory].forEach(l => (l || []).forEach(h => { if (h && h.storeName === oldStoreName) h.storeName = s.name; }));
             s.owner = document.getElementById('e-owner').value.trim();
@@ -2241,7 +2260,7 @@
                 <div class="p-4 overflow-y-auto space-y-3 text-xs">
                     ${!admin ? `<div class="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-500 font-semibold">${off ? 'Đơn bổ sung' : 'Yêu cầu sửa'} sẽ gửi Admin duyệt. Chỉ khi Admin duyệt, đơn mới được tính vào tài khoản của bạn.</div>` : ''}
                     ${off ? `
-                        <div><label class="block font-semibold uppercase mb-1 opacity-70">Cửa hàng (bắt buộc chọn cửa hàng có sẵn) *</label><input id="inv-store" list="inv-stores" value="${escHtml(S.storeName)}" placeholder="Gõ để tìm cửa hàng..." class="${inp}"><datalist id="inv-stores">${(db.stores || []).map(s => `<option value="${escHtml(s.name)}">${escHtml([s.phone, s.district].filter(Boolean).join(' • '))}</option>`).join('')}</datalist></div>
+                        <div><label class="block font-semibold uppercase mb-1 opacity-70">Cửa hàng (bắt buộc chọn cửa hàng có sẵn) *</label><input id="inv-store" list="inv-stores" value="${escHtml(S.storeName)}" placeholder="Gõ để tìm cửa hàng..." class="${inp}"><datalist id="inv-stores">${(db.stores || []).map(s => `<option value="${escHtml(stName(s))}">${escHtml([s.phone, s.district].filter(Boolean).join(' • '))}</option>`).join('')}</datalist></div>
                         <div class="grid grid-cols-2 gap-2"><div><label class="block font-semibold uppercase mb-1 opacity-70">Ngày bán *</label><input id="inv-date" type="date" min="${minD}" max="${maxD}" value="${S.date}" class="${inp}"></div><div><label class="block font-semibold uppercase mb-1 opacity-70">Giờ bán *</label><input id="inv-clock" type="time" value="${S.clock}" class="${inp}"></div></div>
                         <div class="opacity-60">Chỉ được lùi tối đa ${INV_DAYS} ngày (giờ Việt Nam), không chọn ngày tương lai.</div>`
                     : `<div class="p-2.5 rounded-xl bg-theme-input border border-theme-border"><b>${escHtml(S.storeName)}</b><br><span class="opacity-70">${escHtml(S.time)}</span></div>
@@ -2270,7 +2289,7 @@
             if (!S.pay) return 'Chọn phương thức thanh toán (Tiền mặt / Chuyển khoản).';
             if ((S.reason || '').length < 3) return S.mode === 'offline' ? 'Đơn bổ sung bắt buộc phải có lý do.' : 'Hãy ghi lý do sửa hóa đơn.';
             if (S.mode === 'offline') {
-                if (!(db.stores || []).some(s => s.name === S.storeName)) return 'Hãy chọn đúng một cửa hàng có trong danh sách điểm bán.';
+                if (!storeByLabel(S.storeName)) return 'Hãy chọn đúng một cửa hàng có trong danh sách điểm bán.';
                 if (!S.date || !S.clock) return 'Chọn ngày và giờ bán.';
                 const minD = invIsoShift(invTodayIso(), -INV_DAYS), maxD = invTodayIso();
                 if (S.date < minD || S.date > maxD) return 'Ngày bán phải trong vòng ' + INV_DAYS + ' ngày gần đây và không được ở tương lai.';
@@ -2296,11 +2315,11 @@
         function invApply(d, owner, approver) {
             const c = invCalc(d), items = d.items.map(i => { const p = invProd(i.name); return { name: p ? p.name : i.name, q: i.q, price: i.price }; });
             if (d.mode === 'offline') {
-                const st = (db.stores || []).find(s => s.name === d.storeName); if (!st) return 'Cửa hàng "' + d.storeName + '" không còn trong danh sách.';
+                const st = storeByLabel(d.storeName); if (!st) return 'Cửa hàng "' + d.storeName + '" không còn trong danh sách.';
                 if (d.deduct) { const delta = invDelta([], items), pr = invStockProblems(delta); if (pr.length) return 'Không đủ hàng tồn để trừ:\n' + pr.join('\n'); invApplyStock(delta); }
                 const [y, mo, dd] = d.date.split('-').map(Number), time = d.clock + ':00 ' + dd + '/' + mo + '/' + y;
                 const ou = (db.users || []).find(x => x.username === owner) || {};
-                const rec = { time, username: owner, storeName: st.name, storeId: st.id, address: st.address || '', owner: st.owner || '', phone: st.phone || '', saleName: ou.fullname || owner,
+                const rec = { time, username: owner, storeName: st.name, storeId: st.id, storeNo: st.no, address: st.address || '', owner: st.owner || '', phone: st.phone || '', saleName: ou.fullname || owner,
                     note: invNote('Đơn bổ sung', d.pay, items, c.net, d.reason), discountStr: c.str, gross: c.gross, net: c.net, discountAmount: c.amt, pay: d.pay, items, photos: [], photo: '',
                     supplement: true, reason: d.reason, noStock: !d.deduct, createdAt: vnNowStr(), approvedBy: approver };
                 let k = 0; while (invFind(saleKeyOf(rec)) && k < 59) { k++; rec.time = d.clock + ':' + String(k).padStart(2, '0') + ' ' + dd + '/' + mo + '/' + y; }
@@ -2359,7 +2378,7 @@
             }
             const pay = h.pay || ((h.note || '').match(/\(([^)]*)\)/) || [])[1] || '--';
             document.getElementById('bill-title').innerHTML = '<i class="fa-solid fa-receipt mr-1"></i> Xem lại bill đã lưu';
-            document.getElementById('bill-store-name').innerText = h.storeName || '--';
+            document.getElementById('bill-store-name').innerText = stLabelOfRec(h) || '--';
             document.getElementById('bill-owner').innerText = h.owner || st.owner || '--';
             document.getElementById('bill-phone').innerText = h.phone || st.phone || '--';
             document.getElementById('bill-time').innerText = h.time || '--';
@@ -4007,8 +4026,9 @@
         const actSeenTs = () => { try { return Number(localStorage.getItem('hoangde_act_seen')) || 0; } catch (e) { return 0; } };
         function actVisible() { const u = getCurrentUser(); if (!u) return []; const L = db.activityLog || []; return u.role === 'admin' ? L : L.filter(e => e.owner === u.username || e.by === u.username); }
         // ===== Bản 55: Chuông thông báo, Bảo hành, Báo cáo theo khoảng ngày, Bảng trả kho =====
-        const APP_VER = 72;
+        const APP_VER = 73;
         const APP_NOTES = {
+            73: ['Mỗi khách hàng có SỐ THỨ TỰ riêng #1, #2, #3… (chỉ tăng, không dùng lại kể cả khi xóa tiệm)', 'Cho phép tiệm trùng tên: phân biệt bằng số #, hiện ở thẻ tiệm, tìm kiếm, hóa đơn, báo cáo, KPI, chăm sóc, Excel', 'Đơn / check-in mới lưu kèm số khách hàng'],
             72: ['Sửa lỗi 2 tiệm TRÙNG TÊN bị tính chung đơn (Excel thị trường, báo cáo, KPI, chăm sóc, gợi ý chào hàng): mỗi đơn chỉ thuộc đúng 1 tiệm', 'Đơn / check-in mới lưu mã tiệm; đơn cũ tự nhận đúng tiệm theo SĐT, tọa độ, địa chỉ', 'Chặn tạo / sửa tiệm trùng tên; admin có công cụ xử lý tiệm trùng tên (đổi tên chỉ chuyển đúng đơn của tiệm đó)'],
             71: ['Báo cáo ngày: bảng đầu có Doanh thu Gross / Net, số bill, bill chuyển khoản / tiền mặt, cửa hàng thêm mới / đã bán / đã ghé chưa bán, bảo hành, SL bán ra, chiết khấu', 'Chốt nộp tiền công ty (admin): chọn từ ngày – đến ngày, liệt kê đơn tiền mặt + chuyển khoản chưa nộp, ghi người nhận', 'Báo cáo tổng hợp + Excel: cột Nộp công ty, mỗi đơn ghi Đã thanh toán về công ty / Chưa nộp'],
             70: ['Chế độ offline tự động: mất mạng vẫn mở app và làm việc bình thường (app + thư viện lưu sẵn trong máy)', 'Có mạng lại tự đồng bộ ngay; trạng thái 🟢 Đã đồng bộ / 🟠 Offline – còn N thay đổi / 🔵 Đang đồng bộ', 'Gộp dữ liệu 3 phía khi máy khác cũng sửa: không mất đơn, không mất check-in, không trùng đơn, tồn kho cộng đúng phần thay đổi'],
@@ -4082,7 +4102,7 @@
                     <div class="opacity-60">Trả hàng sẽ <b>trừ vào tồn kho</b> số lượng sản phẩm đã chọn (bỏ tick nếu trả lại chính hàng đã sửa).</div>
                 </div>`;
             m.innerHTML = `<div class="bg-theme-card border border-theme-border rounded-t-3xl sm:rounded-3xl w-full max-w-lg max-h-[94vh] flex flex-col">
-                <div class="p-4 border-b border-theme-border flex items-center justify-between gap-2"><div class="font-bold text-sm"><i class="fa-solid fa-screwdriver-wrench text-amber-500 mr-2"></i>Bảo hành • ${escHtml(s.name)}</div><button onclick="wClose()" class="px-3 py-1 rounded-lg bg-theme-input text-xs font-bold">Đóng</button></div>
+                <div class="p-4 border-b border-theme-border flex items-center justify-between gap-2"><div class="font-bold text-sm"><i class="fa-solid fa-screwdriver-wrench text-amber-500 mr-2"></i>Bảo hành • ${escHtml(stName(s))}</div><button onclick="wClose()" class="px-3 py-1 rounded-lg bg-theme-input text-xs font-bold">Đóng</button></div>
                 <div class="p-4 overflow-y-auto space-y-3 text-xs">
                     <div class="flex gap-2">${tabBtn('in', 'fa-box-open', 'Nhận hàng bảo hành')}${tabBtn('out', 'fa-hand-holding-heart', 'Trả hàng bảo hành', open.length)}</div>
                     ${wTab === 'out' ? formOut : formIn}
@@ -4502,7 +4522,7 @@
             blocks.push(row(box('Tổng số lượng bảo hành', D.warQty + ' cái', '#c4b5fd'), box('Tổng SL sản phẩm bán ra', D.totalSold + ' cái', '#fff')));
             blocks.push(row(box('Đã nộp công ty', rpFmt(D.paidSum) + ' đ', '#34d399'), box('Còn phải nộp', D.unpaidN + ' đơn • ' + rpFmt(D.unpaidSum) + ' đ', D.unpaidN ? '#fda4af' : '#34d399')));
             blocks.push(RP_BREAK);
-            const sc = (s, i, has) => rpCard(`<div style="display:flex;justify-content:space-between;gap:6px"><b style="color:${has ? '#fcd34d' : '#cbd5e1'}">${i + 1}. ${escHtml(s.name)}</b><b style="color:${has ? '#fbbf24' : '#94a3b8'};white-space:nowrap">${has ? rpFmt(D.revOf(s)) + ' đ' : 'Chưa có đơn'}</b></div><div>📞 <span style="color:#60a5fa">${escHtml(s.phone || 'N/A')}</span>${storeNoOwner(s) ? ' • <span style="color:#fda4af">Không gặp chủ</span>' : ''}</div>${(s.interests || []).length ? `<div style="opacity:.85">Quan tâm: ${escHtml(s.interests.join(', '))}</div>` : ''}`);
+            const sc = (s, i, has) => rpCard(`<div style="display:flex;justify-content:space-between;gap:6px"><b style="color:${has ? '#fcd34d' : '#cbd5e1'}">${i + 1}. ${escHtml(stName(s))}</b><b style="color:${has ? '#fbbf24' : '#94a3b8'};white-space:nowrap">${has ? rpFmt(D.revOf(s)) + ' đ' : 'Chưa có đơn'}</b></div><div>📞 <span style="color:#60a5fa">${escHtml(s.phone || 'N/A')}</span>${storeNoOwner(s) ? ' • <span style="color:#fda4af">Không gặp chủ</span>' : ''}</div>${(s.interests || []).length ? `<div style="opacity:.85">Quan tâm: ${escHtml(s.interests.join(', '))}</div>` : ''}`);
             rpSection(`🏪 Cửa hàng đã phát sinh đơn (${D.withO.length})`, D.withO.map((s, i) => sc(s, i, true)), 'Không có cửa hàng nào phát sinh đơn.').forEach(b => blocks.push(b));
             rpSection(`🏪 Cửa hàng chưa phát sinh đơn (${D.noO.length})`, D.noO.map((s, i) => sc(s, i, false)), 'Không có.').forEach(b => blocks.push(b));
             const pl = (lbl, x, c) => rpLine(`<b style="color:${c}">${lbl}</b>: ${escHtml(x.n)} — <b>${x.q} cái</b> (${x.pct.toFixed(1)}%)`);
@@ -4727,8 +4747,8 @@
                 xlRow(s1, ['Đã nộp công ty (đ)', D.paidSum], { num: [2], fill: 'FFD1FAE5', bold: true }); xlRow(s1, ['Còn phải nộp (đ) – ' + D.unpaidN + ' đơn', D.unpaidSum], { num: [2], fill: D.unpaidN ? 'FFFFE4E6' : 'FFD1FAE5', bold: true });
                 const s2 = wb.addWorksheet('Cửa hàng'); [6, 30, 16, 36, 18, 18].forEach((w, i) => s2.getColumn(i + 1).width = w);
                 xlTitle(s2, 'DANH SÁCH CỬA HÀNG • ' + D.label, 6); xlHead(s2, ['STT', 'Cửa hàng', 'SĐT', 'Mục quan tâm', 'Đã phát sinh (đ)', 'Tình trạng']);
-                D.withO.forEach((s, i) => xlRow(s2, [i + 1, s.name, s.phone || '', (s.interests || []).join(', '), D.revOf(s), storeNoOwner(s) ? 'Không gặp chủ' : 'Đã có đơn'], { num: [5], fill: 'FFD1FAE5' }));
-                D.noO.forEach((s, i) => xlRow(s2, [D.withO.length + i + 1, s.name, s.phone || '', (s.interests || []).join(', '), 0, storeNoOwner(s) ? 'Không gặp chủ' : 'Chưa lấy hàng'], { num: [5], fill: storeNoOwner(s) ? 'FFFFE4E6' : 'FFF3F4F6' }));
+                D.withO.forEach((s, i) => xlRow(s2, [i + 1, stName(s), s.phone || '', (s.interests || []).join(', '), D.revOf(s), storeNoOwner(s) ? 'Không gặp chủ' : 'Đã có đơn'], { num: [5], fill: 'FFD1FAE5' }));
+                D.noO.forEach((s, i) => xlRow(s2, [D.withO.length + i + 1, stName(s), s.phone || '', (s.interests || []).join(', '), 0, storeNoOwner(s) ? 'Không gặp chủ' : 'Chưa lấy hàng'], { num: [5], fill: storeNoOwner(s) ? 'FFFFE4E6' : 'FFF3F4F6' }));
                 xlRow(s2, ['', 'TỔNG', D.stores.length + ' cửa hàng', '', D.net, ''], { bold: true, num: [5], fill: 'FFFDE68A' });
                 const s3 = wb.addWorksheet('Thống kê bán ra'); [8, 46, 12, 12, 22].forEach((w, i) => s3.getColumn(i + 1).width = w);
                 xlTitle(s3, 'THỐNG KÊ SẢN PHẨM BÁN RA • ' + D.label, 5); xlHead(s3, ['Hạng', 'Sản phẩm', 'Đã bán', '% tổng', 'Ghi chú']);
@@ -4745,7 +4765,7 @@
                     const s5 = wb.addWorksheet('Đơn hàng & Nộp CT'); [6, 20, 30, 20, 14, 14, 12, 14, 26, 18, 22].forEach((w, i) => s5.getColumn(i + 1).width = w);
                     xlTitle(s5, 'ĐƠN HÀNG & NỘP TIỀN CÔNG TY • ' + D.label, 11); xlHead(s5, ['STT', 'Thời gian', 'Cửa hàng', 'Nhân viên', 'Thanh toán', 'Gross (đ)', 'Chiết khấu (đ)', 'Net (đ)', 'Nộp công ty', 'Ngày nộp', 'Người nhận']);
                     D.sales.slice().sort((x, y) => (recTs(x) || 0) - (recTs(y) || 0)).forEach((h, i) => { const po = D.paidOf(h);
-                        xlRow(s5, [i + 1, h.time, h.storeName, users.get(h.username) || h.username || '', saleIsCK(h) ? 'Chuyển khoản' : 'Tiền mặt', saleGross(h), saleGross(h) - saleNet(h), saleNet(h), po ? 'Đã thanh toán về công ty' + (po.diff ? ' (sửa sau, chênh ' + po.diff + ')' : '') : 'Chưa nộp', po ? String(po.p.at || '') : '', po ? po.p.receiver || '' : ''], { num: [6, 7, 8], fill: po ? 'FFD1FAE5' : 'FFFFE4E6' }); });
+                        xlRow(s5, [i + 1, h.time, stLabelOfRec(h), users.get(h.username) || h.username || '', saleIsCK(h) ? 'Chuyển khoản' : 'Tiền mặt', saleGross(h), saleGross(h) - saleNet(h), saleNet(h), po ? 'Đã thanh toán về công ty' + (po.diff ? ' (sửa sau, chênh ' + po.diff + ')' : '') : 'Chưa nộp', po ? String(po.p.at || '') : '', po ? po.p.receiver || '' : ''], { num: [6, 7, 8], fill: po ? 'FFD1FAE5' : 'FFFFE4E6' }); });
                     xlRow(s5, ['', 'TỔNG', D.sales.length + ' đơn', '', '', D.gross, D.disc, D.net, 'Đã nộp ' + D.paidSum.toLocaleString('vi-VN') + ' đ', 'Còn ' + D.unpaidSum.toLocaleString('vi-VN') + ' đ', ''], { bold: true, num: [6, 7, 8], fill: 'FFFDE68A' });
                     const s6 = wb.addWorksheet('Phiếu nộp tiền'); [20, 12, 12, 9, 15, 15, 15, 15, 13, 22, 18, 24].forEach((w, i) => s6.getColumn(i + 1).width = w);
                     xlTitle(s6, 'CÁC LẦN NỘP TIỀN CÔNG TY (liên quan kỳ ' + D.label + ')', 12); xlHead(s6, ['Ngày nộp', 'Từ ngày', 'Đến ngày', 'Số đơn', 'Tiền mặt (đ)', 'Chuyển khoản (đ)', 'Tổng đơn (đ)', 'Thực nộp (đ)', 'Chênh lệch (đ)', 'Người nhận', 'Người chốt', 'Ghi chú']);
@@ -5340,7 +5360,7 @@
                         </tr></thead>
                         <tbody class="divide-y divide-theme-border">
                             ${rows.length ? rows.slice(0, 300).map((r, i) => `<tr class="cursor-pointer hover:bg-white/5" onclick="openStoreRev(${r.s.id})">
-                                <td class="p-2 text-center">${i + 1}</td><td class="p-2 font-bold">${escHtml(r.s.name)}</td><td class="p-2">${escHtml(kpiTrade(r.s) || '-')}</td><td class="p-2">${escHtml(kpiArea(r.s) || '-')}</td>
+                                <td class="p-2 text-center">${i + 1}</td><td class="p-2 font-bold">${escHtml(stName(r.s))}</td><td class="p-2">${escHtml(kpiTrade(r.s) || '-')}</td><td class="p-2">${escHtml(kpiArea(r.s) || '-')}</td>
                                 <td class="p-2 text-center">${r.cur.c}</td><td class="p-2 text-right font-semibold">${kpiFmt(r.cur.n)}</td>
                                 <td class="p-2 text-center font-bold ${kpiDeltaCls(r.dOrd.v)}">${r.dOrd.t}</td><td class="p-2 text-center font-bold ${kpiDeltaCls(r.dRev.v)}">${r.dRev.t}</td>
                                 <td class="p-2 text-right opacity-80">${r.target ? kpiFmt(r.target) + (r.tsrc === 'prev' ? '*' : '') : '-'}${r.ratio != null && r.cur.c ? `<div class="text-[10px] opacity-70">${Math.round(r.ratio * 100)}%</div>` : ''}</td>
@@ -5410,7 +5430,7 @@
                 const s = r.s, ph = String(s.phone || '').replace(/[^\d+]/g, ''), pct = r.days == null ? 100 : Math.min(100, Math.round(r.days / CARE_DAYS * 100));
                 const addr = [s.address, s.district, s.city].filter(Boolean).join(', ');
                 return `<div class="p-3 rounded-2xl border ${r.due ? 'border-rose-500/50' : 'border-theme-border'} bg-theme-input/40 space-y-1.5 text-xs">
-                    <div class="flex justify-between gap-2"><b class="break-words">${i + 1}. ${escHtml(s.name)}</b><span class="px-2 py-0.5 rounded-full text-[10px] font-bold whitespace-nowrap ${carePriCls(r.pri)}">Ưu tiên ${r.pri.toLowerCase()}</span></div>
+                    <div class="flex justify-between gap-2"><b class="break-words">${i + 1}. ${escHtml(stName(s))}</b><span class="px-2 py-0.5 rounded-full text-[10px] font-bold whitespace-nowrap ${carePriCls(r.pri)}">Ưu tiên ${r.pri.toLowerCase()}</span></div>
                     <div class="opacity-80"><i class="fa-solid fa-phone mr-1"></i>${escHtml(s.phone || 'Chưa có SĐT')}${s.owner ? ' • ' + escHtml(s.owner) : ''}</div>
                     <div class="opacity-80"><i class="fa-solid fa-location-dot mr-1"></i>${escHtml(addr || '-')}</div>
                     <div>Doanh thu: <b class="text-amber-500">${kpiFmt(r.total)} đ</b> • tháng này ${kpiFmt(r.month)} đ • ${r.orders} đơn${r.lastOrder ? ' • đơn gần nhất ' + careDate(r.lastOrder) : ''}${r.lastCall ? ' • gọi gần nhất ' + careDate(r.lastCall) : ''}</div>
@@ -5473,7 +5493,7 @@
             if (!m) { m = document.createElement('div'); m.id = 'care-modal'; m.className = 'fixed inset-0 z-50 bg-black/70 flex items-end sm:items-center justify-center p-0 sm:p-4'; document.body.appendChild(m); }
             m.classList.remove('hidden');
             m.innerHTML = `<div class="bg-theme-card border border-theme-border rounded-t-3xl sm:rounded-3xl w-full max-w-lg max-h-[88vh] flex flex-col">
-                <div class="p-4 border-b border-theme-border flex items-center justify-between gap-2"><div class="font-bold text-sm break-words"><i class="fa-solid fa-timeline text-amber-500 mr-2"></i>${escHtml(s.name)}</div><button onclick="document.getElementById('care-modal').classList.add('hidden')" class="px-3 py-1 rounded-lg bg-theme-input text-xs font-bold">Đóng</button></div>
+                <div class="p-4 border-b border-theme-border flex items-center justify-between gap-2"><div class="font-bold text-sm break-words"><i class="fa-solid fa-timeline text-amber-500 mr-2"></i>${escHtml(stName(s))}</div><button onclick="document.getElementById('care-modal').classList.add('hidden')" class="px-3 py-1 rounded-lg bg-theme-input text-xs font-bold">Đóng</button></div>
                 <div class="p-4 overflow-y-auto text-xs space-y-1">
                     ${r ? `<div class="font-semibold mb-2 ${r.due ? 'text-rose-400' : 'text-emerald-400'}">${careStatusText(r)}</div>` : ''}
                     ${ev.length ? ev.map((e, i) => { const nx = ev[i + 1]; const gap = nx ? Math.round((careDay(e.ts) - careDay(nx.ts)) / 864e5) : null;
@@ -5490,7 +5510,7 @@
             const f = [kpiCity !== 'all' ? kpiCity : '', kpiDistrict !== 'all' ? kpiDistrict : '', careNoOwner ? 'Không gặp chủ' : '', careInt.join(', '), carePri !== 'all' ? 'Ưu tiên ' + carePri.toLowerCase() : '', careQ ? '"' + careQ + '"' : ''].filter(Boolean).join(' • ');
             return rpSection('📞 Chăm sóc khách hàng ' + vnDateStr(new Date()) + (f ? ' • ' + escHtml(f) : '') + ' (' + rows.length + ' khách)', rows.map((r, i) => {
                 const s = r.s, col = r.pri === 'Cao' ? '#fb7185' : r.pri === 'Trung bình' ? '#fbbf24' : '#34d399';
-                return rpCard(`<div style="display:flex;justify-content:space-between;gap:6px"><b style="color:#fcd34d">${i + 1}. ${escHtml(s.name)}</b><b style="color:${col};white-space:nowrap">Ưu tiên ${r.pri.toLowerCase()}</b></div>`
+                return rpCard(`<div style="display:flex;justify-content:space-between;gap:6px"><b style="color:#fcd34d">${i + 1}. ${escHtml(stName(s))}</b><b style="color:${col};white-space:nowrap">Ưu tiên ${r.pri.toLowerCase()}</b></div>`
                     + `<div>📞 ${escHtml(s.phone || '-')}${s.owner ? ' • ' + escHtml(s.owner) : ''}</div><div>📍 ${escHtml([s.address, s.district, s.city].filter(Boolean).join(', ') || '-')}</div>`
                     + `<div>Doanh thu: <b style="color:#fbbf24">${rpFmt(r.total)} đ</b> • ${r.orders} đơn${r.lastOrder ? ' • đơn gần nhất ' + careDate(r.lastOrder) : ''}${r.lastCall ? ' • gọi gần nhất ' + careDate(r.lastCall) : ''}</div>`
                     + `<div>🚶 ${r.lastVisit ? 'Ghé gần nhất ' + careDate(r.lastVisit) : 'Chưa ghé tiệm'}</div>`
@@ -5555,7 +5575,7 @@
             const card = (r, i) => {
                 const s = r.s, ph = String(s.phone || '').replace(/[^\d+]/g, ''), lp = r.lastPitch;
                 return `<div class="p-3 rounded-2xl border ${r.due ? 'border-rose-500/50' : 'border-theme-border'} bg-theme-input/40 space-y-1.5 text-xs">
-                    <div class="flex justify-between gap-2"><b class="break-words">${i + 1}. ${escHtml(s.name)}</b><span class="px-2 py-0.5 rounded-full text-[10px] font-bold whitespace-nowrap ${r.due ? 'bg-rose-500/20 text-rose-400' : 'bg-emerald-500/20 text-emerald-400'}">${r.due ? r.due + ' món đến hạn' : 'Chưa đến hạn'}</span></div>
+                    <div class="flex justify-between gap-2"><b class="break-words">${i + 1}. ${escHtml(stName(s))}</b><span class="px-2 py-0.5 rounded-full text-[10px] font-bold whitespace-nowrap ${r.due ? 'bg-rose-500/20 text-rose-400' : 'bg-emerald-500/20 text-emerald-400'}">${r.due ? r.due + ' món đến hạn' : 'Chưa đến hạn'}</span></div>
                     <div class="opacity-80"><i class="fa-solid fa-phone mr-1"></i>${escHtml(s.phone || 'Chưa có SĐT')}${s.owner ? ' • ' + escHtml(s.owner) : ''}</div>
                     <div class="opacity-80"><i class="fa-solid fa-location-dot mr-1"></i>${escHtml([s.address, s.district, s.city].filter(Boolean).join(', ') || '-')}</div>
                     <div class="opacity-80"><i class="fa-solid fa-bullhorn mr-1"></i>${lp ? 'Lần chào gần nhất: Chưa chốt ' + careAgo(lp.ts) + (lp.reason ? ' – lý do: ' + escHtml(lp.reason) : '') + (lp.itemName ? ' (' + escHtml(lp.itemName) + ')' : '') : 'Chưa có lần chào hàng nào'}</div>
@@ -5675,7 +5695,7 @@
         function kpiReportBlocks() {
             const mk = kpiMonthSel || kpiNowKey();
             const rows = kpiRows(mk);
-            return rpSection('📊 KPI khách hàng ' + kpiLabel(mk) + (kpiCity !== 'all' ? ' • ' + kpiCity : '') + (kpiDistrict !== 'all' ? ' • ' + kpiDistrict : '') + ' (' + rows.length + ' khách)', rows.map((r, i) => rpCard('<div style="display:flex;justify-content:space-between;gap:6px"><b style="color:#fcd34d">' + (i + 1) + '. ' + escHtml(r.s.name) + '</b><b style="color:' + (r.status === 'Vượt KPI' ? '#34d399' : r.status === 'Đạt KPI' ? '#60a5fa' : r.status === 'Cần thúc đẩy' ? '#fbbf24' : '#94a3b8') + '">' + r.status + '</b></div><div style="opacity:.85">' + escHtml(kpiTrade(r.s) || '-') + ' • ' + escHtml(kpiArea(r.s) || '-') + '</div><div>' + r.cur.c + ' đơn • <b>' + rpFmt(r.cur.n) + ' đ</b> • Δ đơn ' + r.dOrd.t + ' • Δ doanh thu ' + r.dRev.t + (r.target ? ' • Mục tiêu ' + rpFmt(r.target) : '') + '</div>')), 'Chưa có khách hàng.');
+            return rpSection('📊 KPI khách hàng ' + kpiLabel(mk) + (kpiCity !== 'all' ? ' • ' + kpiCity : '') + (kpiDistrict !== 'all' ? ' • ' + kpiDistrict : '') + ' (' + rows.length + ' khách)', rows.map((r, i) => rpCard('<div style="display:flex;justify-content:space-between;gap:6px"><b style="color:#fcd34d">' + (i + 1) + '. ' + escHtml(stName(r.s)) + '</b><b style="color:' + (r.status === 'Vượt KPI' ? '#34d399' : r.status === 'Đạt KPI' ? '#60a5fa' : r.status === 'Cần thúc đẩy' ? '#fbbf24' : '#94a3b8') + '">' + r.status + '</b></div><div style="opacity:.85">' + escHtml(kpiTrade(r.s) || '-') + ' • ' + escHtml(kpiArea(r.s) || '-') + '</div><div>' + r.cur.c + ' đơn • <b>' + rpFmt(r.cur.n) + ' đ</b> • Δ đơn ' + r.dOrd.t + ' • Δ doanh thu ' + r.dRev.t + (r.target ? ' • Mục tiêu ' + rpFmt(r.target) : '') + '</div>')), 'Chưa có khách hàng.');
         }
         // ---- So sánh doanh thu các tháng của 1 khách
         let revStoreId = null;
@@ -5683,7 +5703,7 @@
         function storeRevRender(a, b) {
             const s = (db.stores || []).find(x => String(x.id) === String(revStoreId)); if (!s) return;
             const by = kpiMonthly(s), keys = Object.keys(by).sort(); const el = document.getElementById('store-rev-body');
-            if (!keys.length) { el.innerHTML = `<div class="font-bold text-sm">${escHtml(s.name)}</div><p class="opacity-70 py-6 text-center">Khách hàng này chưa có đơn hàng nào để so sánh.</p>`; return; }
+            if (!keys.length) { el.innerHTML = `<div class="font-bold text-sm">${escHtml(stName(s))}</div><p class="opacity-70 py-6 text-center">Khách hàng này chưa có đơn hàng nào để so sánh.</p>`; return; }
             // đủ các tháng liên tục từ tháng đầu đến tháng hiện tại
             const all = []; let k = keys[0]; const end = kpiNowKey() > keys[keys.length - 1] ? kpiNowKey() : keys[keys.length - 1]; while (k <= end && all.length < 60) { all.push(k); const [y, m] = k.split('-').map(Number); k = m === 12 ? (y + 1) + '-01' : y + '-' + String(m + 1).padStart(2, '0'); }
             const show = all.slice(-12), max = Math.max(1, ...show.map(x => (by[x] || { n: 0 }).n)), total = all.reduce((t, x) => t + (by[x] || { n: 0 }).n, 0), orders = all.reduce((t, x) => t + (by[x] || { c: 0 }).c, 0);
@@ -5693,7 +5713,7 @@
             const opt = sel => show.map(x => `<option value="${x}" ${x === sel ? 'selected' : ''}>${kpiLabel(x)}</option>`).join('');
             const sc = 'px-3 py-2 rounded-xl bg-theme-input border border-theme-border text-xs font-semibold';
             el.innerHTML = `
-                <div><div class="font-bold text-sm">${escHtml(s.name)}</div><div class="opacity-70">${escHtml([s.address, s.district, s.city].filter(Boolean).join(', '))}</div></div>
+                <div><div class="font-bold text-sm">${escHtml(stName(s))}</div><div class="opacity-70">${escHtml([s.address, s.district, s.city].filter(Boolean).join(', '))}</div></div>
                 <div class="grid grid-cols-3 gap-2 text-center">
                     <div class="p-2 rounded-xl bg-theme-input border border-theme-border"><div class="text-[10px] opacity-70">Tổng doanh thu</div><div class="font-bold text-amber-500">${kpiFmt(total)}</div></div>
                     <div class="p-2 rounded-xl bg-theme-input border border-theme-border"><div class="text-[10px] opacity-70">Tổng đơn</div><div class="font-bold">${orders}</div></div>
@@ -6067,7 +6087,7 @@
                 const nCheck = checks.filter(h => recAtStore(h, s)).length;
                 const added = !isNaN(Number(s.id)) && Number(s.id) > 1e12 ? new Date(Number(s.id)).toLocaleDateString('vi-VN') : '-';
                 const gps = s.lat != null && s.lng != null ? `[${Number(s.lat).toFixed(5)}, ${Number(s.lng).toFixed(5)}]` : 'N/A';
-                return rpCard(`<div style="font-weight:800;color:#fcd34d">${i + 1}. ${escHtml(s.name)}</div><div>Chủ: <b>${escHtml(s.owner || 'N/A')}</b> - SĐT: <span style="color:#60a5fa">${escHtml(s.phone || 'N/A')}</span></div><div style="opacity:.85">Địa chỉ: ${escHtml(s.address || '')}, ${escHtml(s.district || '')}, ${escHtml(s.city || '')}</div><div style="opacity:.9;margin-top:2px">Quy mô: <b>${escHtml(s.scale || '-')}</b> • Ngành: <b>${escHtml(s.industry || '-')}</b> • ${escHtml(relLabel(s.relation) || '-')}</div>${s.interests && s.interests.length ? '<div style="margin-top:2px;color:#7dd3fc">❤ Quan tâm: ' + s.interests.map(escHtml).join(', ') + '</div>' : ''}<div style="margin-top:2px">📍 <span style="color:#fbbf24;font-family:monospace">${gps}</span> • Thêm: ${added}</div><div style="margin-top:2px;color:#6ee7b7">${ps.c} đơn • Net <b>${rpFmt(ps.n)} đ</b> • ${nCheck} lần check-in</div>` + kpiStoreMonthLine(s, 3));
+                return rpCard(`<div style="font-weight:800;color:#fcd34d">${i + 1}. ${escHtml(stName(s))}</div><div>Chủ: <b>${escHtml(s.owner || 'N/A')}</b> - SĐT: <span style="color:#60a5fa">${escHtml(s.phone || 'N/A')}</span></div><div style="opacity:.85">Địa chỉ: ${escHtml(s.address || '')}, ${escHtml(s.district || '')}, ${escHtml(s.city || '')}</div><div style="opacity:.9;margin-top:2px">Quy mô: <b>${escHtml(s.scale || '-')}</b> • Ngành: <b>${escHtml(s.industry || '-')}</b> • ${escHtml(relLabel(s.relation) || '-')}</div>${s.interests && s.interests.length ? '<div style="margin-top:2px;color:#7dd3fc">❤ Quan tâm: ' + s.interests.map(escHtml).join(', ') + '</div>' : ''}<div style="margin-top:2px">📍 <span style="color:#fbbf24;font-family:monospace">${gps}</span> • Thêm: ${added}</div><div style="margin-top:2px;color:#6ee7b7">${ps.c} đơn • Net <b>${rpFmt(ps.n)} đ</b> • ${nCheck} lần check-in</div>` + kpiStoreMonthLine(s, 3));
             }), 'Chưa có khách hàng nào.').forEach(b => blocks.push(b));
             kpiReportBlocks().forEach(b => blocks.push(b));
             rpSection(`✅ Lịch sử check-in (${checks.length})`, checks.map((h, i) => rpLine(`${i + 1}. <b style="color:#6ee7b7">${escHtml(h.storeName)}</b> <span style="opacity:.7">• ${escHtml(h.time)}</span>${h.note ? '<br><span style="opacity:.85">📝 ' + escHtml(h.note) + '</span>' : ''}`)), 'Chưa có lịch sử check-in.').forEach(b => blocks.push(b));
@@ -6118,7 +6138,7 @@
             rpSection(`📤 Đã xuất bán hôm nay: Tổng ${outQty} sản phẩm`, sales.map(h => rpLine(`🔹 Tại ${escHtml(h.storeName)}: ${escHtml(h.note)}`)), 'Chưa có sản phẩm nào được xuất bán.').forEach(b => blocks.push(b));
 
             const newStores = (db.stores || []).filter(addedToday);
-            rpSection('🏪 Danh sách cửa hàng mới thêm', newStores.map((s, i) => rpCard(`<div style="font-weight:800;color:#fcd34d">${i + 1}. ${escHtml(s.name)}</div><div>Chủ: <b>${escHtml(s.owner || 'N/A')}</b> - SĐT: <span style="color:#60a5fa">${escHtml(s.phone || 'N/A')}</span></div><div style="opacity:.8">Địa chỉ: ${escHtml(s.address)}, ${escHtml(s.district)}, ${escHtml(s.city)}</div><div style="opacity:.9;margin-top:2px">Quy mô: <b>${escHtml(s.scale || '-')}</b> • Ngành: <b>${escHtml(s.industry || '-')}</b> • ${escHtml(relLabel(s.relation) || '-')}</div>${s.interests && s.interests.length ? '<div style="margin-top:2px;color:#7dd3fc">❤ Quan tâm: ' + s.interests.map(escHtml).join(', ') + '</div>' : ''}`)), 'Không có cửa hàng mới trong ngày.').forEach(b => blocks.push(b));
+            rpSection('🏪 Danh sách cửa hàng mới thêm', newStores.map((s, i) => rpCard(`<div style="font-weight:800;color:#fcd34d">${i + 1}. ${escHtml(stName(s))}</div><div>Chủ: <b>${escHtml(s.owner || 'N/A')}</b> - SĐT: <span style="color:#60a5fa">${escHtml(s.phone || 'N/A')}</span></div><div style="opacity:.8">Địa chỉ: ${escHtml(s.address)}, ${escHtml(s.district)}, ${escHtml(s.city)}</div><div style="opacity:.9;margin-top:2px">Quy mô: <b>${escHtml(s.scale || '-')}</b> • Ngành: <b>${escHtml(s.industry || '-')}</b> • ${escHtml(relLabel(s.relation) || '-')}</div>${s.interests && s.interests.length ? '<div style="margin-top:2px;color:#7dd3fc">❤ Quan tâm: ' + s.interests.map(escHtml).join(', ') + '</div>' : ''}`)), 'Không có cửa hàng mới trong ngày.').forEach(b => blocks.push(b));
 
             rpSection('✅ Cửa hàng check-in & đơn hàng', checkins.map((h, i) => {
                 const st = byStore[stKeyOfRec(h)] || { count: 0, revenue: 0 };
@@ -6329,7 +6349,6 @@
             const district = document.getElementById('a-district').value.trim();
             const address = document.getElementById('a-address').value.trim();
             if(!name || !owner || !phone || !address || !city || !district) { alert('Điền đủ thông tin!'); return; }
-            if (nameTaken(name)) { alert('⚠ Đã có tiệm tên "' + name + '".\nHãy thêm khu vực để phân biệt, VD: "' + name + ' – ' + district + '".'); return; }
 
             db.stores.unshift({
                 id: Date.now(), name, owner, phone, city, district, address,
@@ -6937,7 +6956,7 @@
         function openSalesOrderModal(id) {
             activeOrderStoreId = id; try { getFreshPosition(); } catch (e) {}   // Bản 68: lấy GPS sẵn để lưu vào đơn
             const store = db.stores.find(s=>String(s.id)===String(id));
-            document.getElementById('order-shop-title').innerText = `Lên đơn: ${store.name}`;
+            document.getElementById('order-shop-title').innerText = `Lên đơn: ${stName(store)}`;
             
             orderPhotos = [];
             renderOrderPhotos();
@@ -7182,7 +7201,7 @@
             db.salesHistory.unshift({ 
                 time: time, 
                 username: user.username, 
-                storeName: store.name, storeId: store.id,   // Bản 72
+                storeName: store.name, storeId: store.id, storeNo: store.no,   // Bản 72-73
                 address: store.address, 
                 note: `Bán đơn hàng (${pay.value}): ${summary.join(', ')} | Tổng: ${grandTotal.toLocaleString()}đ`, 
                 discountStr: discountStr,
@@ -7198,7 +7217,7 @@
             
             lastOrderShareText = `🛒 HÓA ĐƠN BÁN HÀNG\n🏪 Shop: ${store.name}\n👤 Chủ: ${store.owner} (${store.phone})\n⏰ Giờ: ${time}\n💳 TT: ${pay.value}\n🎁 Chiết khấu: ${discountStr}\n📦 Đơn:\n${summary.map(x=>` • ${x}`).join('\n')}\n💰 TỔNG THANH TOÁN: ${grandTotal.toLocaleString()}đ`;
             
-            document.getElementById('bill-store-name').innerText = store.name; 
+            document.getElementById('bill-store-name').innerText = stName(store); 
             document.getElementById('bill-owner').innerText = store.owner; 
             document.getElementById('bill-phone').innerText = store.phone; 
             document.getElementById('bill-time').innerText = time; 
@@ -7309,7 +7328,6 @@
             const a = document.getElementById('s-address').value.trim();
 
             if(!n || !o || !p) { alert('Vui lòng điền Tên Shop, Tên Chủ shop và Số điện thoại!'); return; }
-            if (nameTaken(n)) { alert('⚠ Đã có tiệm tên "' + n + '" trong danh sách.\nHãy thêm khu vực để phân biệt, VD: "' + n + ' – ' + (d || 'Khu vực') + '".\n(Hai tiệm trùng tên sẽ bị lẫn đơn hàng.)'); return; }
             if(!c || !d || !a) { alert('Vui lòng điền đầy đủ Tỉnh/Thành phố, Quận/Huyện và Địa chỉ chi tiết (hoặc gõ tay vào ô)!'); return; }
             const cv = getChipValues('s');
             if(!cv.scale) { alert('Vui lòng chọn Quy mô cửa hàng (Nhỏ / Vừa / To)!'); return; }
@@ -7437,7 +7455,7 @@
             s.visitTimeStr = timeStr;
             if (!db.checkinHistory) db.checkinHistory = [];
             db.checkinHistory.unshift({
-                time: timeStr, username: u.username, storeName: s.name, storeId: s.id,
+                time: timeStr, username: u.username, storeName: s.name, storeId: s.id, storeNo: s.no,
                 address: `${s.address}, ${s.district}, ${s.city}`, phone: s.phone || 'N/A',
                 lat: s.lat, lng: s.lng,
                 note: `[ĐÃ GHÉ THĂM] Thời gian làm việc: ${elapsedMinutes} phút. Ghi chú: ${s.note || 'Không có'}`,
@@ -7779,7 +7797,7 @@
             let total = 0;
             stores.forEach((s, i) => {
                 const rev = revenueBy[stKey(s)] || 0; total += rev;
-                const r = ws.addRow([i + 1, s.name, s.phone || '', s.district || '', s.scale || '', s.industry || '', relLabel(s.relation), rev || '', '', s.note || '']);
+                const r = ws.addRow([i + 1, stName(s), s.phone || '', s.district || '', s.scale || '', s.industry || '', relLabel(s.relation), rev || '', '', s.note || '']);
                 r.height = 85;
                 r.eachCell({ includeEmpty: true }, (c, col) => {
                     c.font = { name: 'Times New Roman', size: 12, bold: true };
@@ -8044,7 +8062,7 @@
                 const note = [s.note || '', ss.length ? ss.length + ' đơn' : 'Chưa có đơn', storeNoOwner(s) ? 'Chưa gặp chủ' : '', bills.length > 4 ? '+' + (bills.length - 4) + ' ảnh hóa đơn khác' : '', lost ? lost + ' ảnh đã xóa khỏi app' : ''].filter(Boolean).join(' • ');
                 const rl = relLabel(s.relation), r = rows.length;
                 rows.push({ h: 85, cells: [
-                    { v: i + 1, s: T.mbody[z] }, { v: s.name, s: T.mname[z] }, { v: s.phone || '', s: T.mbody[z] }, { v: s.district || '', s: T.mbody[z] }, { v: s.scale || '', s: T.mbody[z] }, { v: s.industry || '', s: T.mbody[z] },
+                    { v: i + 1, s: T.mbody[z] }, { v: stName(s), s: T.mname[z] }, { v: s.phone || '', s: T.mbody[z] }, { v: s.district || '', s: T.mbody[z] }, { v: s.scale || '', s: T.mbody[z] }, { v: s.industry || '', s: T.mbody[z] },
                     { v: rl, s: /cũ/i.test(rl) ? T.good : /mới/i.test(rl) ? T.info : T.mbody[z] }, { v: r0 || '', s: r0 ? T.mnum[z] : T.mbody[z] }, { v: pays || '—', s: pays === 'Chuyển khoản' ? T.info : pays === 'Tiền mặt' ? T.good : pays ? T.warn : T.mute },
                     { v: '', s: T.mbody[z] }, { v: '', s: T.mbody[z] }, { v: note, s: storeNoOwner(s) || !ss.length ? T.warn : T.mbody[z] }] });
                 if (typeof s.storePhoto === 'string' && s.storePhoto.startsWith('data:image')) imgs.push({ dataUrl: await shrinkDataUrl(s.storePhoto, 360, 0.7), col: 9, row: r, w: 130, h: 104, xOff: 4 });
@@ -8434,7 +8452,7 @@
             const startOk = mapState.start === 'me' || sel.some(s => String(s.id) === mapState.start);
             if (!startOk) mapState.start = 'me';
             const bt = 'w-full py-3 rounded-xl text-xs font-bold transition shadow flex items-center justify-center space-x-2 ';
-            const startOpts = `<option value="me" ${mapState.start === 'me' ? 'selected' : ''}>📍 Vị trí hiện tại của tôi</option>` + sel.map(s => `<option value="${escHtml(s.id)}" ${String(s.id) === mapState.start ? 'selected' : ''}>🏪 ${escHtml(s.name)}</option>`).join('');
+            const startOpts = `<option value="me" ${mapState.start === 'me' ? 'selected' : ''}>📍 Vị trí hiện tại của tôi</option>` + sel.map(s => `<option value="${escHtml(s.id)}" ${String(s.id) === mapState.start ? 'selected' : ''}>🏪 ${escHtml(stName(s))}</option>`).join('');
 
             let routeCard = '';
             if (hasRoute) {
@@ -8455,7 +8473,7 @@
                             const s = mapById(id); if (!s) return '';
                             const v = visitedToday(s), leg = mapState.legs[i] || 0;
                             return `<div class="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-theme-input border border-theme-border text-xs">
-                                <div class="min-w-0"><div class="font-bold truncate ${v ? 'line-through opacity-60' : ''}">${i + 1}. ${escHtml(s.name)} ${v ? '<span class="text-emerald-400">✓</span>' : ''}</div>
+                                <div class="min-w-0"><div class="font-bold truncate ${v ? 'line-through opacity-60' : ''}">${i + 1}. ${escHtml(stName(s))} ${v ? '<span class="text-emerald-400">✓</span>' : ''}</div>
                                 <div class="opacity-70 truncate">${escHtml(s.address || '')}${leg > 0 ? ' • +' + kmText(leg) : ''}</div></div>
                                 <a href="${gmapsLink(s.lat, s.lng)}" target="_blank" rel="noopener" class="px-2.5 py-2 bg-blue-600 text-white rounded-lg font-semibold whitespace-nowrap"><i class="fa-solid fa-diamond-turn-right"></i></a>
                             </div>`;
@@ -8512,7 +8530,7 @@
                     <div id="map-sel-list" class="space-y-1 max-h-64 overflow-y-auto">
                         ${list.length ? list.map(({ s, d }) => `<label class="flex items-center gap-2 p-2 rounded-lg bg-theme-input border border-theme-border text-xs">
                             <input type="checkbox" ${mapState.sel.has(String(s.id)) ? 'checked' : ''} onchange="mapToggleStore('${s.id}')" class="w-4 h-4 accent-amber-500 flex-shrink-0">
-                            <span class="flex-1 min-w-0 truncate font-semibold">${escHtml(s.name)}</span>
+                            <span class="flex-1 min-w-0 truncate font-semibold">${escHtml(stName(s))}</span>
                             ${visitedToday(s) ? '<span class="text-emerald-400">✓</span>' : ''}
                             ${d != null ? `<span class="opacity-70 whitespace-nowrap">${kmText(d)}</span>` : ''}
                         </label>`).join('') : '<div class="text-xs opacity-70 text-center py-4">Chưa có điểm bán nào có tọa độ.</div>'}
@@ -8605,7 +8623,7 @@
             const d = mapMeOk() ? calculateDistance(currentLivePos.lat, currentLivePos.lng, s.lat, s.lng) : null;
             const tags = [s.scale ? 'Quy mô: ' + s.scale : '', s.industry || '', relLabel(s.relation) || ''].filter(Boolean).map(escHtml).join(' • ');
             return `<div style="min-width:190px;font-size:12px;line-height:1.45;color:#0f172a">
-                <div style="font-weight:800;font-size:13px">${escHtml(s.name)} ${v ? '✓' : ''}</div>
+                <div style="font-weight:800;font-size:13px">${escHtml(stName(s))} ${v ? '✓' : ''}</div>
                 ${s.owner ? `<div>Chủ: ${escHtml(s.owner)}</div>` : ''}
                 ${s.phone ? `<div>SĐT: <a href="tel:${escHtml(s.phone)}">${escHtml(s.phone)}</a></div>` : ''}
                 <div style="opacity:.8">${escHtml([s.address, s.district, s.city].filter(Boolean).join(', '))}</div>
