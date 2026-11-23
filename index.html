@@ -319,6 +319,7 @@
                     <button onclick="rpSpanApply()" class="py-2.5 rounded-xl bg-amber-500 text-slate-950 text-xs font-bold"><i class="fa-solid fa-check mr-1"></i>Xác nhận ngày & cập nhật</button>
                     <button onclick="spanExportExcel()" class="py-2.5 rounded-xl bg-emerald-600 text-white text-xs font-bold"><i class="fa-solid fa-file-excel mr-1"></i>Xuất Excel báo cáo</button>
                 </div>
+                <button id="rp-payout-btn" onclick="openPayout()" class="w-full py-2.5 rounded-xl bg-amber-500/15 border border-amber-500/40 text-amber-500 text-xs font-bold"><i class="fa-solid fa-sack-dollar mr-1"></i>Chốt nộp tiền công ty (tiền mặt + chuyển khoản)</button>
                 <button onclick="openRecon()" class="w-full py-2.5 rounded-xl bg-rose-500/15 border border-rose-500/40 text-rose-400 text-xs font-bold"><i class="fa-solid fa-scale-unbalanced mr-1"></i>Đối chiếu kho: xem chi tiết dòng lệch</button>
                 <p class="text-[10px] opacity-70">Chọn ngày xong báo cáo tự cập nhật (hoặc bấm Xác nhận). Chọn 1 ngày (Từ = Đến) để xuất 1 ngày; chọn khoảng ngày để xuất toàn bộ từ ngày bắt đầu đến ngày kết thúc. Báo cáo trong ngày vẫn giữ mẫu cũ.</p>
             </div>
@@ -1547,7 +1548,7 @@
                         </div>
                         <div>
                             <h1 class="font-black text-xs sm:text-sm uppercase tracking-wider">PHỤ KIỆN HOÀNG ĐẾ</h1>
-                            <p class="text-[11px] sm:text-xs opacity-75">Nhân sự: <span class="font-bold text-amber-500">${user.fullname}</span> (${isPcMode() ? 'Chế độ PC' : 'Chế độ Mobile'} • Bản 70)</p>
+                            <p class="text-[11px] sm:text-xs opacity-75">Nhân sự: <span class="font-bold text-amber-500">${user.fullname}</span> (${isPcMode() ? 'Chế độ PC' : 'Chế độ Mobile'} • Bản 71)</p>
                         </div>
                     </div>
                     <div class="flex space-x-2 w-full sm:w-auto justify-end">
@@ -3939,8 +3940,9 @@
         const actSeenTs = () => { try { return Number(localStorage.getItem('hoangde_act_seen')) || 0; } catch (e) { return 0; } };
         function actVisible() { const u = getCurrentUser(); if (!u) return []; const L = db.activityLog || []; return u.role === 'admin' ? L : L.filter(e => e.owner === u.username || e.by === u.username); }
         // ===== Bản 55: Chuông thông báo, Bảo hành, Báo cáo theo khoảng ngày, Bảng trả kho =====
-        const APP_VER = 70;
+        const APP_VER = 71;
         const APP_NOTES = {
+            71: ['Báo cáo ngày: bảng đầu có Doanh thu Gross / Net, số bill, bill chuyển khoản / tiền mặt, cửa hàng thêm mới / đã bán / đã ghé chưa bán, bảo hành, SL bán ra, chiết khấu', 'Chốt nộp tiền công ty (admin): chọn từ ngày – đến ngày, liệt kê đơn tiền mặt + chuyển khoản chưa nộp, ghi người nhận', 'Báo cáo tổng hợp + Excel: cột Nộp công ty, mỗi đơn ghi Đã thanh toán về công ty / Chưa nộp'],
             70: ['Chế độ offline tự động: mất mạng vẫn mở app và làm việc bình thường (app + thư viện lưu sẵn trong máy)', 'Có mạng lại tự đồng bộ ngay; trạng thái 🟢 Đã đồng bộ / 🟠 Offline – còn N thay đổi / 🔵 Đang đồng bộ', 'Gộp dữ liệu 3 phía khi máy khác cũng sửa: không mất đơn, không mất check-in, không trùng đơn, tồn kho cộng đúng phần thay đổi'],
             69: ['Sheet 3 "Gợi ý chào hàng": mỗi tiệm liệt kê món hay lấy (số lần, cách bao nhiêu ngày, trung bình mỗi lần) → gợi ý chào lại ~X cái; món quá chu kỳ quen báo đỏ', 'Nút Đã chốt (mở form bán hàng) / Chưa chốt (ghi lý do, lưu vào nhật ký chăm sóc, đồng bộ mọi máy)', 'Chưa chốt = đã liên hệ nhưng chưa lấy hàng: không đặt lại bộ đếm 15 ngày, gợi ý ngày gọi lại'],
             68: ['Chăm sóc khách 15 ngày: đếm lại từ lần GHÉ TIỆM (check-in, bán hàng đúng GPS tại tiệm) hoặc lần gọi chăm sóc', 'Mỗi đơn bán lưu khoảng cách GPS tới tiệm: bán từ xa vẫn bán bình thường nhưng không tính là đã ghé; đơn bổ sung không tính', 'Dòng thời gian dễ nhìn: mỗi đơn một khung, liệt kê từng món + số lượng, dấu ✓ Đúng GPS / ⚠ Không đúng GPS; check-in chấm tím'],
@@ -4414,7 +4416,8 @@
             (db.stockLog || []).filter(l => l.ts >= a && l.ts < b && STOCK_ADJ_TYPES.includes(l.type)).forEach(l => { const p = db.productsMaster.find(x => String(x.id) === String(l.productId)), k = p ? p.name : l.productName; adj[k] = (adj[k] || 0) + (Number(l.delta) || 0); });
             const invNames2 = [...new Set(invNames.concat(Object.keys(ret)))].sort((x, y) => x.localeCompare(y, 'vi'));
             const inv = invNames2.map(n => { const o = { n, imp: imp[n] || 0, stock: stockOf(n), sold: sold[n] || 0, ret: ret[n] || 0, adj: adj[n] || 0 }; o.lech = o.stock - (o.imp - o.sold - o.ret + o.adj); return o; });
-            return { a, b, label: rpFrom === rpTo ? isoToVN(rpFrom) : isoToVN(rpFrom) + ' → ' + isoToVN(rpTo), sales, checks, gross, net, disc: gross - net, ck, tm, ckSum: ck.reduce((s, h) => s + saleNet(h), 0), tmSum: tm.reduce((s, h) => s + saleNet(h), 0), added: (db.stores || []).filter(created), stores, withO, noO, rev, noOwner: stores.filter(s => storeNoOwner(s)), war, warQty: war.reduce((s, w) => s + (Number(w.qty) || 0), 0), ranked, unsold, never, slow, totalSold, inv };
+            const pIdx = payoutIndex(), paidOf = h => payoutOf(h, pIdx), paidSum = sales.filter(paidOf).reduce((s, h) => s + saleNet(h), 0);   // Bản 71
+            return { paidOf, paidSum, unpaidSum: sales.reduce((s, h) => s + saleNet(h), 0) - paidSum, unpaidN: sales.filter(h => !paidOf(h)).length, a, b, label: rpFrom === rpTo ? isoToVN(rpFrom) : isoToVN(rpFrom) + ' → ' + isoToVN(rpTo), sales, checks, gross, net, disc: gross - net, ck, tm, ckSum: ck.reduce((s, h) => s + saleNet(h), 0), tmSum: tm.reduce((s, h) => s + saleNet(h), 0), added: (db.stores || []).filter(created), stores, withO, noO, rev, noOwner: stores.filter(s => storeNoOwner(s)), war, warQty: war.reduce((s, w) => s + (Number(w.qty) || 0), 0), ranked, unsold, never, slow, totalSold, inv };
         }
         function spanReportBlocks() {
             const D = spanData(), blocks = [];
@@ -4427,6 +4430,7 @@
             blocks.push(row(box('Cửa hàng đã thêm', D.added.length, '#34d399'), box('Cửa hàng đã phát sinh đơn', D.withO.length, '#fbbf24')));
             blocks.push(row(box('Cửa hàng chưa lấy hàng', D.noO.length, '#fda4af'), box('Cửa hàng chưa gặp chủ', D.noOwner.length, '#fda4af')));
             blocks.push(row(box('Tổng số lượng bảo hành', D.warQty + ' cái', '#c4b5fd'), box('Tổng SL sản phẩm bán ra', D.totalSold + ' cái', '#fff')));
+            blocks.push(row(box('Đã nộp công ty', rpFmt(D.paidSum) + ' đ', '#34d399'), box('Còn phải nộp', D.unpaidN + ' đơn • ' + rpFmt(D.unpaidSum) + ' đ', D.unpaidN ? '#fda4af' : '#34d399')));
             blocks.push(RP_BREAK);
             const sc = (s, i, has) => rpCard(`<div style="display:flex;justify-content:space-between;gap:6px"><b style="color:${has ? '#fcd34d' : '#cbd5e1'}">${i + 1}. ${escHtml(s.name)}</b><b style="color:${has ? '#fbbf24' : '#94a3b8'};white-space:nowrap">${has ? rpFmt(D.rev[s.name]) + ' đ' : 'Chưa có đơn'}</b></div><div>📞 <span style="color:#60a5fa">${escHtml(s.phone || 'N/A')}</span>${storeNoOwner(s) ? ' • <span style="color:#fda4af">Không gặp chủ</span>' : ''}</div>${(s.interests || []).length ? `<div style="opacity:.85">Quan tâm: ${escHtml(s.interests.join(', '))}</div>` : ''}`);
             rpSection(`🏪 Cửa hàng đã phát sinh đơn (${D.withO.length})`, D.withO.map((s, i) => sc(s, i, true)), 'Không có cửa hàng nào phát sinh đơn.').forEach(b => blocks.push(b));
@@ -4445,6 +4449,13 @@
             items.push(tr(`<td style="${th};font-weight:900;color:#fde68a">TỔNG (${D.inv.length} SP)</td><td style="${th};text-align:right;font-weight:900;color:#fde68a">${ti}c</td><td style="${th};text-align:right;font-weight:900;color:#fde68a">${ts}c</td><td style="${th};text-align:right;font-weight:900;color:#fde68a">${tsold}c</td><td style="${th};text-align:right;font-weight:900;color:${D.inv.some(x => x.lech) ? '#fda4af' : '#34d399'}">${D.inv.filter(x => x.lech).length || '✓'}</td>`, 'rgba(245,158,11,.18)'));
             items.push(`<div style="font-size:9px;color:#cbd5e1;margin-top:4px">Lệch = Tồn hiện tại − (Nhập − Bán − Trả kho ± điều chỉnh kho trong kỳ). ✓ là khớp. Áp dụng khi kho đã về 0 trước ngày bắt đầu.</div>`);
             rpSection('📦 Nhập kho | Tồn hiện tại | Đã bán | Lệch', items, 'Chưa có dữ liệu kho.').forEach(b => blocks.push(b));
+            { // Bản 71: danh sách đơn + trạng thái nộp công ty
+                const users = new Map((db.users || []).map(u => [u.username, u.fullname || u.username])), L = D.sales.slice().sort((x, y) => (recTs(x) || 0) - (recTs(y) || 0)), out = []; let day = '';
+                L.forEach(h => { const d = dayKeyOf(h.time); if (d !== day) { day = d; const g = L.filter(x => dayKeyOf(x.time) === d); out.push(rpLine(`<b style="color:#fbbf24">📅 ${escHtml(d)}: ${g.length} đơn • ${rpFmt(g.reduce((a, x) => a + saleNet(x), 0))} đ</b>`)); }
+                    const po = D.paidOf(h);
+                    out.push(rpLine(`• ${escHtml(String(h.time).split(' ')[0].slice(0, 5))} ${escHtml(h.storeName)} <span style="opacity:.75">(${escHtml(users.get(h.username) || h.username || '')})</span> • ${saleIsCK(h) ? '<span style="color:#60a5fa">CK</span>' : '<span style="color:#34d399">TM</span>'} <b>${rpFmt(saleNet(h))} đ</b><br><span style="font-weight:700;color:${po ? '#34d399' : '#fda4af'}">${po ? escHtml(payoutText(po)) : '⏳ Chưa nộp công ty'}</span>`)); });
+                rpSection(`🧾 Đơn hàng & nộp công ty (${D.sales.length} đơn • đã nộp ${rpFmt(D.paidSum)} đ • còn ${rpFmt(D.unpaidSum)} đ)`, out, 'Không có đơn trong kỳ.').forEach(b => blocks.push(b));
+            }
             return blocks;
         }
 
@@ -4555,6 +4566,84 @@
             clearTimeout(rpDateTimer);
             rpDateTimer = setTimeout(() => { const f = document.getElementById('rp-from').value, t = document.getElementById('rp-to').value; if (f && t && f <= t && t <= invTodayIso() && (f !== rpFrom || t !== rpTo)) rpSpanApply(); }, 600);
         }
+        // ===== Bản 71: Chốt nộp tiền công ty (lưu trong settings.payouts để mọi bản app đều giữ khi đồng bộ) =====
+        function payouts() { db.settings = db.settings || {}; if (!Array.isArray(db.settings.payouts)) db.settings.payouts = []; return db.settings.payouts; }
+        function payoutIndex() { const m = new Map(); ((db.settings && db.settings.payouts) || []).forEach(p => (p.sales || []).forEach(x => { m.set('s:' + x.s, { p, x }); if (!m.has('k:' + x.k)) m.set('k:' + x.k, { p, x }); })); return m; }
+        function payoutOf(h, idx) { const a = idx.get('s:' + recSig('sales', h)); if (a) return { p: a.p, diff: 0 }; const b = idx.get('k:' + saleKeyOf(h)); return b ? { p: b.p, diff: saleNet(h) - (Number(b.x.n) || 0) } : null; }
+        const payoutText = po => '✓ Đã thanh toán về công ty ' + String(po.p.at || '').split(' ')[1] + (po.p.receiver ? ' – người nhận: ' + po.p.receiver : '') + (po.diff ? ' • đơn sửa sau khi nộp, chênh ' + (po.diff > 0 ? '+' : '') + rpFmt(po.diff) + ' đ' : '');
+        let poFrom = '', poTo = '', poSkip = new Set(), poAmt = null;
+        function openPayout() {
+            if (!isAdminU()) { alert('Chỉ admin được chốt nộp tiền công ty.'); return; }
+            if (!poTo) poTo = invTodayIso();
+            if (!poFrom) { const idx = payoutIndex(), un = allSales().filter(h => !payoutOf(h, idx)).map(h => recTs(h) || 0).filter(Boolean); const t = un.length ? Math.min(...un) : Date.now(); const q = vnParts(new Date(t)); poFrom = `${q.y}-${String(q.m).padStart(2, '0')}-${String(q.d).padStart(2, '0')}`; }
+            poSkip = new Set(); poAmt = null; let m = document.getElementById('payout-modal');
+            if (!m) { m = document.createElement('div'); m.id = 'payout-modal'; m.className = 'fixed inset-0 z-[60] bg-black/70 flex items-end sm:items-center justify-center p-0 sm:p-4'; document.body.appendChild(m); }
+            m.classList.remove('hidden'); payoutDraw();
+        }
+        function payoutList() {
+            if (poFrom > poTo) { const t = poFrom; poFrom = poTo; poTo = t; }
+            const a = isoToTs(poFrom), b = isoToTs(poTo) + 864e5, idx = payoutIndex();
+            return allSales().filter(h => { const k = dayKeyOf(h.time); if (!k) return false; const x = parseDayKey(k); return x >= a && x < b && !payoutOf(h, idx); }).sort((x, y) => (recTs(x) || 0) - (recTs(y) || 0));
+        }
+        function payoutDraw() {
+            const m = document.getElementById('payout-modal'); if (!m) return;
+            const keep = id => { const e = document.getElementById(id); return e ? e.value : null; };
+            const rcv = keep('po-receiver'), note = keep('po-note');
+            const list = payoutList(), pick = list.filter(h => !poSkip.has(recSig('sales', h)));
+            const sum = l => l.reduce((a, h) => a + saleNet(h), 0), ck = pick.filter(saleIsCK), tm = pick.filter(h => !saleIsCK(h)), tot = sum(pick);
+            const users = new Map((db.users || []).map(u => [u.username, u.fullname || u.username]));
+            const rcvList = [...new Set(payouts().map(p => p.receiver).filter(Boolean))];
+            const byDay = []; list.forEach(h => { const d = dayKeyOf(h.time); let g = byDay[byDay.length - 1]; if (!g || g.d !== d) byDay.push(g = { d, l: [] }); g.l.push(h); });
+            const line = h => { const sg = recSig('sales', h), on = !poSkip.has(sg);
+                return `<label class="flex items-start gap-2 p-2 rounded-xl border ${on ? 'border-emerald-500/40 bg-emerald-500/5' : 'border-theme-border opacity-60'}"><input type="checkbox" ${on ? 'checked' : ''} onchange="payoutTog('${encodeURIComponent(sg).replace(/'/g, '%27')}')" class="mt-0.5 accent-emerald-500">
+                    <span class="flex-1 min-w-0"><b class="break-words">${escHtml(h.storeName)}</b> <span class="opacity-70">• ${escHtml(String(h.time).split(' ')[0].slice(0, 5))} • ${escHtml(users.get(h.username) || h.username || '')}</span></span>
+                    <span class="text-right whitespace-nowrap"><b>${rpFmt(saleNet(h))} đ</b><br><span class="text-[10px] font-bold ${saleIsCK(h) ? 'text-sky-400' : 'text-emerald-400'}">${saleIsCK(h) ? 'Chuyển khoản' : 'Tiền mặt'}</span></span></label>`; };
+            const hist = payouts().slice().sort((x, y) => (y.ts || 0) - (x.ts || 0));
+            const inp = 'w-full mt-1 px-3 py-2 rounded-xl bg-theme-input border border-theme-border text-theme-text text-sm';
+            m.innerHTML = `<div class="bg-theme-card border border-theme-border rounded-t-3xl sm:rounded-3xl w-full max-w-2xl max-h-[92vh] flex flex-col text-theme-text text-xs">
+                <div class="p-4 border-b border-theme-border flex justify-between items-center gap-2"><b class="text-sm"><i class="fa-solid fa-sack-dollar text-amber-500 mr-2"></i>Chốt nộp tiền công ty</b><button onclick="document.getElementById('payout-modal').classList.add('hidden');if(reportMode==='span')openReportModal('span')" class="px-3 py-1 rounded-lg bg-theme-input font-bold">Đóng</button></div>
+                <div class="p-4 overflow-y-auto space-y-3">
+                    <div class="grid grid-cols-2 gap-2 font-semibold"><label>Từ ngày<input type="date" value="${poFrom}" max="${invTodayIso()}" onchange="poFrom=this.value;poSkip=new Set();poAmt=null;payoutDraw()" class="${inp}"></label><label>Đến ngày<input type="date" value="${poTo}" max="${invTodayIso()}" onchange="poTo=this.value;poSkip=new Set();poAmt=null;payoutDraw()" class="${inp}"></label></div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div class="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30"><div class="opacity-80">Tiền mặt</div><b class="text-emerald-400 text-sm">${tm.length} bill • ${rpFmt(sum(tm))} đ</b></div>
+                        <div class="p-2 rounded-xl bg-sky-500/10 border border-sky-500/30"><div class="opacity-80">Chuyển khoản</div><b class="text-sky-400 text-sm">${ck.length} bill • ${rpFmt(sum(ck))} đ</b></div>
+                        <div class="col-span-2 p-2 rounded-xl bg-amber-500/15 border border-amber-500/40 text-center"><div class="opacity-80">Tổng phải nộp (${pick.length}/${list.length} đơn chưa nộp đang chọn)</div><b class="text-amber-500 text-base">${rpFmt(tot)} đ</b></div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 font-semibold">
+                        <label class="col-span-2">Người nhận (bắt buộc)<input id="po-receiver" list="po-rcv-list" value="${escHtml(rcv != null ? rcv : '')}" placeholder="VD: Kế toán công ty" class="${inp}"><datalist id="po-rcv-list">${rcvList.map(r => `<option value="${escHtml(r)}">`).join('')}</datalist></label>
+                        <label>Số tiền thực nộp (đ)<input id="po-amount" type="number" inputmode="numeric" value="${poAmt != null && poAmt !== '' ? escHtml(poAmt) : tot}" oninput="poAmt=this.value" class="${inp}"></label>
+                        <label>Ghi chú<input id="po-note" value="${escHtml(note || '')}" placeholder="VD: CK Vietcombank" class="${inp}"></label>
+                    </div>
+                    <button onclick="payoutSave()" class="w-full py-3 rounded-xl bg-amber-500 text-slate-950 text-sm font-bold" ${pick.length ? '' : 'disabled style="opacity:.5"'}><i class="fa-solid fa-check mr-1"></i>Xác nhận đã nộp ${pick.length} đơn</button>
+                    <div class="flex gap-2"><button onclick="poSkip=new Set();poAmt=null;payoutDraw()" class="flex-1 py-2 rounded-xl bg-theme-input border border-theme-border font-bold">Chọn tất cả</button><button onclick="poSkip=new Set(payoutList().map(h=>recSig('sales',h)));poAmt=null;payoutDraw()" class="flex-1 py-2 rounded-xl bg-theme-input border border-theme-border font-bold">Bỏ chọn tất cả</button></div>
+                    <div class="space-y-2">${byDay.length ? byDay.slice(0, 120).map(g => `<div class="space-y-1"><div class="font-bold text-amber-500 pt-1">📅 ${escHtml(g.d)} • ${g.l.length} đơn • ${rpFmt(sum(g.l))} đ</div>${g.l.map(line).join('')}</div>`).join('') : '<div class="p-4 text-center opacity-70">Không còn đơn nào chưa nộp trong khoảng ngày này.</div>'}</div>
+                    <div class="pt-2 border-t border-theme-border space-y-2"><b class="text-sm">📜 Các lần đã nộp (${hist.length})</b>
+                        ${hist.length ? hist.map(p => `<div class="p-2 rounded-xl border border-theme-border bg-theme-input/40 space-y-1"><div class="flex justify-between gap-2"><b>${escHtml(String(p.at || ''))}</b><b class="text-amber-500 whitespace-nowrap">${rpFmt(p.amount)} đ</b></div>
+                            <div class="opacity-80">Từ ${isoToVN(p.from)} đến ${isoToVN(p.to)} • ${p.count} đơn (TM ${rpFmt(p.tm)} đ • CK ${rpFmt(p.ck)} đ)${Number(p.amount) !== Number(p.total) ? ' • <b class="text-rose-400">lệch ' + rpFmt(Number(p.amount) - Number(p.total)) + ' đ</b>' : ''}</div>
+                            <div>Người nhận: <b>${escHtml(p.receiver || '')}</b> • Người chốt: ${escHtml(users.get(p.by) || p.by || '')}${p.note ? ' • ' + escHtml(p.note) : ''}</div>
+                            <button onclick="payoutDel('${p.id}')" class="px-3 py-1 rounded-lg bg-rose-500/15 text-rose-400 font-bold"><i class="fa-solid fa-rotate-left mr-1"></i>Hủy phiếu (bấm nhầm)</button></div>`).join('') : '<div class="opacity-70">Chưa có lần nộp nào.</div>'}
+                    </div>
+                </div></div>`;
+        }
+        function payoutTog(sg) { try { sg = decodeURIComponent(sg); } catch (e) {} poSkip.has(sg) ? poSkip.delete(sg) : poSkip.add(sg); poAmt = null; payoutDraw(); }
+        function payoutSave() {
+            if (!isAdminU()) return;
+            const list = payoutList().filter(h => !poSkip.has(recSig('sales', h))); if (!list.length) { alert('Chưa chọn đơn nào.'); return; }
+            const receiver = (document.getElementById('po-receiver').value || '').trim(); if (!receiver) { alert('Hãy nhập Người nhận.'); document.getElementById('po-receiver').focus(); return; }
+            const total = list.reduce((a, h) => a + saleNet(h), 0), amountRaw = document.getElementById('po-amount').value, amount = amountRaw === '' ? total : Number(amountRaw) || 0;
+            const ck = list.filter(saleIsCK), tm = list.filter(h => !saleIsCK(h)), sum = l => l.reduce((a, h) => a + saleNet(h), 0);
+            if (!confirm(`Xác nhận ĐÃ NỘP về công ty?\n\nTừ ${isoToVN(poFrom)} đến ${isoToVN(poTo)}\n${list.length} đơn • Tiền mặt ${rpFmt(sum(tm))} đ • Chuyển khoản ${rpFmt(sum(ck))} đ\nTổng đơn: ${rpFmt(total)} đ\nThực nộp: ${rpFmt(amount)} đ${amount !== total ? ' (lệch ' + rpFmt(amount - total) + ' đ)' : ''}\nNgười nhận: ${receiver}\n\nTồn kho không thay đổi.`)) return;
+            const u = getCurrentUser();
+            payouts().push({ id: newRecId(), at: vnNowStr(), ts: Date.now(), by: u ? u.username : '', from: poFrom, to: poTo, receiver, note: (document.getElementById('po-note').value || '').trim(), amount, total, tm: sum(tm), ck: sum(ck), count: list.length,
+                sales: list.map(h => ({ k: saleKeyOf(h), s: recSig('sales', h), n: saleNet(h) })) });
+            saveData(); poSkip = new Set(); poAmt = null; payoutDraw();
+        }
+        function payoutDel(id) {
+            const l = payouts(), i = l.findIndex(p => p.id === id); if (i < 0) return;
+            if (!confirm('Hủy phiếu nộp tiền ' + (l[i].at || '') + ' (' + rpFmt(l[i].amount) + ' đ)?\nCác đơn trong phiếu sẽ trở lại "chưa nộp".')) return;
+            l.splice(i, 1); saveData(); payoutDraw();
+        }
+
         async function spanExportExcel() {
             if (typeof ExcelJS === 'undefined') { alert('Chưa tải được thư viện Excel, kiểm tra mạng rồi thử lại.'); return; }
             const f = document.getElementById('rp-from'), t = document.getElementById('rp-to'); if (f && f.value) rpFrom = f.value; if (t && t.value) rpTo = t.value;
@@ -4565,6 +4654,7 @@
                 xlTitle(s1, 'BÁO CÁO TỔNG HỢP • ' + D.label, 2); xlHead(s1, ['Chỉ tiêu', 'Giá trị']);
                 [['Tổng doanh thu Gross (đ)', D.gross, 'FFFEF3C7'], ['Tổng doanh thu Net (đ)', D.net, 'FFFDE68A'], ['Tổng chiết khấu (đ)', D.disc, 'FFFFE4E6'], ['Tổng số đơn', D.sales.length], ['Số đơn chuyển khoản', D.ck.length, 'FFDBEAFE'], ['Tiền chuyển khoản (đ)', D.ckSum, 'FFDBEAFE'], ['Số đơn tiền mặt', D.tm.length, 'FFD1FAE5'], ['Tiền mặt (đ)', D.tmSum, 'FFD1FAE5'], ['Cửa hàng đã thêm', D.added.length], ['Cửa hàng đã phát sinh đơn', D.withO.length, 'FFD1FAE5'], ['Cửa hàng chưa lấy hàng', D.noO.length, 'FFFFE4E6'], ['Cửa hàng chưa gặp chủ', D.noOwner.length, 'FFFFE4E6'], ['Tổng số lượng bảo hành', D.warQty], ['Tổng SL sản phẩm bán ra', D.totalSold]]
                     .forEach(r => xlRow(s1, [r[0], r[1]], { num: [2], fill: r[2], bold: !!r[2] }));
+                xlRow(s1, ['Đã nộp công ty (đ)', D.paidSum], { num: [2], fill: 'FFD1FAE5', bold: true }); xlRow(s1, ['Còn phải nộp (đ) – ' + D.unpaidN + ' đơn', D.unpaidSum], { num: [2], fill: D.unpaidN ? 'FFFFE4E6' : 'FFD1FAE5', bold: true });
                 const s2 = wb.addWorksheet('Cửa hàng'); [6, 30, 16, 36, 18, 18].forEach((w, i) => s2.getColumn(i + 1).width = w);
                 xlTitle(s2, 'DANH SÁCH CỬA HÀNG • ' + D.label, 6); xlHead(s2, ['STT', 'Cửa hàng', 'SĐT', 'Mục quan tâm', 'Đã phát sinh (đ)', 'Tình trạng']);
                 D.withO.forEach((s, i) => xlRow(s2, [i + 1, s.name, s.phone || '', (s.interests || []).join(', '), D.rev[s.name], storeNoOwner(s) ? 'Không gặp chủ' : 'Đã có đơn'], { num: [5], fill: 'FFD1FAE5' }));
@@ -4580,6 +4670,17 @@
                 xlTitle(s4, 'TỔNG NHẬP KHO | TỒN HIỆN TẠI | ĐÃ BÁN | LỆCH • ' + D.label, 7); xlHead(s4, ['Sản phẩm', 'Tổng nhập kho', 'Tồn hiện tại', 'Đã bán ra', 'Trả kho', 'Điều chỉnh kho', 'Lệch']);
                 D.inv.forEach(x => { const r = xlRow(s4, [x.n, x.imp, x.stock, x.sold, x.ret, x.adj, x.lech || 'Khớp'], { num: [2, 3, 4, 5, 6, 7] }); r.getCell(7).fill = XL.fill(x.lech ? 'FFFCA5A5' : 'FFBBF7D0'); if (x.lech) r.getCell(7).font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FF991B1B' } }; r.getCell(2).fill = XL.fill('FFFEF3C7'); r.getCell(3).fill = XL.fill(x.stock < 5 ? 'FFFECACA' : 'FFDBEAFE'); r.getCell(4).fill = XL.fill('FFD1FAE5'); });
                 xlRow(s4, ['TỔNG (' + D.inv.length + ' sản phẩm)', D.inv.reduce((s, x) => s + x.imp, 0), D.inv.reduce((s, x) => s + x.stock, 0), D.inv.reduce((s, x) => s + x.sold, 0), D.inv.reduce((s, x) => s + x.ret, 0), D.inv.reduce((s, x) => s + x.adj, 0), D.inv.filter(x => x.lech).length + ' dòng lệch'], { bold: true, num: [2, 3, 4, 5, 6], fill: 'FFFDE68A' });
+                { // Bản 71: đơn hàng + cột Nộp công ty / Người nhận; danh sách phiếu nộp tiền
+                    const users = new Map((db.users || []).map(u => [u.username, u.fullname || u.username]));
+                    const s5 = wb.addWorksheet('Đơn hàng & Nộp CT'); [6, 20, 30, 20, 14, 14, 12, 14, 26, 18, 22].forEach((w, i) => s5.getColumn(i + 1).width = w);
+                    xlTitle(s5, 'ĐƠN HÀNG & NỘP TIỀN CÔNG TY • ' + D.label, 11); xlHead(s5, ['STT', 'Thời gian', 'Cửa hàng', 'Nhân viên', 'Thanh toán', 'Gross (đ)', 'Chiết khấu (đ)', 'Net (đ)', 'Nộp công ty', 'Ngày nộp', 'Người nhận']);
+                    D.sales.slice().sort((x, y) => (recTs(x) || 0) - (recTs(y) || 0)).forEach((h, i) => { const po = D.paidOf(h);
+                        xlRow(s5, [i + 1, h.time, h.storeName, users.get(h.username) || h.username || '', saleIsCK(h) ? 'Chuyển khoản' : 'Tiền mặt', saleGross(h), saleGross(h) - saleNet(h), saleNet(h), po ? 'Đã thanh toán về công ty' + (po.diff ? ' (sửa sau, chênh ' + po.diff + ')' : '') : 'Chưa nộp', po ? String(po.p.at || '') : '', po ? po.p.receiver || '' : ''], { num: [6, 7, 8], fill: po ? 'FFD1FAE5' : 'FFFFE4E6' }); });
+                    xlRow(s5, ['', 'TỔNG', D.sales.length + ' đơn', '', '', D.gross, D.disc, D.net, 'Đã nộp ' + D.paidSum.toLocaleString('vi-VN') + ' đ', 'Còn ' + D.unpaidSum.toLocaleString('vi-VN') + ' đ', ''], { bold: true, num: [6, 7, 8], fill: 'FFFDE68A' });
+                    const s6 = wb.addWorksheet('Phiếu nộp tiền'); [20, 12, 12, 9, 15, 15, 15, 15, 13, 22, 18, 24].forEach((w, i) => s6.getColumn(i + 1).width = w);
+                    xlTitle(s6, 'CÁC LẦN NỘP TIỀN CÔNG TY (liên quan kỳ ' + D.label + ')', 12); xlHead(s6, ['Ngày nộp', 'Từ ngày', 'Đến ngày', 'Số đơn', 'Tiền mặt (đ)', 'Chuyển khoản (đ)', 'Tổng đơn (đ)', 'Thực nộp (đ)', 'Chênh lệch (đ)', 'Người nhận', 'Người chốt', 'Ghi chú']);
+                    payouts().filter(p => !(p.to < rpFrom || p.from > rpTo)).sort((x, y) => (x.ts || 0) - (y.ts || 0)).forEach(p => xlRow(s6, [p.at, isoToVN(p.from), isoToVN(p.to), p.count, p.tm, p.ck, p.total, p.amount, (Number(p.amount) || 0) - (Number(p.total) || 0), p.receiver || '', users.get(p.by) || p.by || '', p.note || ''], { num: [4, 5, 6, 7, 8, 9] }));
+                }
                 await xlSave(wb, 'Bao-Cao-' + rpFrom + (rpTo !== rpFrom ? '_' + rpTo : '') + '.xlsx');
             } catch (e) { console.error(e); alert('Lỗi xuất Excel: ' + e.message); }
         }
@@ -5924,7 +6025,23 @@
             const blocks = [];
 
             blocks.push(`<div style="text-align:center;border-bottom:1px solid rgba(245,158,11,.4);padding-bottom:8px;margin-bottom:8px"><div style="font-weight:900;color:#fbbf24;font-size:14px;letter-spacing:1px">PHỤ KIỆN HOÀNG ĐẾ</div><div style="font-weight:700;color:#fde68a;font-size:10px;margin-top:2px">BÁO CÁO TỔNG KẾT KINH DOANH THỊ TRƯỜNG</div><div style="font-size:10px;color:#cbd5e1;margin-top:3px">Ngày báo cáo: <b style="color:#fff">${todayVN()}</b></div></div>`);
-            blocks.push(`<div style="display:flex;gap:6px;margin-bottom:6px"><div style="flex:1.3;background:rgba(0,0,0,.4);border:1px solid rgba(245,158,11,.25);border-radius:10px;padding:8px"><div style="font-size:10px;color:#cbd5e1;font-weight:600">Tổng doanh thu:</div><div style="font-size:14px;font-weight:900;color:#fbbf24;margin-top:3px">${revenue.toLocaleString('vi-VN')} đ</div></div><div style="flex:1;background:rgba(0,0,0,.4);border:1px solid rgba(245,158,11,.25);border-radius:10px;padding:8px"><div style="font-size:10px;color:#cbd5e1;font-weight:600">Số Bill đã bán:</div><div style="font-size:14px;font-weight:900;color:#fff;margin-top:3px">${sales.length} đơn</div></div></div>`);
+            { // Bản 71: bảng chỉ số đầu báo cáo ngày (2 cột)
+                const box = (l, v, c) => `<div style="flex:1;background:rgba(0,0,0,.4);border:1px solid rgba(245,158,11,.3);border-radius:10px;padding:7px 8px;min-width:0"><div style="font-size:9.5px;color:#cbd5e1;font-weight:600">${l}</div><div style="font-size:12.5px;font-weight:900;color:${c || '#fff'};margin-top:3px;word-break:break-word">${v}</div></div>`;
+                const row = (...b) => `<div style="display:flex;gap:6px;margin-bottom:6px">${b.join('')}</div>`;
+                const g = sales.reduce((a, h) => a + saleGross(h), 0), n = sales.reduce((a, h) => a + saleNet(h), 0);
+                const ck = sales.filter(saleIsCK), tm = sales.filter(h => !saleIsCK(h)), sum = l => l.reduce((a, h) => a + saleNet(h), 0);
+                const soldSet = new Set(sales.map(h => h.storeName));
+                const visitSet = new Set(checkins.map(h => h.storeName).concat((db.stores || []).filter(visitedToday).map(x => x.name)));
+                const t0 = parseDayKey(todayVN()), war = warrantyList().filter(w => w.kind !== 'out' && w.receivedTs >= t0 && w.receivedTs < t0 + 864e5 && rptMine(w));
+                const qty = sales.reduce((a, h) => a + saleItemsOf(h).reduce((x, i) => x + (Number(i.q) || 0), 0), 0);
+                blocks.push(row(box('Doanh thu Gross', rpFmt(g) + ' đ'), box('Doanh thu Net', rpFmt(n) + ' đ', '#fbbf24')));
+                blocks.push(row(box('Số bill đã bán', sales.length + ' bill'), box('Tổng chiết khấu', rpFmt(g - n) + ' đ', '#fda4af')));
+                blocks.push(row(box('Bill chuyển khoản', ck.length + ' bill • ' + rpFmt(sum(ck)) + ' đ', '#60a5fa'), box('Bill tiền mặt', tm.length + ' bill • ' + rpFmt(sum(tm)) + ' đ', '#34d399')));
+                blocks.push(row(box('Cửa hàng thêm mới', (db.stores || []).filter(addedToday).length, '#34d399'), box('Cửa hàng đã bán được hàng', soldSet.size, '#fbbf24')));
+                blocks.push(row(box('Cửa hàng đã ghé chưa bán hàng', [...visitSet].filter(x => !soldSet.has(x)).length, '#fda4af'), box('Tổng SL bảo hành', war.reduce((a, w) => a + (Number(w.qty) || 0), 0) + ' cái', '#c4b5fd')));
+                blocks.push(row(box('Tổng SL sản phẩm bán ra', qty + ' cái')));
+            }
+            if (0) blocks.push(`<div style="display:flex;gap:6px;margin-bottom:6px"><div style="flex:1.3;background:rgba(0,0,0,.4);border:1px solid rgba(245,158,11,.25);border-radius:10px;padding:8px"><div style="font-size:10px;color:#cbd5e1;font-weight:600">Tổng doanh thu:</div><div style="font-size:14px;font-weight:900;color:#fbbf24;margin-top:3px">${revenue.toLocaleString('vi-VN')} đ</div></div><div style="flex:1;background:rgba(0,0,0,.4);border:1px solid rgba(245,158,11,.25);border-radius:10px;padding:8px"><div style="font-size:10px;color:#cbd5e1;font-weight:600">Số Bill đã bán:</div><div style="font-size:14px;font-weight:900;color:#fff;margin-top:3px">${sales.length} đơn</div></div></div>`);
             blocks.push(`<div style="background:rgba(0,0,0,.4);border:1px solid rgba(245,158,11,.25);border-radius:10px;padding:8px;margin-bottom:6px"><div style="font-size:10px;color:#cbd5e1;font-weight:600">Số cửa hàng đã ghé thăm hôm nay:</div><div style="font-size:12px;font-weight:900;color:#34d399;margin-top:3px">${visits} cửa hàng</div></div>`);
 
             rpSection('📦 Sản phẩm đã nhập kho hôm nay', imports.map(i => rpLine(`🔹 ${escHtml(i.productName)}: <b>+${i.qty} cái</b> (Lúc ${escHtml(i.time)})`)), 'Không có nhập kho mới trong ngày.').forEach(b => blocks.push(b));
@@ -5980,6 +6097,7 @@
             document.getElementById('report-title').innerHTML = '<i class="fa-solid fa-file-invoice-dollar text-amber-500 mr-2"></i>' + (reportMode === 'care' ? 'Chăm Sóc Khách Hàng' : reportMode === 'span' ? 'Báo Cáo Tổng Hợp Theo Khoảng Ngày' : reportMode === 'range' ? 'Báo Cáo Tổng Lịch Sử Theo Khoảng Ngày' : 'Báo Cáo Doanh Thu & Thị Trường Trong Ngày');
             const act = 'flex-1 py-2.5 rounded-xl text-xs font-bold border bg-amber-500 text-slate-950 border-amber-500', off = 'flex-1 py-2.5 rounded-xl text-xs font-bold border bg-theme-input border-theme-border';
             document.getElementById('rp-tab-day').className = reportMode === 'day' ? act : off;
+            { const pb = document.getElementById('rp-payout-btn'); if (pb) pb.classList.toggle('hidden', !isAdminU()); }
             document.getElementById('rp-tab-all').className = reportMode === 'span' ? act : off;
             const prog = document.getElementById('rp-progress'); prog.innerText = 'Đang dựng báo cáo...';
             const host = document.getElementById('report-pages'); host.innerHTML = '';
