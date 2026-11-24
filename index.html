@@ -1657,7 +1657,7 @@
                         </div>
                         <div>
                             <h1 class="font-black text-xs sm:text-sm uppercase tracking-wider">PHỤ KIỆN HOÀNG ĐẾ</h1>
-                            <p class="text-[11px] sm:text-xs opacity-75">Nhân sự: <span class="font-bold text-amber-500">${user.fullname}</span> (${isPcMode() ? 'Chế độ PC' : 'Chế độ Mobile'} • Bản 77)</p>
+                            <p class="text-[11px] sm:text-xs opacity-75">Nhân sự: <span class="font-bold text-amber-500">${user.fullname}</span> (${isPcMode() ? 'Chế độ PC' : 'Chế độ Mobile'} • Bản 78)</p>
                         </div>
                     </div>
                     <div class="flex space-x-2 w-full sm:w-auto justify-end">
@@ -2267,7 +2267,7 @@
                             <input type="text" id="master-search" value="${escHtml(masterQ)}" oninput="masterSearchInput(this.value)" placeholder="Tìm sản phẩm theo tên hoặc mã..." class="w-full pl-9 pr-3 py-3 rounded-xl bg-theme-input border border-theme-border text-theme-text text-sm outline-none">
                         </div>
                         <div class="flex gap-2 overflow-x-auto pb-1 hide-scrollbar">${chips}</div>
-                        ${isAdmin ? `<button type="button" onclick="openCleanTool()" class="w-full py-2.5 rounded-xl border border-rose-500/40 bg-rose-500/10 text-rose-500 text-xs font-bold"><i class="fa-solid fa-broom mr-1"></i>Dọn sản phẩm chưa từng nhập / chưa từng bán</button><button type="button" onclick="openDupTool()" class="w-full py-2.5 rounded-xl border border-emerald-500/40 bg-emerald-500/10 text-emerald-500 text-xs font-bold"><i class="fa-solid fa-code-merge mr-1"></i>Quét & gộp sản phẩm trùng (và chuẩn hóa tên cũ)</button><button type="button" onclick="harvestVariantsBtn()" class="w-full py-2.5 rounded-xl border border-amber-500/40 bg-amber-500/10 text-amber-500 text-xs font-bold"><i class="fa-solid fa-tags mr-1"></i>Quét & lưu hết biến thể từ sản phẩm trong kho vào ô chọn nhanh</button><button type="button" onclick="replaceAllProductsFromList()" class="w-full py-2.5 rounded-xl border border-rose-500/40 bg-rose-500/10 text-rose-400 text-xs font-bold"><i class="fa-solid fa-file-import mr-1"></i>Thay toàn bộ sản phẩm bằng danh sách Excel (${EXCEL_PRODUCTS.p.length} sản phẩm)</button>` : ''}
+                        ${isAdmin ? `<button type="button" onclick="openCleanTool()" class="w-full py-2.5 rounded-xl border border-rose-500/40 bg-rose-500/10 text-rose-500 text-xs font-bold"><i class="fa-solid fa-broom mr-1"></i>Dọn sản phẩm chưa từng nhập / chưa từng bán</button><button type="button" onclick="openDupTool()" class="w-full py-2.5 rounded-xl border border-emerald-500/40 bg-emerald-500/10 text-emerald-500 text-xs font-bold"><i class="fa-solid fa-code-merge mr-1"></i>Quét & gộp sản phẩm trùng (và chuẩn hóa tên cũ)</button>` : ''}
                     </div>
                     ${db.productsMaster.length === 0 ? `<div class="bg-theme-card border border-theme-border rounded-2xl p-8 text-center opacity-60 text-sm">Chưa có sản phẩm nào. Hãy vào mục "Kho Tồn" để nhập hàng mới.</div>` : ''}
                     <div id="master-groups" class="space-y-4">${groups}</div>
@@ -4296,8 +4296,9 @@
         const actSeenTs = () => { try { return Number(localStorage.getItem('hoangde_act_seen')) || 0; } catch (e) { return 0; } };
         function actVisible() { const u = getCurrentUser(); if (!u) return []; const L = db.activityLog || []; return u.role === 'admin' ? L : L.filter(e => e.owner === u.username || e.by === u.username); }
         // ===== Bản 55: Chuông thông báo, Bảo hành, Báo cáo theo khoảng ngày, Bảng trả kho =====
-        const APP_VER = 77;
+        const APP_VER = 78;
         const APP_NOTES = {
+            78: ['Bảng tổng sản phẩm: bỏ 2 nút không dùng (Quét & lưu hết biến thể, Thay toàn bộ sản phẩm bằng danh sách Excel)'],
             77: ['Chuông thông báo chia theo tab: thông báo mục nào chỉ hiện ở tab mục đó (Bán hàng, Bảo hành, Kho, Sản phẩm, Cửa hàng, Duyệt, Cập nhật), mỗi tab có số mới riêng', 'Địa chỉ 3 cấp Tỉnh (mới, sau sáp nhập 2025) → Huyện (khu vực) → Xã/Phường; tên tỉnh viết khác nhau được gộp lại; chấm GPS tự điền khu vực theo các tiệm gần đó; ô Huyện chỉ nhận tên huyện chuẩn (tên xã, thị trấn, tên đường, viết tắt ghi nhầm vào ô Huyện được tự xếp lại; thiếu huyện thì lấy theo tiệm gần đó); admin có công cụ Chuẩn hóa địa chỉ', 'Bản đồ mở từ file trên máy tính tự dùng nền CARTO (OpenStreetMap chặn khi mở bằng file)', 'Bộ lọc Tỉnh – Huyện – Xã/Phường + ô Chỉ cửa hàng đã bán hàng ở Điểm bán, Bản đồ, KPI, Chăm sóc, Gợi ý chào hàng', 'Bản đồ: lịch trình đi ô tô từ vị trí hiện tại theo quãng đường lái xe thật, đi hết khu này sang khu khác, chia chặng mở Google Maps, có bản đồ chi tiết từng chặng'],
             75: ['Excel sheet Cửa hàng: thay cột Quận/Huyện bằng cột Khách hàng đã chuyển đổi (Đã lấy hàng / Chưa chuyển đổi)', 'Tô cả dòng: đã lấy hàng màu xanh lá, chưa chuyển đổi màu đen mờ; quận/huyện ghép vào ô Địa chỉ; lọc theo Tỉnh/TP và theo trạng thái'],
             74: ['Excel sao lưu gọn hơn: bỏ cột Số ảnh (lịch sử bán), Có ảnh (check-in), Ảnh shop (cửa hàng)', 'Lịch sử check-in (Excel): bỏ cột Vĩ độ, Kinh độ; thay bằng cột Cách tiệm khi check-in (m) – lưu từ lần check-in mới', 'Sheet KPI: tên khách có số #, khu vực không lặp chữ'],
