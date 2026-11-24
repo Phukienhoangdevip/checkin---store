@@ -1632,7 +1632,7 @@
                         </div>
                         <div>
                             <h1 class="font-black text-xs sm:text-sm uppercase tracking-wider">PHỤ KIỆN HOÀNG ĐẾ</h1>
-                            <p class="text-[11px] sm:text-xs opacity-75">Nhân sự: <span class="font-bold text-amber-500">${user.fullname}</span> (${isPcMode() ? 'Chế độ PC' : 'Chế độ Mobile'} • Bản 74)</p>
+                            <p class="text-[11px] sm:text-xs opacity-75">Nhân sự: <span class="font-bold text-amber-500">${user.fullname}</span> (${isPcMode() ? 'Chế độ PC' : 'Chế độ Mobile'} • Bản 75)</p>
                         </div>
                     </div>
                     <div class="flex space-x-2 w-full sm:w-auto justify-end">
@@ -4026,8 +4026,9 @@
         const actSeenTs = () => { try { return Number(localStorage.getItem('hoangde_act_seen')) || 0; } catch (e) { return 0; } };
         function actVisible() { const u = getCurrentUser(); if (!u) return []; const L = db.activityLog || []; return u.role === 'admin' ? L : L.filter(e => e.owner === u.username || e.by === u.username); }
         // ===== Bản 55: Chuông thông báo, Bảo hành, Báo cáo theo khoảng ngày, Bảng trả kho =====
-        const APP_VER = 74;
+        const APP_VER = 75;
         const APP_NOTES = {
+            75: ['Excel sheet Cửa hàng: thay cột Quận/Huyện bằng cột Khách hàng đã chuyển đổi (Đã lấy hàng / Chưa chuyển đổi)', 'Tô cả dòng: đã lấy hàng màu xanh lá, chưa chuyển đổi màu đen mờ; quận/huyện ghép vào ô Địa chỉ; lọc theo Tỉnh/TP và theo trạng thái'],
             74: ['Excel sao lưu gọn hơn: bỏ cột Số ảnh (lịch sử bán), Có ảnh (check-in), Ảnh shop (cửa hàng)', 'Lịch sử check-in (Excel): bỏ cột Vĩ độ, Kinh độ; thay bằng cột Cách tiệm khi check-in (m) – lưu từ lần check-in mới', 'Sheet KPI: tên khách có số #, khu vực không lặp chữ'],
             73: ['Mỗi khách hàng có SỐ THỨ TỰ riêng #1, #2, #3… (chỉ tăng, không dùng lại kể cả khi xóa tiệm)', 'Cho phép tiệm trùng tên: phân biệt bằng số #, hiện ở thẻ tiệm, tìm kiếm, hóa đơn, báo cáo, KPI, chăm sóc, Excel', 'Đơn / check-in mới lưu kèm số khách hàng'],
             72: ['Sửa lỗi 2 tiệm TRÙNG TÊN bị tính chung đơn (Excel thị trường, báo cáo, KPI, chăm sóc, gợi ý chào hàng): mỗi đơn chỉ thuộc đúng 1 tiệm', 'Đơn / check-in mới lưu mã tiệm; đơn cũ tự nhận đúng tiệm theo SĐT, tọa độ, địa chỉ', 'Chặn tạo / sửa tiệm trùng tên; admin có công cụ xử lý tiệm trùng tên (đổi tên chỉ chuyển đúng đơn của tiệm đó)'],
@@ -7981,6 +7982,9 @@
             T.good = tag(XC.GREENL, XC.GREEN); T.warn = tag(XC.GOLDL, 'FF92400E'); T.bad = tag(XC.REDL, XC.RED); T.info = tag(XC.BLUEL, XC.BLUED); T.mute = tag(XC.GRAYL, XC.GRAY); T.purple = tag(XC.PURPLEL, XC.PURPLE);
             T.supRow = [x({ fill: XC.GOLDL, al: { h: 'left', wrap: 1 } }), x({ fill: XC.GOLDL, nf: XNF, al: { h: 'right' } }), x({ fill: XC.GOLDL, al: { h: 'center' } })];
             T.B = B; T.cell = (kind, i) => B[kind][i % 2];
+            { const K = { t: { al: { h: 'left', wrap: 1 } }, c: { al: { h: 'center' } }, n: { nf: XNF, al: { h: 'right' } }, nb: { nf: XNF, font: { b: 1 }, al: { h: 'right' } }, tb: { font: { b: 1 }, al: { h: 'left', wrap: 1 } }, mono: { al: { h: 'center' } }, st: { font: { b: 1 }, al: { h: 'center' } } }, M = {};
+              // Bản 75: tô cả dòng – 'on' = đã lấy hàng (xanh lá), 'off' = chưa chuyển đổi (đen mờ)
+              T.rowSt = (mode, kind) => { const k = mode + kind; if (M[k] == null) { const b = K[kind] || K.t, fg = mode === 'on' ? XC.GREEN : 'FF3F3F46'; M[k] = x(Object.assign({}, b, { fill: mode === 'on' ? XC.GREENL : 'FFD4D4D8', font: Object.assign({}, b.font || {}, { color: kind === 'st' || kind === 'nb' || kind === 'tb' ? fg : (mode === 'on' ? XC.TEXT : 'FF52525B') }) })); } return M[k]; }; }
             T.mbody = v('mb', { font: { sz: 11 }, al: { h: 'center', wrap: 1 } }); T.mname = v('mn', { font: { b: 1, sz: 11, color: XC.NAVY }, al: { h: 'center', wrap: 1 } }); T.mnum = v('mnum', { font: { b: 1, sz: 11, color: XC.GREEN }, nf: XNF, al: { h: 'right' } });
             return T;
         }
@@ -8118,11 +8122,13 @@
             const ov = { name: 'Tổng quan', rows: R, widths: [42, 22, 44], ncol: 3, merges: M, tab: XC.NAVY, fit: 1, noGrid: 1 };
             // ---- Cửa hàng
             const relSt = v => /cũ/i.test(v) ? T.good : /mới/i.test(v) ? T.info : null;
-            const shopRows = stores.slice().sort((a, b) => ((revS[stKey(b)] || 0) - (revS[stKey(a)] || 0)) || a.name.localeCompare(b.name, 'vi')).map((s, i) => ({ 'STT': i + 1, 'Tên cửa hàng': stLabel(s), 'Chủ shop': s.owner || '', 'SĐT': s.phone || '', 'Tỉnh/TP': s.city || '', 'Quận/Huyện': s.district || '', 'Địa chỉ': s.address || '', 'Quy mô': s.scale || '', 'Ngành hàng': s.industry || '', 'Tình trạng KH': relLabel(s.relation), 'Quan tâm': (s.interests || []).join(', '), 'Gặp chủ': storeNoOwner(s) ? 'Chưa gặp' : 'Đã gặp', 'DT tháng (đ)': revS[stKey(s)] || 0, 'Đơn tháng': cntS[stKey(s)] || 0, 'Mua gần nhất': lastS[stKey(s)] ? tsToVN(lastS[stKey(s)]) : '', 'Vĩ độ': s.lat == null ? '' : s.lat, 'Kinh độ': s.lng == null ? '' : s.lng }));
+            const everBought = new Set(allSales().map(stKeyOfRec));   // Bản 75: đã từng mua bất kỳ lúc nào
+            const shopRows = stores.slice().sort((a, b) => ((revS[stKey(b)] || 0) - (revS[stKey(a)] || 0)) || a.name.localeCompare(b.name, 'vi')).map((s, i) => ({ 'STT': i + 1, 'Tên cửa hàng': stLabel(s), 'Chủ shop': s.owner || '', 'SĐT': s.phone || '', 'Tỉnh/TP': s.city || '', 'Khách hàng đã chuyển đổi': everBought.has(stKey(s)) ? 'Đã lấy hàng' : 'Chưa chuyển đổi', 'Địa chỉ': [s.address, s.district].filter(Boolean).join(', '), 'Quy mô': s.scale || '', 'Ngành hàng': s.industry || '', 'Tình trạng KH': relLabel(s.relation), 'Quan tâm': (s.interests || []).join(', '), 'Gặp chủ': storeNoOwner(s) ? 'Chưa gặp' : 'Đã gặp', 'DT tháng (đ)': revS[stKey(s)] || 0, 'Đơn tháng': cntS[stKey(s)] || 0, 'Mua gần nhất': lastS[stKey(s)] ? tsToVN(lastS[stKey(s)]) : '', 'Vĩ độ': s.lat == null ? '' : s.lat, 'Kinh độ': s.lng == null ? '' : s.lng }));
             const shop = xbTable(T, { name: 'Cửa hàng', tab: XC.GREEN, title: 'DANH SÁCH CỬA HÀNG – ' + lbl, sub: stores.length + ' cửa hàng • ' + Object.keys(revS).length + ' có đơn trong tháng • sắp xếp theo doanh thu tháng • cập nhật ' + now,
-                heads: Object.keys(shopRows[0] || { 'STT': 0, 'Tên cửa hàng': '', 'Chủ shop': '', 'SĐT': '', 'Tỉnh/TP': '', 'Quận/Huyện': '', 'Địa chỉ': '', 'Quy mô': '', 'Ngành hàng': '', 'Tình trạng KH': '', 'Quan tâm': '', 'Gặp chủ': '', 'DT tháng (đ)': 0, 'Đơn tháng': 0, 'Mua gần nhất': '', 'Vĩ độ': '', 'Kinh độ': '' }),
+                heads: Object.keys(shopRows[0] || { 'STT': 0, 'Tên cửa hàng': '', 'Chủ shop': '', 'SĐT': '', 'Tỉnh/TP': '', 'Khách hàng đã chuyển đổi': '', 'Địa chỉ': '', 'Quy mô': '', 'Ngành hàng': '', 'Tình trạng KH': '', 'Quan tâm': '', 'Gặp chủ': '', 'DT tháng (đ)': 0, 'Đơn tháng': 0, 'Mua gần nhất': '', 'Vĩ độ': '', 'Kinh độ': '' }),
                 widths: [6, 26, 16, 13, 14, 16, 26, 9, 12, 13, 24, 11, 15, 9, 13, 11, 11], data: shopRows,
-                style: (h, v, r, i) => h === 'STT' || h === 'Quy mô' || h === 'Ảnh shop' || h === 'Đơn tháng' || h === 'Mua gần nhất' ? T.cell('c', i) : h === 'Tình trạng KH' ? (relSt(v) || T.cell('c', i)) : h === 'Gặp chủ' ? (v === 'Chưa gặp' ? T.bad : T.good) : h === 'DT tháng (đ)' ? (v ? T.cell('nb', i) : T.cell('n', i)) : h === 'Vĩ độ' || h === 'Kinh độ' ? T.cell('mono', i) : null,
+                style: (h, v, r, i) => { const m = r && r['Khách hàng đã chuyển đổi'] === 'Đã lấy hàng' ? 'on' : 'off';   // Bản 75: tô cả dòng theo trạng thái chuyển đổi
+                    return T.rowSt(m, h === 'Khách hàng đã chuyển đổi' ? 'st' : h === 'STT' || h === 'Quy mô' || h === 'Đơn tháng' || h === 'Mua gần nhất' || h === 'Tình trạng KH' || h === 'Gặp chủ' || h === 'SĐT' ? 'c' : h === 'DT tháng (đ)' ? 'nb' : h === 'Tên cửa hàng' ? 'tb' : h === 'Vĩ độ' || h === 'Kinh độ' ? 'mono' : 't'); },
                 total: { 'STT': 'TỔNG', 'Tên cửa hàng': stores.length + ' cửa hàng', 'DT tháng (đ)': net, 'Đơn tháng': sales.length } });
             // ---- Sản phẩm & tồn kho
             const pr = prods.slice().sort((a, b) => prodCat(a).localeCompare(prodCat(b), 'vi') || a.name.localeCompare(b.name, 'vi')).map((p, i) => { const st = stockOf(p); return { 'STT': i + 1, 'Phân loại': prodCat(p), 'Tên sản phẩm': p.name, 'Mã SP': String(prodCode(p) || ''), 'Giá bán (đ)': Number(p.price) || 0, 'VAT': p.vat ? 'Có' : '', 'Tồn kho': st, 'Giá trị tồn (đ)': st * (Number(p.price) || 0), 'Nhập tháng': impP[p.name] || 0, 'Bán tháng': soldP[p.name] || 0, 'Trạng thái': st <= 0 ? 'Hết hàng' : st <= 5 ? 'Sắp hết' : 'Còn hàng' }; });
