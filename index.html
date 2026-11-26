@@ -1636,7 +1636,7 @@
                         </div>
                         <div>
                             <h1 class="font-black text-xs sm:text-sm uppercase tracking-wider">PHỤ KIỆN HOÀNG ĐẾ</h1>
-                            <p class="text-[11px] sm:text-xs opacity-75">Nhân sự: <span class="font-bold text-amber-500">${user.fullname}</span> (${isPcMode() ? 'Chế độ PC' : 'Chế độ Mobile'} • Bản 82)</p>
+                            <p class="text-[11px] sm:text-xs opacity-75">Nhân sự: <span class="font-bold text-amber-500">${user.fullname}</span> (${isPcMode() ? 'Chế độ PC' : 'Chế độ Mobile'} • Bản 83)</p>
                         </div>
                     </div>
                     <div class="flex space-x-2 w-full sm:w-auto justify-end">
@@ -2246,7 +2246,10 @@
                             <input type="text" id="master-search" value="${escHtml(masterQ)}" oninput="masterSearchInput(this.value)" placeholder="Tìm sản phẩm theo tên hoặc mã..." class="w-full pl-9 pr-3 py-3 rounded-xl bg-theme-input border border-theme-border text-theme-text text-sm outline-none">
                         </div>
                         <div class="flex gap-2 overflow-x-auto pb-1 hide-scrollbar">${chips}</div>
-                        ${isAdmin ? `<button type="button" onclick="openCleanTool()" class="w-full py-2.5 rounded-xl border border-rose-500/40 bg-rose-500/10 text-rose-500 text-xs font-bold"><i class="fa-solid fa-broom mr-1"></i>Dọn sản phẩm chưa từng nhập / chưa từng bán</button><button type="button" onclick="openDupTool()" class="w-full py-2.5 rounded-xl border border-emerald-500/40 bg-emerald-500/10 text-emerald-500 text-xs font-bold"><i class="fa-solid fa-code-merge mr-1"></i>Quét & gộp sản phẩm trùng (và chuẩn hóa tên cũ)</button><button type="button" onclick="openSkuSync()" class="w-full py-2.5 rounded-xl border border-sky-500/40 bg-sky-500/10 text-sky-500 text-xs font-bold"><i class="fa-solid fa-rotate mr-1"></i>Đồng bộ mã SKU từ Sapo (chỉ đọc mã, không thêm sản phẩm)</button>` : ''}
+                        ${isAdmin ? `<details id="tool-common" ${(() => { try { return localStorage.getItem('hoangde_tools_open') === '1' ? 'open' : ''; } catch (e) { return ''; } })()} ontoggle="try{localStorage.setItem('hoangde_tools_open',this.open?'1':'0')}catch(e){}" class="rounded-xl border border-theme-border bg-theme-input/40">
+                            <summary class="cursor-pointer select-none px-3 py-2.5 text-xs font-bold flex items-center justify-between"><span><i class="fa-solid fa-gear text-amber-500 mr-1"></i>Tính năng chung</span><span class="opacity-60 font-normal">${skuMissList().length ? skuMissList().length + ' sản phẩm chưa có mã SKU' : 'bấm để mở'}</span></summary>
+                            <div class="px-3 pb-3"><button type="button" style="margin-top:6px" onclick="openCleanTool()" class="w-full py-2.5 rounded-xl border border-rose-500/40 bg-rose-500/10 text-rose-500 text-xs font-bold"><i class="fa-solid fa-broom mr-1"></i>Dọn sản phẩm chưa từng nhập / chưa từng bán</button><button type="button" style="margin-top:6px" onclick="openDupTool()" class="w-full py-2.5 rounded-xl border border-emerald-500/40 bg-emerald-500/10 text-emerald-500 text-xs font-bold"><i class="fa-solid fa-code-merge mr-1"></i>Quét & gộp sản phẩm trùng (và chuẩn hóa tên cũ)</button><button type="button" style="margin-top:6px" onclick="openSkuSync()" class="w-full py-2.5 rounded-xl border border-sky-500/40 bg-sky-500/10 text-sky-500 text-xs font-bold"><i class="fa-solid fa-rotate mr-1"></i>Đồng bộ mã SKU từ Sapo (chỉ đọc mã, không thêm sản phẩm)</button><button type="button" style="margin-top:6px" onclick="openSkuMiss()" class="w-full py-2.5 rounded-xl border border-violet-500/40 bg-violet-500/10 text-violet-400 text-xs font-bold"><i class="fa-solid fa-tags mr-1"></i>Sản phẩm chưa đồng bộ mã (${skuMissList().length})</button></div>
+                        </details>` : ''}
                     </div>
                     ${db.productsMaster.length === 0 ? `<div class="bg-theme-card border border-theme-border rounded-2xl p-8 text-center opacity-60 text-sm">Chưa có sản phẩm nào. Hãy vào mục "Kho Tồn" để nhập hàng mới.</div>` : ''}
                     <div id="master-groups" class="space-y-4">${groups}</div>
@@ -4281,8 +4284,9 @@
         const actSeenTs = () => { try { return Number(localStorage.getItem('hoangde_act_seen')) || 0; } catch (e) { return 0; } };
         function actVisible() { const u = getCurrentUser(); if (!u) return []; const L = db.activityLog || []; return u.role === 'admin' ? L : L.filter(e => e.owner === u.username || e.by === u.username); }
         // ===== Bản 55: Chuông thông báo, Bảo hành, Báo cáo theo khoảng ngày, Bảng trả kho =====
-        const APP_VER = 82;
+        const APP_VER = 83;
         const APP_NOTES = {
+            83: ['Bảng tổng sản phẩm: gom các nút vào 1 dòng ⚙️ Tính năng chung', 'Nút mới Sản phẩm chưa đồng bộ mã: liệt kê sản phẩm còn mã SP…, gõ mã tay hoặc Quét lại file nhập hàng PDF/Excel để lấy mã SKU (chỉ điền mã, không nhập kho)'],
             82: ['Đồng bộ mã SKU: thêm nút Xóa sản phẩm gốc trống (sản phẩm chung không ghi biến thể, tồn 0, chưa nhập, chưa bán) – dùng công cụ Dọn sản phẩm, có khôi phục'],
             81: ['Đồng bộ mã SKU: đọc đúng từng biến thể của Sapo (mỗi biến thể 1 mã riêng; dòng biến thể để trống tên thì lấy tên dòng trên + giá trị thuộc tính); so tên hiểu Chân / (VT) / Type C = TypeC / iPhone / Sam sung / Ghi = Xám; sản phẩm chung không ghi biến thể thì giữ mã cũ'],
             80: ['Đồng bộ mã SKU từ file Sapo (admin, bảng tổng sản phẩm): chỉ đọc mã SKU, gán vào ô Mã SP của sản phẩm đang có – không thêm sản phẩm, không đổi tên/giá/tồn kho; có khôi phục', 'Nhập hàng (PDF/Excel/ảnh): cột Mã sản phẩm là mã SKU; lịch sử nhập lưu kèm mã SKU (Excel thêm cột Mã SKU)', 'Hóa đơn Xuất VAT: chữ chìm XUẤT VAT to, chéo, mờ phía sau nội dung', 'Hóa đơn: tách cột Số lượng (SL) riêng – bảng Tên sản phẩm | SL | Giá bán | Thành tiền, chữ nhẹ hơn dễ đọc', 'Bán hàng có ô tích Xuất VAT (giá giữ nguyên): hóa đơn ghi XUẤT VAT; Excel Lịch sử bán hàng thêm cột Xuất VAT'],
@@ -6957,22 +6961,22 @@
             const sec = (t, body, open) => body ? `<details ${open ? 'open' : ''} class="space-y-1"><summary class="font-bold cursor-pointer py-1">${t}</summary><div class="space-y-1 max-h-72 overflow-y-auto">${body}</div></details>` : '';
             const sure = g('sure'), near = g('near'), conf = g('conflict'), multi = g('multi'), none = g('none'), parent = g('parent');
             m.innerHTML = `<div class="bg-theme-card text-theme-text w-full sm:max-w-2xl rounded-t-3xl sm:rounded-3xl max-h-[92vh] flex flex-col text-xs">
-                <div class="p-4 border-b border-theme-border flex justify-between items-center gap-2"><div class="font-bold text-sm"><i class="fa-solid fa-rotate text-sky-500 mr-1"></i>Đồng bộ mã SKU từ Sapo</div><button onclick="document.getElementById('sku-sync-modal').classList.add('hidden')" class="px-3 py-1 rounded-lg bg-theme-input font-bold">Đóng</button></div>
+                <div class="p-4 border-b border-theme-border flex justify-between items-center gap-2"><div class="font-bold text-sm"><i class="fa-solid fa-rotate text-sky-500 mr-1"></i>${S.inv ? 'Lấy mã SKU từ hóa đơn nhập hàng' : 'Đồng bộ mã SKU từ Sapo'}</div><button onclick="document.getElementById('sku-sync-modal').classList.add('hidden')" class="px-3 py-1 rounded-lg bg-theme-input font-bold">Đóng</button></div>
                 <div class="p-4 space-y-3 overflow-y-auto">
-                    <div class="opacity-80">File <b>${escHtml(S.file)}</b>: ${S.n.toLocaleString()} mã SKU (đọc ${S.sec} giây). Chỉ đổi <b>ô Mã SP</b> của sản phẩm đang có trong app – không thêm sản phẩm, không đổi tên / giá / tồn kho.</div>
+                    <div class="opacity-80">File <b>${escHtml(S.file)}</b>: ${S.n.toLocaleString()} mã SKU (đọc ${S.sec} giây). Chỉ đổi <b>ô Mã SP</b> của sản phẩm đang có trong app – không thêm sản phẩm, không đổi tên / giá / tồn kho${S.inv ? ', <b>không nhập kho</b>. Chỉ xét ' + S.scope + ' sản phẩm chưa có mã SKU' : ''}.</div>
                     <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
                         <div class="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30"><b class="text-base">${sure.length}</b><br>✅ Khớp tên</div>
                         <div class="p-2 rounded-xl bg-amber-500/10 border border-amber-500/30"><b class="text-base">${near.length}</b><br>⚠️ Gần giống</div>
                         <div class="p-2 rounded-xl bg-rose-500/10 border border-rose-500/30"><b class="text-base">${conf.length + multi.length}</b><br>⛔ Trùng / nhiều mã</div>
-                        <div class="p-2 rounded-xl bg-theme-input border border-theme-border"><b class="text-base">${none.length + parent.length}</b><br>❌ Không có mã riêng</div></div>
+                        <div class="p-2 rounded-xl bg-theme-input border border-theme-border"><b class="text-base">${none.length + parent.length}</b><br>❌ ${S.inv ? 'Không có trong file' : 'Không có mã riêng'}</div></div>
                     ${sec(`✅ Khớp tên – sẽ gán mã SKU (${sure.length})`, sure.map(line).join(''), true)}
                     ${sec(`⚠️ Gần giống – anh tích chọn dòng đúng (${near.length})`, near.map(line).join(''), true)}
                     ${sec(`⛔ Mã SKU đang thuộc sản phẩm khác trong app – không gán (${conf.length})`, conf.map(r => info(r, 'SKU ' + escHtml(r.sku) + ' đang là mã của: ' + escHtml(r.cand))).join(''))}
                     ${sec(`⛔ Một tên có nhiều mã SKU trên Sapo – không gán (${multi.length})`, multi.map(r => info(r, 'Các mã: ' + escHtml(r.cand))).join(''))}
                     ${(() => { const ids = new Set(parent.map(r => String(r.p.id))), n = cleanScan().cand.filter(p => ids.has(String(p.id))).length;
                         return parent.length ? `<div class="flex flex-wrap items-center justify-between gap-2 p-2 rounded-xl bg-rose-500/5 border border-rose-500/30"><span>📦 ${parent.length} sản phẩm gốc không ghi biến thể${n ? `, trong đó <b>${n}</b> dòng trống (tồn 0, chưa từng nhập, chưa từng bán)` : ''}.</span>${n ? `<button onclick="skuCleanParents()" class="px-3 py-2 rounded-lg bg-rose-500 text-white font-bold"><i class="fa-solid fa-trash mr-1"></i>Xóa ${n} sản phẩm gốc trống</button>` : ''}</div>` : ''; })()}
-                    ${sec(`📦 Sản phẩm chung không ghi biến thể – trên Sapo mỗi biến thể 1 mã, giữ mã cũ (${parent.length})`, parent.map(r => info(r, 'Biến thể trên Sapo: ' + escHtml(r.cand))).join(''))}
-                    ${sec(`❌ Không thấy trên Sapo – giữ mã cũ (${none.length})`, none.map(r => info(r, 'Giữ nguyên mã hiện tại')).join(''))}
+                    ${sec(`📦 Sản phẩm chung không ghi biến thể – ${S.inv ? 'trong file' : 'trên Sapo'} mỗi biến thể 1 mã, giữ mã cũ (${parent.length})`, parent.map(r => info(r, (S.inv ? 'Biến thể trong file: ' : 'Biến thể trên Sapo: ') + escHtml(r.cand))).join(''))}
+                    ${S.inv ? '' : sec(`❌ Không thấy trên Sapo – giữ mã cũ (${none.length})`, none.map(r => info(r, 'Giữ nguyên mã hiện tại')).join(''))}
                 </div>
                 <div class="p-4 border-t border-theme-border grid grid-cols-2 gap-2">
                     <button onclick="skuRestore()" class="py-3 rounded-xl bg-theme-input border border-theme-border font-bold">↩️ Khôi phục mã lần trước</button>
@@ -6989,6 +6993,62 @@
             if (!m) { m = document.createElement('div'); m.id = 'clean-modal'; m.className = 'fixed inset-0 z-50 bg-black/70 flex items-end sm:items-center justify-center p-0 sm:p-4'; document.body.appendChild(m); }
             m.classList.remove('hidden'); cleanRender();
         }
+        // ===== Bản 83: SẢN PHẨM CHƯA ĐỒNG BỘ MÃ + quét lại hóa đơn nhập hàng (chỉ lấy mã, KHÔNG nhập kho) =====
+        function skuStock(p) { return (db.warehouse || []).filter(w => String(w.productId) === String(p.id)).reduce((a, w) => a + (Number(w.qty) || 0), 0); }
+        function skuMissList() { return (db.productsMaster || []).filter(p => !p.code || /^SP\d+$/i.test(String(p.code))); }
+        function openSkuMiss() {
+            if (!isAdminU()) { alert('Chỉ admin dùng công cụ này.'); return; }
+            let m = document.getElementById('sku-miss-modal');
+            if (!m) { m = document.createElement('div'); m.id = 'sku-miss-modal'; m.className = 'fixed inset-0 z-[60] bg-black/70 flex items-end sm:items-center justify-center p-0 sm:p-4'; document.body.appendChild(m); }
+            m.classList.remove('hidden'); skuMissDraw();
+        }
+        function skuMissDraw() {
+            const m = document.getElementById('sku-miss-modal'); if (!m) return;
+            const L = skuMissList().slice().sort((a, b) => (Number(skuStock(b)) || 0) - (Number(skuStock(a)) || 0) || String(a.name).localeCompare(String(b.name), 'vi'));
+            m.innerHTML = `<div class="bg-theme-card text-theme-text w-full sm:max-w-2xl rounded-t-3xl sm:rounded-3xl max-h-[92vh] flex flex-col text-xs">
+                <div class="p-4 border-b border-theme-border flex justify-between items-center gap-2"><div class="font-bold text-sm"><i class="fa-solid fa-tags text-violet-400 mr-1"></i>Sản phẩm chưa đồng bộ mã (${L.length})</div><button onclick="document.getElementById('sku-miss-modal').classList.add('hidden');render()" class="px-3 py-1 rounded-lg bg-theme-input font-bold">Đóng</button></div>
+                <div class="p-4 space-y-2 overflow-y-auto">
+                    <div class="opacity-80">Các sản phẩm vẫn còn mã app tự đặt (SP…). Chọn lại <b>hóa đơn nhập hàng</b> (PDF / Excel) để app tự lấy mã SKU theo tên – <b>chỉ điền mã, không nhập kho, không đổi giá</b>. Hoặc gõ mã tay vào từng dòng.</div>
+                    <button onclick="skuScanInvoice()" class="w-full py-3 rounded-xl bg-violet-500 text-white font-bold"><i class="fa-solid fa-file-pdf mr-1"></i>Quét lại file nhập hàng (PDF / Excel)</button>
+                    <div id="sku-miss-prog" class="text-center opacity-70"></div>
+                    ${L.length ? L.map(p => `<div class="flex items-center gap-2 p-2 rounded-lg bg-theme-input border border-theme-border">
+                        <div class="flex-1 min-w-0"><b class="break-words">${escHtml(p.name)}</b><br><span class="opacity-60">${escHtml(prodCode(p))} • tồn ${Number(skuStock(p)) || 0}</span></div>
+                        <input id="skm-${p.id}" placeholder="Mã SKU" class="w-28 px-2 py-1.5 rounded-lg bg-theme-card border border-theme-border text-theme-text uppercase">
+                        <button onclick="skuMissSave('${p.id}')" class="px-2.5 py-1.5 rounded-lg bg-emerald-600 text-white font-bold">Lưu</button></div>`).join('') : '<div class="p-4 text-center text-emerald-500 font-bold">Tất cả sản phẩm đã có mã SKU 🎉</div>'}
+                </div></div>`;
+        }
+        function skuMissSave(id) {
+            const p = (db.productsMaster || []).find(x => String(x.id) === String(id)), el = document.getElementById('skm-' + id); if (!p || !el) return;
+            const v = el.value.trim().toUpperCase().replace(/\s+/g, ''); if (v.length < 3) { alert('Mã SKU quá ngắn.'); return; }
+            const o = (db.productsMaster || []).find(x => x !== p && qiCodeKey(prodCode(x)) === qiCodeKey(v)); if (o) { alert('Mã ' + v + ' đang là mã của "' + o.name + '".'); return; }
+            p.code = v; saveData(); skuMissDraw();
+        }
+        async function skuScanInvoice() {
+            const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.pdf,.xlsx,.xlsm,.csv';
+            inp.onchange = async () => {
+                const f = inp.files && inp.files[0]; if (!f) return; const prog = document.getElementById('sku-miss-prog');
+                try {
+                    const t0 = Date.now(), low = f.name.toLowerCase(), buf = await f.arrayBuffer(); QI_CODES = [];
+                    if (prog) prog.innerText = '⏳ Đang đọc file...';
+                    if (/\.(xlsx|xlsm)$/.test(low)) qiGridToText(await qiXlsxRows(buf));
+                    else if (/\.(csv|txt)$/.test(low)) qiGridToText(qiCsvRows(new TextDecoder('utf-8').decode(buf)));
+                    else if (/\.pdf$/.test(low) || f.type === 'application/pdf') { const r = await qiPdfExtract(buf, prog); if (r.words < 8) throw new Error('PDF dạng ảnh scan, không có chữ để đọc mã.'); }
+                    else throw new Error('Chỉ đọc được file PDF, Excel (.xlsx) hoặc CSV.');
+                    const list = (QI_CODES || []).filter(c => c.code && c.code.length >= 3 && /\d/.test(c.code)).map(c => ({ sku: c.code.toUpperCase(), name: c.name }));
+                    if (!list.length) throw new Error('Không thấy cột Mã sản phẩm / Mã SKU trong hóa đơn này.');
+                    const miss = new Set(skuMissList().map(p => String(p.id)));
+                    const rows = skuMatch(list).filter(r => miss.has(String(r.p.id)) && r.kind !== 'none');
+                    skuSync = { file: f.name, n: new Set(list.map(x => x.sku)).size, rows, sec: ((Date.now() - t0) / 1000).toFixed(1), inv: true, scope: miss.size };
+                    skuSync.on = new Set(rows.filter(r => r.kind === 'sure').map(r => String(r.p.id)));
+                    if (prog) prog.innerText = '';
+                    document.getElementById('sku-miss-modal').classList.add('hidden');
+                    let m = document.getElementById('sku-sync-modal');
+                    if (!m) { m = document.createElement('div'); m.id = 'sku-sync-modal'; m.className = 'fixed inset-0 z-[60] bg-black/70 flex items-end sm:items-center justify-center p-0 sm:p-4'; document.body.appendChild(m); }
+                    m.classList.remove('hidden'); skuDraw();
+                } catch (e) { if (prog) prog.innerText = ''; alert('Không đọc được file: ' + (e.message || e)); }
+            };
+            inp.click();
+        }
         function skuToggle(id, v) { if (!skuSync) return; if (v) skuSync.on.add(String(id)); else skuSync.on.delete(String(id)); skuDraw(); }
         function skuApply() {
             if (!skuSync || !skuSync.on.size) { alert('Chưa chọn dòng nào.'); return; }
@@ -6999,8 +7059,10 @@
             if (!confirm(`Gán mã SKU cho ${ok.length} sản phẩm?${skip.length ? '\n(' + skip.length + ' dòng bỏ qua vì 2 sản phẩm cùng 1 mã SKU)' : ''}\nChỉ đổi ô Mã SP. Có thể khôi phục lại.`)) return;
             try { localStorage.setItem('hoangde_sku_backup', JSON.stringify({ at: vnNowStr(), rows: ok.map(r => ({ id: String(r.p.id), code: r.p.code || '', aliasCodes: r.p.aliasCodes || null })) })); } catch (e) { }
             ok.forEach(r => { const old = r.p.code; if (old && !/^SP\d+$/.test(old) && qiCodeKey(old) !== qiCodeKey(r.sku)) r.p.aliasCodes = [...new Set([...(r.p.aliasCodes || []), old])]; r.p.code = r.sku; });
+            const fromInv = skuSync.inv;
             saveData(); document.getElementById('sku-sync-modal').classList.add('hidden'); skuSync = null; render();
             alert('Đã gán mã SKU cho ' + ok.length + ' sản phẩm.');
+            if (fromInv) openSkuMiss();   // quay lại danh sách chưa có mã để quét tiếp file khác
         }
         function skuRestore() {
             let b = null; try { b = JSON.parse(localStorage.getItem('hoangde_sku_backup') || 'null'); } catch (e) { }
