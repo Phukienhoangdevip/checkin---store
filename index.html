@@ -1636,7 +1636,7 @@
                         </div>
                         <div>
                             <h1 class="font-black text-xs sm:text-sm uppercase tracking-wider">PHỤ KIỆN HOÀNG ĐẾ</h1>
-                            <p class="text-[11px] sm:text-xs opacity-75">Nhân sự: <span class="font-bold text-amber-500">${user.fullname}</span> (${isPcMode() ? 'Chế độ PC' : 'Chế độ Mobile'} • Bản 81)</p>
+                            <p class="text-[11px] sm:text-xs opacity-75">Nhân sự: <span class="font-bold text-amber-500">${user.fullname}</span> (${isPcMode() ? 'Chế độ PC' : 'Chế độ Mobile'} • Bản 82)</p>
                         </div>
                     </div>
                     <div class="flex space-x-2 w-full sm:w-auto justify-end">
@@ -4281,8 +4281,9 @@
         const actSeenTs = () => { try { return Number(localStorage.getItem('hoangde_act_seen')) || 0; } catch (e) { return 0; } };
         function actVisible() { const u = getCurrentUser(); if (!u) return []; const L = db.activityLog || []; return u.role === 'admin' ? L : L.filter(e => e.owner === u.username || e.by === u.username); }
         // ===== Bản 55: Chuông thông báo, Bảo hành, Báo cáo theo khoảng ngày, Bảng trả kho =====
-        const APP_VER = 81;
+        const APP_VER = 82;
         const APP_NOTES = {
+            82: ['Đồng bộ mã SKU: thêm nút Xóa sản phẩm gốc trống (sản phẩm chung không ghi biến thể, tồn 0, chưa nhập, chưa bán) – dùng công cụ Dọn sản phẩm, có khôi phục'],
             81: ['Đồng bộ mã SKU: đọc đúng từng biến thể của Sapo (mỗi biến thể 1 mã riêng; dòng biến thể để trống tên thì lấy tên dòng trên + giá trị thuộc tính); so tên hiểu Chân / (VT) / Type C = TypeC / iPhone / Sam sung / Ghi = Xám; sản phẩm chung không ghi biến thể thì giữ mã cũ'],
             80: ['Đồng bộ mã SKU từ file Sapo (admin, bảng tổng sản phẩm): chỉ đọc mã SKU, gán vào ô Mã SP của sản phẩm đang có – không thêm sản phẩm, không đổi tên/giá/tồn kho; có khôi phục', 'Nhập hàng (PDF/Excel/ảnh): cột Mã sản phẩm là mã SKU; lịch sử nhập lưu kèm mã SKU (Excel thêm cột Mã SKU)', 'Hóa đơn Xuất VAT: chữ chìm XUẤT VAT to, chéo, mờ phía sau nội dung', 'Hóa đơn: tách cột Số lượng (SL) riêng – bảng Tên sản phẩm | SL | Giá bán | Thành tiền, chữ nhẹ hơn dễ đọc', 'Bán hàng có ô tích Xuất VAT (giá giữ nguyên): hóa đơn ghi XUẤT VAT; Excel Lịch sử bán hàng thêm cột Xuất VAT'],
             79: ['Hóa đơn bán hàng mẫu mới: nền trắng dễ đọc, ngày giờ góc phải, Cửa hàng – chủ shop, SĐT, địa chỉ, thanh toán; dòng chiết khấu chỉ hiện khi có chiết khấu; bảng Tên sản phẩm (SL) – Giá bán – Thành tiền', 'Excel sheet Lịch sử bán hàng: Cửa hàng lên cột 2, thêm cột SĐT khách, Nhân viên chuyển về cột cuối'],
@@ -6968,12 +6969,25 @@
                     ${sec(`⚠️ Gần giống – anh tích chọn dòng đúng (${near.length})`, near.map(line).join(''), true)}
                     ${sec(`⛔ Mã SKU đang thuộc sản phẩm khác trong app – không gán (${conf.length})`, conf.map(r => info(r, 'SKU ' + escHtml(r.sku) + ' đang là mã của: ' + escHtml(r.cand))).join(''))}
                     ${sec(`⛔ Một tên có nhiều mã SKU trên Sapo – không gán (${multi.length})`, multi.map(r => info(r, 'Các mã: ' + escHtml(r.cand))).join(''))}
+                    ${(() => { const ids = new Set(parent.map(r => String(r.p.id))), n = cleanScan().cand.filter(p => ids.has(String(p.id))).length;
+                        return parent.length ? `<div class="flex flex-wrap items-center justify-between gap-2 p-2 rounded-xl bg-rose-500/5 border border-rose-500/30"><span>📦 ${parent.length} sản phẩm gốc không ghi biến thể${n ? `, trong đó <b>${n}</b> dòng trống (tồn 0, chưa từng nhập, chưa từng bán)` : ''}.</span>${n ? `<button onclick="skuCleanParents()" class="px-3 py-2 rounded-lg bg-rose-500 text-white font-bold"><i class="fa-solid fa-trash mr-1"></i>Xóa ${n} sản phẩm gốc trống</button>` : ''}</div>` : ''; })()}
                     ${sec(`📦 Sản phẩm chung không ghi biến thể – trên Sapo mỗi biến thể 1 mã, giữ mã cũ (${parent.length})`, parent.map(r => info(r, 'Biến thể trên Sapo: ' + escHtml(r.cand))).join(''))}
                     ${sec(`❌ Không thấy trên Sapo – giữ mã cũ (${none.length})`, none.map(r => info(r, 'Giữ nguyên mã hiện tại')).join(''))}
                 </div>
                 <div class="p-4 border-t border-theme-border grid grid-cols-2 gap-2">
                     <button onclick="skuRestore()" class="py-3 rounded-xl bg-theme-input border border-theme-border font-bold">↩️ Khôi phục mã lần trước</button>
                     <button onclick="skuApply()" class="py-3 rounded-xl bg-sky-500 text-white font-bold">Áp dụng ${S.on.size} mã SKU</button></div></div>`;
+        }
+        // Bản 82: xóa các sản phẩm gốc trống – dùng đúng công cụ "Dọn sản phẩm không dùng" (chỉ tồn 0, chưa nhập, chưa bán; có khôi phục)
+        function skuCleanParents() {
+            if (!skuSync) return;
+            const ids = new Set(skuSync.rows.filter(r => r.kind === 'parent').map(r => String(r.p.id))), r = cleanScan(), cand = r.cand.filter(p => ids.has(String(p.id)));
+            if (!cand.length) { alert('Không có sản phẩm gốc trống để xóa.'); return; }
+            cleanState = { cand, keep: r.keep, sel: new Set(cand.map(p => String(p.id))), fromSku: true };
+            document.getElementById('sku-sync-modal').classList.add('hidden');
+            let m = document.getElementById('clean-modal');
+            if (!m) { m = document.createElement('div'); m.id = 'clean-modal'; m.className = 'fixed inset-0 z-50 bg-black/70 flex items-end sm:items-center justify-center p-0 sm:p-4'; document.body.appendChild(m); }
+            m.classList.remove('hidden'); cleanRender();
         }
         function skuToggle(id, v) { if (!skuSync) return; if (v) skuSync.on.add(String(id)); else skuSync.on.delete(String(id)); skuDraw(); }
         function skuApply() {
