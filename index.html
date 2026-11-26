@@ -1636,7 +1636,7 @@
                         </div>
                         <div>
                             <h1 class="font-black text-xs sm:text-sm uppercase tracking-wider">PHỤ KIỆN HOÀNG ĐẾ</h1>
-                            <p class="text-[11px] sm:text-xs opacity-75">Nhân sự: <span class="font-bold text-amber-500">${user.fullname}</span> (${isPcMode() ? 'Chế độ PC' : 'Chế độ Mobile'} • Bản 80)</p>
+                            <p class="text-[11px] sm:text-xs opacity-75">Nhân sự: <span class="font-bold text-amber-500">${user.fullname}</span> (${isPcMode() ? 'Chế độ PC' : 'Chế độ Mobile'} • Bản 81)</p>
                         </div>
                     </div>
                     <div class="flex space-x-2 w-full sm:w-auto justify-end">
@@ -4281,8 +4281,9 @@
         const actSeenTs = () => { try { return Number(localStorage.getItem('hoangde_act_seen')) || 0; } catch (e) { return 0; } };
         function actVisible() { const u = getCurrentUser(); if (!u) return []; const L = db.activityLog || []; return u.role === 'admin' ? L : L.filter(e => e.owner === u.username || e.by === u.username); }
         // ===== Bản 55: Chuông thông báo, Bảo hành, Báo cáo theo khoảng ngày, Bảng trả kho =====
-        const APP_VER = 80;
+        const APP_VER = 81;
         const APP_NOTES = {
+            81: ['Đồng bộ mã SKU: đọc đúng từng biến thể của Sapo (mỗi biến thể 1 mã riêng; dòng biến thể để trống tên thì lấy tên dòng trên + giá trị thuộc tính); so tên hiểu Chân / (VT) / Type C = TypeC / iPhone / Sam sung / Ghi = Xám; sản phẩm chung không ghi biến thể thì giữ mã cũ'],
             80: ['Đồng bộ mã SKU từ file Sapo (admin, bảng tổng sản phẩm): chỉ đọc mã SKU, gán vào ô Mã SP của sản phẩm đang có – không thêm sản phẩm, không đổi tên/giá/tồn kho; có khôi phục', 'Nhập hàng (PDF/Excel/ảnh): cột Mã sản phẩm là mã SKU; lịch sử nhập lưu kèm mã SKU (Excel thêm cột Mã SKU)', 'Hóa đơn Xuất VAT: chữ chìm XUẤT VAT to, chéo, mờ phía sau nội dung', 'Hóa đơn: tách cột Số lượng (SL) riêng – bảng Tên sản phẩm | SL | Giá bán | Thành tiền, chữ nhẹ hơn dễ đọc', 'Bán hàng có ô tích Xuất VAT (giá giữ nguyên): hóa đơn ghi XUẤT VAT; Excel Lịch sử bán hàng thêm cột Xuất VAT'],
             79: ['Hóa đơn bán hàng mẫu mới: nền trắng dễ đọc, ngày giờ góc phải, Cửa hàng – chủ shop, SĐT, địa chỉ, thanh toán; dòng chiết khấu chỉ hiện khi có chiết khấu; bảng Tên sản phẩm (SL) – Giá bán – Thành tiền', 'Excel sheet Lịch sử bán hàng: Cửa hàng lên cột 2, thêm cột SĐT khách, Nhân viên chuyển về cột cuối'],
             78: ['Bảng tổng sản phẩm: bỏ 2 nút không dùng (Quét & lưu hết biến thể, Thay toàn bộ sản phẩm bằng danh sách Excel)'],
@@ -6845,6 +6846,15 @@
         // ===== Bản 80: ĐỒNG BỘ MÃ SKU TỪ FILE SAPO – chỉ đọc mã, KHÔNG thêm sản phẩm, KHÔNG đổi tên / giá / tồn kho =====
         let skuSync = null;
         const skuKey = t => normTxt(String(t || '')).replace(/[^a-z0-9]+/g, ' ').trim();
+        // Bản 81: so tên kiểu "từ khóa": bỏ chữ phụ (Chân, VT, Mặc định), gộp cách viết (Type C = TypeC = Type, iPhone = IP = Lightning), không quan tâm thứ tự / dấu ngoặc / gạch
+        const SKU_DROP = new Set(['chan', 'vt', 'vat', 'mac', 'dinh', 'loai', 'dau', 'cong']);
+        const SKU_MAP = { type: 'typec', typc: 'typec', tc: 'typec', ip: 'iphone', lightning: 'iphone', light: 'iphone', ss: 'samsung', ghi: 'xam' };
+        function skuToks(t) {
+            const w = skuKey(t).replace(/\btype\s*c\b/g, 'typec').replace(/\bi\s*phone\b/g, 'iphone').replace(/\bsam\s*sung\b/g, 'samsung').split(' ').filter(Boolean), out = [];
+            w.forEach(x => { x = SKU_MAP[x] || x; if (!SKU_DROP.has(x) && !out.includes(x)) out.push(x); });
+            return out;
+        }
+        const skuSig = t => skuToks(t).slice().sort().join(' ');
         async function skuReadFile(file) {   // → [{ sku, name }]
             const low = file.name.toLowerCase(), out = [];
             let rows = [];
@@ -6868,7 +6878,7 @@
             const h = rows[H].map(x => skuKey(x));
             const ci = re => h.findIndex(x => re.test(x));
             let cSku = ci(/^(ma )?sku/); if (cSku < 0) cSku = ci(/^ma (phien ban|san pham|sp)$|^ma$/);
-            const cVar = ci(/ten phien ban/), cName = ci(/^ten san pham|^ten hang|^san pham$|^ten$/);
+            const cVar = ci(/ten phien ban/), cName = ci(/^ten san pham|^ten hang|^san pham$|^ten$/), cAttr = h.map((x, i) => /^gia tri thuoc tinh/.test(x) ? i : -1).filter(i => i >= 0);
             if (cName < 0 && cVar < 0) throw new Error('Không thấy cột "Tên sản phẩm" trong file.');
             let lastName = '';
             rows.slice(H + 1).forEach(r => {
@@ -6877,32 +6887,45 @@
                 const vr = cVar >= 0 ? String(r[cVar] || '').trim() : '';
                 if (!sku) return;
                 const names = new Set(); if (vr) { names.add(vr); if (nm && !skuKey(vr).includes(skuKey(nm))) names.add(nm + ' ' + vr); if (nm && /^(mac dinh|default)/.test(skuKey(vr))) names.add(nm); } else if (nm) names.add(nm);
+                { const av = cAttr.map(i => String(r[i] || '').trim()).filter(v => v && !/^(mac dinh|default)$/.test(skuKey(v))); if (nm) names.add(av.length ? nm + ' ' + av.join(' ') : nm); }   // tên sản phẩm + giá trị thuộc tính (dòng biến thể để trống tên thì lấy tên dòng trên)
                 names.forEach(n => out.push({ sku, name: n }));
             });
             return out;
         }
         function skuMatch(list) {
-            const byKey = new Map(), tok = new Map();
-            list.forEach(x => { const k = skuKey(x.name); if (!k) return; if (!byKey.has(k)) byKey.set(k, new Set()); byKey.get(k).add(x.sku); k.split(' ').forEach(t => { if (t.length < 2) return; if (!tok.has(t)) tok.set(t, []); tok.get(t).push(x); }); });
+            const bySig = new Map(), tok = new Map(), sapoSig = [];
+            list.forEach(x => { const sg = skuSig(x.name); if (!sg) return; x.toks = sg.split(' '); x.sig = sg; sapoSig.push(x);
+                if (!bySig.has(sg)) bySig.set(sg, new Map()); bySig.get(sg).set(x.sku, x.name);
+                x.toks.forEach(t => { if (!tok.has(t)) tok.set(t, []); tok.get(t).push(x); }); });
             const codeOwner = new Map(); (db.productsMaster || []).forEach(p => codeOwner.set(qiCodeKey(prodCode(p)), p));
             const rows = [];
             (db.productsMaster || []).forEach(p => {
-                const keys = [p.name, ...(p.aliases || [])].map(skuKey).filter(Boolean);
+                const sigs = [p.name, ...(p.aliases || [])].map(skuSig).filter(Boolean);
                 let sku = null, kind = '', cand = '';
-                for (const k of keys) { const S = byKey.get(k); if (S && S.size === 1) { sku = [...S][0]; kind = 'sure'; break; } if (S && S.size > 1) { kind = 'multi'; cand = [...S].join(', '); } }
-                if (!sku && kind !== 'multi') {   // gần giống: nhiều chữ trùng nhau nhất
-                    const T = new Set(keys[0].split(' ')), seen = new Map();
-                    [...T].filter(t => t.length >= 2 && tok.has(t)).sort((a, b) => tok.get(a).length - tok.get(b).length).slice(0, 3).forEach(t => tok.get(t).slice(0, 400).forEach(x => seen.set(x.sku + '|' + x.name, x)));
-                    let best = null, bs = 0, second = 0;
-                    seen.forEach(x => { const U = new Set(skuKey(x.name).split(' ')); let inter = 0; T.forEach(t => { if (U.has(t)) inter++; }); const sc = inter / (T.size + U.size - inter); if (sc > bs) { second = bs; bs = sc; best = x; } else if (sc > second) second = sc; });
-                    if (best && bs >= 0.6 && bs - second >= 0.05) { sku = best.sku; kind = 'near'; cand = best.name; }
+                for (const sg of sigs) { const S = bySig.get(sg); if (!S) continue; const ks = [...S.keys()]; if (ks.length === 1) { sku = ks[0]; kind = 'sure'; cand = S.get(sku); break; } kind = 'multi'; cand = ks.join(', '); }
+                if (!sku && kind !== 'multi' && sigs.length) {
+                    const T = sigs[0].split(' '), seen = new Map();
+                    T.filter(t => tok.has(t)).sort((a, b) => tok.get(a).length - tok.get(b).length).slice(0, 3).forEach(t => tok.get(t).slice(0, 600).forEach(x => seen.set(x.sku + '|' + x.sig, x)));
+                    const sc = [...seen.values()].map(x => { const U = new Set(x.toks); let inter = 0; T.forEach(t => { if (U.has(t)) inter++; }); return { x, inter, s: inter / (T.length + U.size - inter), sup: inter === T.length }; }).sort((a, b) => b.s - a.s);
+                    // sản phẩm chung (không ghi biến thể) mà Sapo có nhiều biến thể: tất cả tên Sapo đều chứa đủ chữ của tên app
+                    const sup = sc.filter(o => o.sup && o.x.toks.length > T.length), supSku = [...new Set(sup.map(o => o.x.sku))];
+                    const best = sc[0], second = sc.find(o => o.x.sku !== (best && best.x.sku));
+                    if (best && best.s >= 0.75 && (!second || best.s - second.s >= 0.1)) { sku = best.x.sku; kind = 'near'; cand = best.x.name; }
+                    else if (supSku.length > 1 && (!best || best.s < 1)) { kind = 'parent'; cand = [...new Map(sup.map(o => [o.x.sku, o.x.name])).entries()].slice(0, 6).map(([k, n]) => n + ' (' + k + ')').join('; '); }
                 }
                 const cur = prodCode(p);
-                if (!sku) { rows.push({ p, kind: kind === 'multi' ? 'multi' : 'none', cand, cur }); return; }
-                if (qiCodeKey(cur) === qiCodeKey(sku) && cur === sku) return;   // đã đúng mã
+                if (!sku) { rows.push({ p, kind: kind || 'none', cand, cur }); return; }
+                if (cur === sku) return;   // đã đúng mã
                 const own = codeOwner.get(qiCodeKey(sku));
                 if (own && own !== p) { rows.push({ p, kind: 'conflict', sku, cand: own.name, cur }); return; }
                 rows.push({ p, kind, sku, cand, cur });
+            });
+            // mã đã khớp chắc chắn cho 1 biến thể → dòng "gần giống" cùng mã là sản phẩm chung, không gán trùng
+            const sureSku = new Set(rows.filter(r => r.kind === 'sure').map(r => qiCodeKey(r.sku)));
+            (db.productsMaster || []).forEach(p => { if (!rows.some(r => r.p === p)) sureSku.add(qiCodeKey(prodCode(p))); });
+            rows.forEach(r => {
+                if (r.kind === 'near' && sureSku.has(qiCodeKey(r.sku))) { r.kind = 'parent'; r.cand = 'mã ' + r.sku + ' đã thuộc biến thể ' + ((rows.find(x => x.kind === 'sure' && qiCodeKey(x.sku) === qiCodeKey(r.sku)) || {}).p || db.productsMaster.find(q => qiCodeKey(prodCode(q)) === qiCodeKey(r.sku)) || {}).name; r.sku = null; }
+                else if (r.kind === 'sure' && String(r.sku).length < 4) { r.kind = 'near'; r.cand = (r.cand || '') + ' – mã trên Sapo quá ngắn, kiểm tra lại'; }
             });
             return rows;
         }
@@ -6928,10 +6951,10 @@
             const m = document.getElementById('sku-sync-modal'); if (!m || !skuSync) return;
             const S = skuSync, g = k => S.rows.filter(r => r.kind === k);
             const line = r => `<label class="flex items-start gap-2 p-2 rounded-lg bg-theme-input border border-theme-border"><input type="checkbox" ${S.on.has(String(r.p.id)) ? 'checked' : ''} onchange="skuToggle('${r.p.id}',this.checked)" class="mt-0.5 w-4 h-4 accent-sky-500">
-                <span class="min-w-0"><b>${escHtml(r.p.name)}</b><br><span class="opacity-70">${escHtml(r.cur)}</span> → <b class="text-sky-400">${escHtml(r.sku)}</b>${r.kind === 'near' ? `<br><span class="text-amber-400">Tên trên Sapo: ${escHtml(r.cand)}</span>` : ''}</span></label>`;
+                <span class="min-w-0"><b>${escHtml(r.p.name)}</b><br><span class="opacity-70">${escHtml(r.cur)}</span> → <b class="text-sky-400">${escHtml(r.sku)}</b>${r.cand ? `<br><span class="${r.kind === 'near' ? 'text-amber-400' : 'opacity-60'}">Sapo: ${escHtml(r.cand)}</span>` : ''}</span></label>`;
             const info = (r, why) => `<div class="p-2 rounded-lg bg-theme-input/50 border border-theme-border"><b>${escHtml(r.p.name)}</b> <span class="opacity-60">(${escHtml(r.cur)})</span><br><span class="opacity-70">${why}</span></div>`;
             const sec = (t, body, open) => body ? `<details ${open ? 'open' : ''} class="space-y-1"><summary class="font-bold cursor-pointer py-1">${t}</summary><div class="space-y-1 max-h-72 overflow-y-auto">${body}</div></details>` : '';
-            const sure = g('sure'), near = g('near'), conf = g('conflict'), multi = g('multi'), none = g('none');
+            const sure = g('sure'), near = g('near'), conf = g('conflict'), multi = g('multi'), none = g('none'), parent = g('parent');
             m.innerHTML = `<div class="bg-theme-card text-theme-text w-full sm:max-w-2xl rounded-t-3xl sm:rounded-3xl max-h-[92vh] flex flex-col text-xs">
                 <div class="p-4 border-b border-theme-border flex justify-between items-center gap-2"><div class="font-bold text-sm"><i class="fa-solid fa-rotate text-sky-500 mr-1"></i>Đồng bộ mã SKU từ Sapo</div><button onclick="document.getElementById('sku-sync-modal').classList.add('hidden')" class="px-3 py-1 rounded-lg bg-theme-input font-bold">Đóng</button></div>
                 <div class="p-4 space-y-3 overflow-y-auto">
@@ -6940,11 +6963,12 @@
                         <div class="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30"><b class="text-base">${sure.length}</b><br>✅ Khớp tên</div>
                         <div class="p-2 rounded-xl bg-amber-500/10 border border-amber-500/30"><b class="text-base">${near.length}</b><br>⚠️ Gần giống</div>
                         <div class="p-2 rounded-xl bg-rose-500/10 border border-rose-500/30"><b class="text-base">${conf.length + multi.length}</b><br>⛔ Trùng / nhiều mã</div>
-                        <div class="p-2 rounded-xl bg-theme-input border border-theme-border"><b class="text-base">${none.length}</b><br>❌ Không thấy trên Sapo</div></div>
+                        <div class="p-2 rounded-xl bg-theme-input border border-theme-border"><b class="text-base">${none.length + parent.length}</b><br>❌ Không có mã riêng</div></div>
                     ${sec(`✅ Khớp tên – sẽ gán mã SKU (${sure.length})`, sure.map(line).join(''), true)}
                     ${sec(`⚠️ Gần giống – anh tích chọn dòng đúng (${near.length})`, near.map(line).join(''), true)}
                     ${sec(`⛔ Mã SKU đang thuộc sản phẩm khác trong app – không gán (${conf.length})`, conf.map(r => info(r, 'SKU ' + escHtml(r.sku) + ' đang là mã của: ' + escHtml(r.cand))).join(''))}
                     ${sec(`⛔ Một tên có nhiều mã SKU trên Sapo – không gán (${multi.length})`, multi.map(r => info(r, 'Các mã: ' + escHtml(r.cand))).join(''))}
+                    ${sec(`📦 Sản phẩm chung không ghi biến thể – trên Sapo mỗi biến thể 1 mã, giữ mã cũ (${parent.length})`, parent.map(r => info(r, 'Biến thể trên Sapo: ' + escHtml(r.cand))).join(''))}
                     ${sec(`❌ Không thấy trên Sapo – giữ mã cũ (${none.length})`, none.map(r => info(r, 'Giữ nguyên mã hiện tại')).join(''))}
                 </div>
                 <div class="p-4 border-t border-theme-border grid grid-cols-2 gap-2">
