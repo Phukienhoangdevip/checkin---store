@@ -1636,7 +1636,7 @@
                         </div>
                         <div>
                             <h1 class="font-black text-xs sm:text-sm uppercase tracking-wider">PHỤ KIỆN HOÀNG ĐẾ</h1>
-                            <p class="text-[11px] sm:text-xs opacity-75">Nhân sự: <span class="font-bold text-amber-500">${user.fullname}</span> (${isPcMode() ? 'Chế độ PC' : 'Chế độ Mobile'} • Bản 84)</p>
+                            <p class="text-[11px] sm:text-xs opacity-75">Nhân sự: <span class="font-bold text-amber-500">${user.fullname}</span> (${isPcMode() ? 'Chế độ PC' : 'Chế độ Mobile'} • Bản 85)</p>
                         </div>
                     </div>
                     <div class="flex space-x-2 w-full sm:w-auto justify-end">
@@ -2634,7 +2634,7 @@
             document.getElementById('bill-title').innerHTML = '<i class="fa-solid fa-receipt mr-1"></i> Xem lại bill đã lưu';
             billRender({ store: stLabelOfRec(h) || h.storeName, owner: h.owner || st.owner, phone: h.phone || st.phone, address: billAddr(h.address || st.address, st && st.id ? st : h), time: h.time,
                 sale: h.saleName || h.username, pay, discountStr: h.discountStr, discountAmount: h.discountAmount, items: items.length ? items : null, note: h.note, total: saleNet(h), vat: !!h.vat });
-            lastOrderShareText = `🛒 HÓA ĐƠN BÁN HÀNG${h.vat ? ' (XUẤT VAT)' : ''}\n🏪 Shop: ${h.storeName}\n⏰ Giờ: ${h.time}\n💳 TT: ${pay}\n🎁 Chiết khấu: ${h.discountStr || '0 đ'}\n📦 ${h.note}`;
+            lastOrderShareText = `🛒 HÓA ĐƠN BÁN HÀNG${h.vat ? ' (XUẤT VAT)' : ''}\n🏪 Shop: ${h.storeName}\n📍 Địa chỉ: ${billAddr(h.address || st.address, st && st.id ? st : h)}\n⏰ Giờ: ${h.time}\n💳 TT: ${pay}\n🎁 Chiết khấu: ${h.discountStr || '0 đ'}\n📦 ${h.note}`;
             document.getElementById('bill-modal').classList.remove('hidden');
             setTimeout(() => prepareShare('bill', 'invoice-card', '#ffffff', 'Hoa-Don-' + Date.now() + '.jpg'), 400);
         }
@@ -4284,8 +4284,9 @@
         const actSeenTs = () => { try { return Number(localStorage.getItem('hoangde_act_seen')) || 0; } catch (e) { return 0; } };
         function actVisible() { const u = getCurrentUser(); if (!u) return []; const L = db.activityLog || []; return u.role === 'admin' ? L : L.filter(e => e.owner === u.username || e.by === u.username); }
         // ===== Bản 55: Chuông thông báo, Bảo hành, Báo cáo theo khoảng ngày, Bảng trả kho =====
-        const APP_VER = 84;
+        const APP_VER = 85;
         const APP_NOTES = {
+            85: ['Tin nhắn gửi kèm hóa đơn (dạng chữ để copy) có thêm dòng 📍 Địa chỉ đầy đủ'],
             84: ['Hóa đơn: dòng Địa chỉ ghi đủ tên đường + Xã/Phường + Huyện + Tỉnh'],
             83: ['Bảng tổng sản phẩm: gom các nút vào 1 dòng ⚙️ Tính năng chung', 'Nút mới Sản phẩm chưa đồng bộ mã: liệt kê sản phẩm còn mã SP…, gõ mã tay hoặc Quét lại file nhập hàng PDF/Excel để lấy mã SKU (chỉ điền mã, không nhập kho)'],
             82: ['Đồng bộ mã SKU: thêm nút Xóa sản phẩm gốc trống (sản phẩm chung không ghi biến thể, tồn 0, chưa nhập, chưa bán) – dùng công cụ Dọn sản phẩm, có khôi phục'],
@@ -7720,7 +7721,7 @@
             saveData();
             document.getElementById('sales-order-modal').classList.add('hidden');
             
-            lastOrderShareText = `🛒 HÓA ĐƠN BÁN HÀNG${db.salesHistory[0].vat ? ' (XUẤT VAT)' : ''}\n🏪 Shop: ${store.name}\n👤 Chủ: ${store.owner} (${store.phone})\n⏰ Giờ: ${time}\n💳 TT: ${pay.value}\n🎁 Chiết khấu: ${discountStr}\n📦 Đơn:\n${summary.map(x=>` • ${x}`).join('\n')}\n💰 TỔNG THANH TOÁN: ${grandTotal.toLocaleString()}đ`;
+            lastOrderShareText = `🛒 HÓA ĐƠN BÁN HÀNG${db.salesHistory[0].vat ? ' (XUẤT VAT)' : ''}\n🏪 Shop: ${store.name}\n👤 Chủ: ${store.owner} (${store.phone})\n📍 Địa chỉ: ${billAddr(store.address, store)}\n⏰ Giờ: ${time}\n💳 TT: ${pay.value}\n🎁 Chiết khấu: ${discountStr}\n📦 Đơn:\n${summary.map(x=>` • ${x}`).join('\n')}\n💰 TỔNG THANH TOÁN: ${grandTotal.toLocaleString()}đ`;
             
             billRender({ store: stName(store), owner: store.owner, phone: store.phone, address: billAddr(store.address, store), time, sale: user.fullname || user.username, pay: pay.value,
                 discountStr, discountAmount, items: db.salesHistory[0].items, total: grandTotal, vat: !!db.salesHistory[0].vat });
