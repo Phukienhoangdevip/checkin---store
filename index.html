@@ -1636,7 +1636,7 @@
                         </div>
                         <div>
                             <h1 class="font-black text-xs sm:text-sm uppercase tracking-wider">PHỤ KIỆN HOÀNG ĐẾ</h1>
-                            <p class="text-[11px] sm:text-xs opacity-75">Nhân sự: <span class="font-bold text-amber-500">${user.fullname}</span> (${isPcMode() ? 'Chế độ PC' : 'Chế độ Mobile'} • Bản 86)</p>
+                            <p class="text-[11px] sm:text-xs opacity-75">Nhân sự: <span class="font-bold text-amber-500">${user.fullname}</span> (${isPcMode() ? 'Chế độ PC' : 'Chế độ Mobile'} • Bản 87)</p>
                         </div>
                     </div>
                     <div class="flex space-x-2 w-full sm:w-auto justify-end">
@@ -4284,8 +4284,9 @@
         const actSeenTs = () => { try { return Number(localStorage.getItem('hoangde_act_seen')) || 0; } catch (e) { return 0; } };
         function actVisible() { const u = getCurrentUser(); if (!u) return []; const L = db.activityLog || []; return u.role === 'admin' ? L : L.filter(e => e.owner === u.username || e.by === u.username); }
         // ===== Bản 55: Chuông thông báo, Bảo hành, Báo cáo theo khoảng ngày, Bảng trả kho =====
-        const APP_VER = 86;
+        const APP_VER = 87;
         const APP_NOTES = {
+            87: ['Báo cáo khoảng ngày: bấm vào tên sản phẩm trong bảng Nhập–Bán–Trả–Tồn để xem đã bán cho cửa hàng nào – từng bill, địa chỉ, ngày giờ, số lượng, xem lại bill (trong kỳ hoặc toàn bộ thời gian)'],
             86: ['Báo cáo khoảng ngày – bảng tồn kho: thêm cột Trả kho, thứ tự Sản phẩm | Tổng nhập | Đã bán | Trả kho | Tồn kho | Lệch (cả file Excel)'],
             85: ['Tin nhắn gửi kèm hóa đơn (dạng chữ để copy) có thêm dòng 📍 Địa chỉ đầy đủ'],
             84: ['Hóa đơn: dòng Địa chỉ ghi đủ tên đường + Xã/Phường + Huyện + Tỉnh'],
@@ -4792,6 +4793,35 @@
             const pIdx = payoutIndex(), paidOf = h => payoutOf(h, pIdx), paidSum = sales.filter(paidOf).reduce((s, h) => s + saleNet(h), 0);   // Bản 71
             return { revOf: rv, paidOf, paidSum, unpaidSum: sales.reduce((s, h) => s + saleNet(h), 0) - paidSum, unpaidN: sales.filter(h => !paidOf(h)).length, a, b, label: rpFrom === rpTo ? isoToVN(rpFrom) : isoToVN(rpFrom) + ' → ' + isoToVN(rpTo), sales, checks, gross, net, disc: gross - net, ck, tm, ckSum: ck.reduce((s, h) => s + saleNet(h), 0), tmSum: tm.reduce((s, h) => s + saleNet(h), 0), added: (db.stores || []).filter(created), stores, withO, noO, rev, noOwner: stores.filter(s => storeNoOwner(s)), war, warQty: war.reduce((s, w) => s + (Number(w.qty) || 0), 0), ranked, unsold, never, slow, totalSold, inv };
         }
+        // ===== Bản 87: bấm 1 sản phẩm trong bảng Nhập–Bán–Trả–Tồn → lịch sử bán cho từng cửa hàng =====
+        let RP_INV_NAMES = [], rpHist = { i: -1, all: false };
+        function rpProdHist(i, all) {
+            if (i != null) rpHist.i = i; if (all != null) rpHist.all = all;
+            const n = RP_INV_NAMES[rpHist.i]; if (!n) return;
+            const RES = prodResolver(), D = spanData(), src = rpHist.all ? allSales().filter(h => rptMine(h)) : D.sales, list = [];
+            src.forEach(h => { let q = 0, price = null; saleItemsOf(h).forEach(it => { const p = RES(it.name), k = p ? p.name : it.name; if (k === n) { q += it.q; const raw = (h.items || []).find(x => x.name === it.name); if (raw && raw.price != null) price = Number(raw.price); } }); if (q) list.push({ h, q, price, ts: recTs(h) || 0 }); });
+            list.sort((x, y) => y.ts - x.ts);
+            const money = v => Number(v || 0).toLocaleString('vi-VN'), totQ = list.reduce((a, x) => a + x.q, 0), totM = list.reduce((a, x) => a + (x.price != null ? x.price * x.q : 0), 0);
+            const nStores = new Set(list.map(x => stKeyOfRec(x.h))).size;
+            let m = document.getElementById('rp-hist-modal');
+            if (!m) { m = document.createElement('div'); m.id = 'rp-hist-modal'; m.className = 'fixed inset-0 z-[60] bg-black/70 flex items-end sm:items-center justify-center p-0 sm:p-4'; document.body.appendChild(m); }
+            m.classList.remove('hidden');
+            const tab = (v, t) => `<button onclick="rpProdHist(null, ${v})" class="flex-1 py-2 rounded-lg font-bold ${rpHist.all === v ? 'bg-amber-500 text-slate-950' : 'bg-theme-input border border-theme-border'}">${t}</button>`;
+            m.innerHTML = `<div class="bg-theme-card text-theme-text w-full sm:max-w-2xl rounded-t-3xl sm:rounded-3xl max-h-[92vh] flex flex-col text-xs">
+                <div class="p-4 border-b border-theme-border flex justify-between items-start gap-2"><div class="min-w-0"><div class="font-bold text-sm break-words"><i class="fa-solid fa-box text-amber-500 mr-1"></i>${escHtml(n)}</div>
+                    <div class="opacity-70 mt-0.5">${list.length} bill • ${nStores} cửa hàng • ${totQ} cái${totM ? ' • ' + money(totM) + ' đ' : ''}</div></div>
+                    <button onclick="document.getElementById('rp-hist-modal').classList.add('hidden')" class="px-3 py-1 rounded-lg bg-theme-input font-bold shrink-0">Đóng</button></div>
+                <div class="px-4 pt-3 flex gap-2">${tab(false, 'Trong kỳ ' + escHtml(D.label))}${tab(true, 'Toàn bộ thời gian')}</div>
+                <div class="p-4 space-y-2 overflow-y-auto">${list.length ? list.map(x => {
+                    const h = x.h, st = storeOfRec(h) || {}, idx = (db.salesHistory || []).indexOf(h), aidx = idx < 0 ? (((db.historyArchive || {}).sales) || []).indexOf(h) : -1;
+                    return `<div class="p-3 rounded-xl bg-theme-input border border-theme-border space-y-1">
+                        <div class="flex justify-between gap-2"><b class="break-words">${escHtml(stLabelOfRec(h) || h.storeName || '--')}${st.owner ? ' <span class="font-normal opacity-70">- ' + escHtml(st.owner) + '</span>' : ''}</b><span class="whitespace-nowrap font-bold text-amber-500">${x.q} cái</span></div>
+                        <div class="opacity-75">📍 ${escHtml(billAddr(h.address || st.address, st && st.id ? st : h) || '--')}</div>
+                        <div class="flex justify-between items-center gap-2"><span class="opacity-75">🕒 ${escHtml(h.time || '')}${x.price != null ? ' • ' + money(x.price) + ' đ/cái' : ''} • ${escHtml(h.saleName || h.username || '')}</span>
+                        ${idx >= 0 || aidx >= 0 ? `<button onclick="rpHistBill(${idx >= 0 ? idx : aidx}, ${idx < 0})" class="px-2.5 py-1.5 rounded-lg bg-emerald-600 text-white font-bold whitespace-nowrap"><i class="fa-solid fa-receipt mr-1"></i>Xem bill</button>` : ''}</div></div>`;
+                }).join('') : `<div class="p-6 text-center opacity-70">Chưa bán cho cửa hàng nào ${rpHist.all ? '' : 'trong kỳ này'}.</div>`}</div></div>`;
+        }
+        function rpHistBill(i, arch) { const bm = document.getElementById('bill-modal'); if (bm) bm.style.zIndex = '80'; viewSavedBill(i, arch); }
         function spanReportBlocks() {
             const D = spanData(), blocks = [];
             const box = (l, v, c) => `<div style="flex:1;background:rgba(0,0,0,.4);border:1px solid rgba(245,158,11,.3);border-radius:10px;padding:7px 8px;min-width:0"><div style="font-size:9.5px;color:#cbd5e1;font-weight:600">${l}</div><div style="font-size:12.5px;font-weight:900;color:${c || '#fff'}">${v}</div></div>`;
@@ -4817,9 +4847,11 @@
             rpSection(`📊 Thống kê bán ra (tổng ${D.totalSold} cái)`, st, '').forEach(b => blocks.push(b));
             const th = 'padding:4px 5px;border:1px solid rgba(148,163,184,.35);font-size:9.5px', tr = (c, bg) => `<table style="width:100%;border-collapse:collapse;table-layout:fixed;color:#e2e8f0${bg ? ';background:' + bg : ''}"><colgroup><col style="width:34%"><col style="width:13%"><col style="width:12%"><col style="width:12%"><col style="width:15%"><col style="width:14%"></colgroup><tr>${c}</tr></table>`;
             const items = [tr(`<td style="${th};font-weight:800;color:#111;background:#fbbf24">Sản phẩm</td><td style="${th};font-weight:800;color:#111;background:#fbbf24;text-align:center">Tổng nhập</td><td style="${th};font-weight:800;color:#111;background:#34d399;text-align:center">Đã bán</td><td style="${th};font-weight:800;color:#111;background:#c4b5fd;text-align:center">Trả kho</td><td style="${th};font-weight:800;color:#111;background:#60a5fa;text-align:center">Tồn kho</td><td style="${th};font-weight:800;color:#111;background:#f87171;text-align:center">Lệch</td>`)]
-                .concat(D.inv.map(x => tr(`<td style="${th}">${escHtml(x.n)}</td><td style="${th};text-align:right">${x.imp}c</td><td style="${th};text-align:right">${x.sold}c</td><td style="${th};text-align:right">${x.ret}c</td><td style="${th};text-align:right;${x.stock < 5 ? 'color:#fda4af;font-weight:800' : ''}">${x.stock}c</td><td style="${th};text-align:right;${x.lech ? 'color:#fff;background:#e11d48;font-weight:800' : 'color:#34d399'}">${x.lech ? (x.lech > 0 ? '+' : '') + x.lech : '✓'}</td>`, x.lech ? 'rgba(225,29,72,.15)' : 'rgba(0,0,0,.3)')));
+                .concat(D.inv.map((x, xi) => tr(`<td style="${th}"><span style="color:#93c5fd">${escHtml(x.n)}</span> <span style="color:#94a3b8">›</span></td><td style="${th};text-align:right">${x.imp}c</td><td style="${th};text-align:right">${x.sold}c</td><td style="${th};text-align:right">${x.ret}c</td><td style="${th};text-align:right;${x.stock < 5 ? 'color:#fda4af;font-weight:800' : ''}">${x.stock}c</td><td style="${th};text-align:right;${x.lech ? 'color:#fff;background:#e11d48;font-weight:800' : 'color:#34d399'}">${x.lech ? (x.lech > 0 ? '+' : '') + x.lech : '✓'}</td>`, x.lech ? 'rgba(225,29,72,.15)' : 'rgba(0,0,0,.3)').replace('<table ', `<table onclick="rpProdHist(${xi})" `)));
+            RP_INV_NAMES = D.inv.map(x => x.n);   // Bản 87
             const ti = D.inv.reduce((s, x) => s + x.imp, 0), ts = D.inv.reduce((s, x) => s + x.stock, 0), tsold = D.inv.reduce((s, x) => s + x.sold, 0), tret = D.inv.reduce((s, x) => s + x.ret, 0);
             items.push(tr(`<td style="${th};font-weight:900;color:#fde68a">TỔNG (${D.inv.length} SP)</td><td style="${th};text-align:right;font-weight:900;color:#fde68a">${ti}c</td><td style="${th};text-align:right;font-weight:900;color:#fde68a">${tsold}c</td><td style="${th};text-align:right;font-weight:900;color:#fde68a">${tret}c</td><td style="${th};text-align:right;font-weight:900;color:#fde68a">${ts}c</td><td style="${th};text-align:right;font-weight:900;color:${D.inv.some(x => x.lech) ? '#fda4af' : '#34d399'}">${D.inv.filter(x => x.lech).length || '✓'}</td>`, 'rgba(245,158,11,.18)'));
+            items.push(`<div data-html2canvas-ignore="true" style="font-size:9px;color:#93c5fd;margin-top:4px">👆 Bấm vào tên sản phẩm để xem đã bán cho cửa hàng nào (từng bill, địa chỉ, ngày giờ).</div>`);
             items.push(`<div style="font-size:9px;color:#cbd5e1;margin-top:4px">Lệch = Tồn hiện tại − (Nhập − Bán − Trả kho ± điều chỉnh kho trong kỳ). ✓ là khớp. Áp dụng khi kho đã về 0 trước ngày bắt đầu.</div>`);
             rpSection('📦 Nhập kho | Đã bán | Trả kho | Tồn kho | Lệch', items, 'Chưa có dữ liệu kho.').forEach(b => blocks.push(b));
             { // Bản 71: danh sách đơn + trạng thái nộp công ty
